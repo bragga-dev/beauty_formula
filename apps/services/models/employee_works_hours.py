@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from beauty_formula.apps.accounts.models.employee import Employee
-
+from datetime import datetime, date
 
 
 
@@ -29,6 +29,31 @@ class EmployeeWorkingHours(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["employee", "weekday", "start_time"], name="unique_employee_weekday_start"),
         ]
+        verbose_name = _("Horário de trabalho")
+        verbose_name_plural = _("Horários de trabalho")
+        indexes = [
+            models.Index(fields=["employee", "weekday"]),
+        ]
+        ordering = ["employee", "weekday", "start_time"]
+        
 
     def __str__(self):
         return f"{self.employee} - {self.get_weekday_display()} ({self.start_time} - {self.end_time})"
+    
+    def clean(self):
+        """Validação adicional"""
+        if self.start_time >= self.end_time:
+            raise ValidationError(_("O horário de início deve ser antes do horário de fim."))
+        
+        if self.lunch_start and self.lunch_end:
+            if self.lunch_start >= self.lunch_end:
+                raise ValidationError(_("O início do almoço deve ser antes do fim."))
+            if not (self.start_time <= self.lunch_start <= self.end_time):
+                raise ValidationError(_("O almoço deve estar dentro do expediente."))
+    
+    @property
+    def total_hours(self):
+        """Retorna o total de horas trabalhadas no dia"""
+        delta = datetime.combine(date.today(), self.end_time) - datetime.combine(date.today(), self.start_time)
+        return delta.total_seconds() / 3600
+

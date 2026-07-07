@@ -67,6 +67,7 @@ LOCAL_APPS = [
     "beauty_formula.apps.core",
     "beauty_formula.apps.accounts",
     "beauty_formula.apps.services",
+    "beauty_formula.apps.payment",
    
 ]
 
@@ -348,7 +349,7 @@ NINJA_JWT = {
 # AUTH
 # =========================================================
 
-AUTH_USER_MODEL = "users.User"
+AUTH_USER_MODEL = "accounts.User"
 
 
 # =========================================================
