@@ -4,7 +4,6 @@ import uuid
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from beauty_formula.apps.accounts.models.employee import DEFAULT_USER_PHOTO
 from beauty_formula.apps.core.validators.validate_image_file import validate_image_file
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.core.constants.gender import Gender    
@@ -23,6 +22,8 @@ class Client(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     first_name = models.CharField(_("Nome"), max_length=255, blank=True, null=True)
     last_name = models.CharField(_("Sobrenome"), max_length=255, blank=True, null=True)
+    username = models.CharField(_("Nome de usuário"), max_length=150, unique=True, blank=True, null=True)
+    phone = models.CharField(_("Telefone"), max_length=20, blank=True, null=True, help_text=_("Número de telefone do cliente."))
     gender = models.CharField(_("Gênero"), max_length=10, choices=Gender.CHOICES, default=Gender.OTHER)
     birth_date = models.DateField(_("Data de nascimento"), blank=True, null=True)
     instagram = models.URLField(_("Instagram"), max_length=255, blank=True, null=True, help_text=_("URL do perfil do Instagram do cliente."))
