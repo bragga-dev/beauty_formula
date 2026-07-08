@@ -1,1 +1,0 @@
-from beauty_formula.apps.core.validators.validate_image_file import validate_image_file
