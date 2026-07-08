@@ -1,0 +1,30 @@
+# Env
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Django
+*.log
+local_settings.py
+media/
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+*.override.yml
+
+# DB
+*.sqlite3venv/
+.coverage
+venv/
+.coverage
+venv/
