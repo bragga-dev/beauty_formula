@@ -7,11 +7,11 @@ class PermissionDenied(Exception):
         super().__init__(_(msg))
 
 
-class ChurchNotFoundError(Exception):
-    """Exceção lançada quando a igreja não é encontrada."""
+class EmployeeNotFoundError(Exception):
+    """Exceção lançada quando a funcionário não é encontrada."""
     pass
 
 
-class MemberNotActiveError(Exception):
-    """Exceção lançada quando o membro não está ativo na igreja."""
+class ClientNotActiveError(Exception):
+    """Exceção lançada quando o client não está ativo na funcionário."""
     pass

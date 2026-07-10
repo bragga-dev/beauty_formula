@@ -24,7 +24,7 @@ class UserManager(BaseUserManager):
             extra_fields.setdefault('is_trusty', True)
 
         # ─────────────────────────────────────────────
-        # MEMBER e CHURCH — precisam confirmação/aprovação
+        # CLIENT e EMPLOYEE — precisam confirmação/aprovação
         # ─────────────────────────────────────────────
         else:
             extra_fields.setdefault('is_staff', False)
