@@ -120,4 +120,3 @@ Use `docker-compose.prod.yml`, com as variáveis de produção configuradas no `
 
 ## Licença
 
-Projeto privado — todos os direitos reservados.
