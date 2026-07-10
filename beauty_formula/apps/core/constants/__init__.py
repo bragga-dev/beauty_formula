@@ -4,7 +4,7 @@ from beauty_formula.apps.core.constants.block_type import BlockType
 
 
 
-___all__ = [
-    "   Gender",
-    "   BlockType",
+__all__ = [
+    "Gender",
+    "BlockType",
 ]   
