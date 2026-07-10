@@ -1,2 +1,0 @@
-# beauty_formula
-kkkkkkkkkkkkkkkkk
