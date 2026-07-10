@@ -4,4 +4,4 @@ from beauty_formula.apps.accounts.schemas.user_schema import UserOut, UserRoleEn
 
 
 
-ffffffffffffffffffffffffff# Teste
+ffffffffffffffffffffffffff
