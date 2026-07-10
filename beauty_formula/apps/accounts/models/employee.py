@@ -20,7 +20,6 @@ DEFAULT_EMPLOYEE_PHOTO = "default/employee_img.jpeg"
 
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="employee_profile")
-    services = models.ManyToManyField('services.Service', related_name="employees", blank=True)
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     first_name = models.CharField(_("Nome"), max_length=255, blank=True, null=True)
     last_name = models.CharField(_("Sobrenome"), max_length=255, blank=True, null=True)
