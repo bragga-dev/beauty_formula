@@ -58,7 +58,9 @@ class Employee(models.Model):
                 pass
         return self.photo.storage.url(DEFAULT_EMPLOYEE_PHOTO)    
     
-    # ── Utilitários internos ──────────────────────────────────────────────────
+    def get_full_name(self):
+        full_name = f"{self.first_name} {self.last_name}".strip()
+        return full_name or self.username or f"Employee {self.id}"
 
     def save(self, *args, **kwargs):
         self.full_clean()

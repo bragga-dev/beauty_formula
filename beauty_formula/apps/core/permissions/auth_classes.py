@@ -3,15 +3,15 @@ Auth Classes - Classes de autenticação com permissões embutidas.
 """
 from ninja_jwt.authentication import JWTAuth
 from beauty_formula.apps.core.exceptions import PermissionDenied
-from .roles import is_employee, is_client, is_admin, is_active, is_verified
+from beauty_formula.apps.core.permissions.roles import is_employee, is_client, is_admin, is_active, is_verified
 from beauty_formula.apps.accounts.models.employee import Employee
-DEFAULT_USER_PHOTO = "default/user_img.jpg"
-DEFAULT_EMPLOYEE_BANNER = "default/banner.jpg"
 
+DEFAULT_EMPLOYEE_PHOTO = "default/employee_img.jpeg"
+DEFAULT_CLIENT_PHOTO = "default/client_img.jpg"
 class EmployeeOnlyAuth(JWTAuth):
     def authenticate(self, request, token):
         user = super().authenticate(request, token)
-        if user and not is_verified(user):  # Verificar email PRIMEIRO
+        if user and not is_verified(user):  
             raise PermissionDenied("Verifique seu e-mail para acessar.")
         if user and not is_admin(user) and not is_employee(user):
             raise PermissionDenied("Apenas funcionários podem acessar este recurso.")
@@ -27,6 +27,7 @@ class EmployeeCompleteProfileAuth(JWTAuth):
             raise PermissionDenied("Apenas funcionários podem acessar este recurso.")
         try:
             employee = user.employee
+            client = user.client
         except Employee.DoesNotExist:
             raise PermissionDenied("Usuário não possui funcionário vinculada.")
 
@@ -42,11 +43,11 @@ class EmployeeCompleteProfileAuth(JWTAuth):
 
         missing = [field for field, value in required_fields.items() if not value]
 
-        if employee.user.photo == DEFAULT_USER_PHOTO:
+        if employee.photo == DEFAULT_CLIENT_PHOTO:
             missing.append("Foto (não pode ser a foto padrão)")
 
-        if employee.banner == DEFAULT_EMPLOYEE_BANNER:
-            missing.append("Banner (não pode ser a banner padrão)")
+        if client.photo == DEFAULT_EMPLOYEE_PHOTO:
+            missing.append("Foto (não pode ser a foto padrão)")
 
         if missing:
             missing_count = len(missing)
@@ -65,7 +66,7 @@ class EmployeeCompleteProfileAuth(JWTAuth):
 class ClientOnlyAuth(JWTAuth):
     def authenticate(self, request, token):
         user = super().authenticate(request, token)
-        if user and not is_admin(user) and not is_verified(user):  # Verificar email PRIMEIRO
+        if user and not is_admin(user) and not is_verified(user):  
             raise PermissionDenied("Verifique seu e-mail para acessar.")
         if user and not is_admin(user) and not is_client(user):
             raise PermissionDenied("Apenas clients podem acessar este recurso.")
