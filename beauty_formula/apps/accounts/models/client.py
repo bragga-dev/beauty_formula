@@ -72,9 +72,9 @@ class Client(models.Model):
         return format_number(number, PhoneNumberFormat.E164)
 
     def clean(self):
-        if self.date_of_birth and self.date_of_birth > timezone.localdate():
+        if self.birth_date and self.birth_date > timezone.localdate():
             raise ValidationError(
-                {'date_of_birth': _('Data de nascimento não pode ser no futuro.')}
+                {'birth_date': _('Data de nascimento não pode ser no futuro.')}
             )
 
     def save(self, *args, **kwargs):

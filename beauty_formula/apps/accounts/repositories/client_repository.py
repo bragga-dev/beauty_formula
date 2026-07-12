@@ -7,7 +7,6 @@ from beauty_formula.apps.accounts.models.client import Client
 from beauty_formula.apps.accounts.schemas.client_schema import GenderEnum
 from django.core.files import File
 
-from typing import Optional
 
 def create_client(
     user: User,
@@ -20,17 +19,19 @@ def create_client(
     instagram: Optional[str] = None,
     photo: Optional[File] = None,
 ) -> Client:
-    client = Client(
-        user=user,
-        first_name=first_name,
-        last_name=last_name,
-        username=username,
-        phone=phone,
-        gender=gender,
-        birth_date=birth_date,
-        instagram=instagram,
-        photo=photo,
-    )
+    fields = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "username": username,
+        "phone": phone,
+        "gender": gender,
+        "birth_date": birth_date,
+        "instagram": instagram,
+        "photo": photo,
+    }
+    fields = {k: v for k, v in fields.items() if v is not None}
+
+    client = Client(user=user, **fields)
     client.save()
     return client
 
@@ -48,4 +49,3 @@ def update_client(client: Client, **fields) -> Client:
 
 def delete_client(client: Client) -> None:
     client.delete()
-

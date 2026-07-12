@@ -55,7 +55,7 @@ class ClientCreateIn(Schema):
     photo_url: Optional[str] = None  
     phone: Optional[str] = None  
     birth_date: Optional[date] = None 
-    gender: GenderEnum
+    gender: Optional[GenderEnum] = None
     instagram: Optional[str] = None
 
     @field_validator("birth_date")
