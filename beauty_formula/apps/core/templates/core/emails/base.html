@@ -1,0 +1,233 @@
+<!-- ============================================================
+     FILE: base.html
+     Description: Base layout for Fórmula da Beleza emails.
+     Contains shared header, footer, and global styles.
+     ============================================================ -->
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>{% block title %}Fórmula da Beleza{% endblock %}</title>
+
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+
+    <style>
+        /* ── Reset ─────────────────────────────────────────────── */
+        * { box-sizing: border-box; }
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; border: 0; display: block; outline: none; text-decoration: none; }
+        body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+
+        /* ── Preheader ─────────────────────────────────────────── */
+        .preheader {
+            display: none !important;
+            visibility: hidden;
+            mso-hide: all;
+            font-size: 1px;
+            line-height: 1px;
+            max-height: 0;
+            max-width: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+
+        /* ── Wrapper ───────────────────────────────────────────── */
+        .email-wrapper {
+            background-color: #faf5f0;  /* warm neutral */
+            width: 100%;
+            padding: 48px 16px;
+        }
+
+        /* ── Card ──────────────────────────────────────────────── */
+        .email-card {
+            background-color: #ffffff;
+            border-radius: 28px;
+            overflow: hidden;
+            max-width: 620px;
+            width: 100%;
+            margin: 0 auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(200,160,130,0.15);
+        }
+
+        /* ── Header ────────────────────────────────────────────── */
+        .header {
+            background: linear-gradient(145deg, #1e0f08 0%, #3b2016 100%);
+            padding: 36px 40px 28px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header-ornament {
+            display: block;
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #d4a373, transparent);
+            margin: 0 auto 16px;
+        }
+
+        .logo-text {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-weight: 700;
+            font-size: 34px;
+            color: #d4a373;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin: 0;
+            line-height: 1.1;
+            text-shadow: 0 2px 12px rgba(180,120,80,0.3);
+        }
+
+        .logo-sub {
+            font-family: 'Georgia', serif;
+            font-size: 13px;
+            font-style: italic;
+            color: rgba(212, 163, 115, 0.6);
+            letter-spacing: 6px;
+            margin: 6px 0 0;
+        }
+
+        .header-tagline {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            font-weight: 400;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin: 14px 0 0;
+        }
+
+        .header-divider {
+            display: block;
+            width: 40px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(212,163,115,0.4), transparent);
+            margin: 14px auto 0;
+        }
+
+        /* ── Body ──────────────────────────────────────────────── */
+        .body-cell {
+            padding: 32px 44px 44px;
+            background-color: #ffffff;
+        }
+
+        /* ── Footer ────────────────────────────────────────────── */
+        .footer {
+            background: #1e0f08;
+            padding: 28px 40px;
+            text-align: center;
+        }
+
+        .footer-logo {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: #d4a373;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .footer-tagline {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            color: rgba(255,255,255,0.3);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin: 6px 0 0;
+        }
+
+        .footer-divider {
+            width: 32px;
+            height: 1px;
+            background: rgba(212,163,115,0.2);
+            margin: 14px auto;
+            border: none;
+        }
+
+        .footer-auto {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            color: rgba(255,255,255,0.2);
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Mobile ────────────────────────────────────────────── */
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 24px 12px !important; }
+            .header { padding: 28px 20px 24px !important; }
+            .logo-text { font-size: 26px !important; letter-spacing: 3px !important; }
+            .body-cell { padding: 24px 20px 32px !important; }
+            .footer { padding: 24px 20px !important; }
+        }
+
+        @media only screen and (max-width: 400px) {
+            .body-cell { padding: 18px 14px 24px !important; }
+            .logo-text { font-size: 20px !important; letter-spacing: 2px !important; }
+        }
+
+        /* ── Dark mode (subtle) ───────────────────────────────── */
+        @media (prefers-color-scheme: dark) {
+            .email-wrapper { background-color: #120a06 !important; }
+            .email-card { background-color: #1a110c !important; box-shadow: 0 20px 60px rgba(0,0,0,0.6) !important; }
+            .body-cell { background-color: #1a110c !important; }
+            .header { background: #0f0805 !important; }
+            .footer { background: #0f0805 !important; }
+            /* keep text legible */
+            .body-cell { color: #e8ddd0; }
+        }
+    </style>
+
+    {% block extra_styles %}{% endblock %}
+</head>
+
+<body>
+
+<!-- Preheader (hidden) -->
+<span class="preheader">{% block preheader %}Fórmula da Beleza – confirme seu e-mail{% endblock %}</span>
+
+<div class="email-wrapper">
+    <div class="email-card">
+
+        <!-- ── HEADER ─────────────────────────────────────────── -->
+        <div class="header">
+            <span class="header-ornament"></span>
+            <p class="logo-text">Fórmula da Beleza</p>
+            <p class="logo-sub">Salão &amp; Barbearia</p>
+            <p class="header-tagline">Estilo, cuidado e confiança</p>
+            <span class="header-divider"></span>
+        </div>
+
+        <!-- ── BODY (child template) ──────────────────────────── -->
+        <div class="body-cell">
+            {% block content %}
+            <!-- default content (overridden) -->
+            <p style="font-family: Arial, sans-serif; color: #4a3a2e;">Conteúdo padrão</p>
+            {% endblock %}
+        </div>
+
+        <!-- ── FOOTER ─────────────────────────────────────────── -->
+        <div class="footer">
+            <p class="footer-logo">Fórmula da Beleza</p>
+            <p class="footer-tagline">Onde seu estilo ganha forma</p>
+            <hr class="footer-divider">
+            <p class="footer-auto">Mensagem automática. Não responda este e-mail.</p>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>
