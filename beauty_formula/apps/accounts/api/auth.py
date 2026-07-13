@@ -1,40 +1,59 @@
 """
 Login endpoint — autenticação de usuários.
 """
+
+from django.conf import settings
+from django.http import HttpResponseRedirect
+
+from django_ratelimit.decorators import ratelimit
 from ninja import Router
 from ninja_jwt.authentication import JWTAuth
-from beauty_formula.apps.accounts.services.auth_service import  (
+
+from beauty_formula.apps.accounts.services.auth_service import (
+    change_password,
+    confirm_password_reset,
     login_user,
     logout_user,
     refresh_access_token,
-    change_password,
     request_password_reset,
-    confirm_password_reset,    
-    
 )
+from beauty_formula.apps.accounts.services.user_service import (
+    deactivate_account,
+    register_user,
+)
+from beauty_formula.apps.accounts.services.verification import verify_email
 
-from beauty_formula.apps.accounts.services.user_service import  (
-  register_user,
-  deactivate_account,    
-)
 
 from beauty_formula.apps.accounts.schemas.user_schema import (
-    LoginIn,
-    TokenOut,
-    MessageOut,
-    RefreshIn,
     ChangePasswordIn,
-    PasswordResetRequestIn,
+    LoginIn,
+    MessageOut,
     PasswordResetConfirmIn,
+    PasswordResetRequestIn,
+    RefreshIn,
     RegisterIn,
-    
+    TokenOut,
 )
-from beauty_formula.apps.core.exceptions import InvalidCredentials, EmailNotVerified, InvalidPassword, InvalidToken, UserAlreadyExists
-from django_ratelimit.decorators import ratelimit
 
+from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_email
+
+from beauty_formula.apps.accounts.tasks.verification_account import send_verification_email
+
+from beauty_formula.apps.core.exceptions import (
+    EmailNotVerified,
+    InvalidCredentials,
+    InvalidPassword,
+    InvalidToken,
+    UserAlreadyExists,
+)
 router = Router()
 
  
+
+
+
+
+
 
 @router.post("/login", response={200: TokenOut, 401: MessageOut, 403: MessageOut}, auth=None, summary="Login")
 @ratelimit(key="ip", rate="5/m", block=True)
@@ -57,25 +76,6 @@ def logout(request, payload: RefreshIn):
         return 200, {"detail": "Logout realizado com sucesso."}
     except InvalidToken as e:
         return 401, {"detail": str(e)}
-    
-
-@router.post("/change-password",  response={200: TokenOut, 400: MessageOut, 429: MessageOut},
-        auth=JWTAuth(), summary="Alterar senha", description=(
-        "Troca a senha do usuário autenticado. "
-        "Todos os tokens anteriores são invalidados e um novo par é retornado."
-    ),
-)
-@ratelimit(key="user", rate="5/h", block=True)
-def change_password_router(request, payload: ChangePasswordIn):
-    try:
-        tokens = change_password(
-            user=request.auth,
-            old_password=payload.old_password,
-            new_password=payload.new_password,
-        )
-        return 200, tokens
-    except InvalidPassword as e:
-        return 400, {"detail": str(e)}
     
 
 
@@ -123,3 +123,56 @@ def register(request, payload: RegisterIn):
         return 201, tokens
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
+    
+
+
+
+
+@router.get("/verify-email/{uidb64}/{token}", summary="Confirmar e-mail",  description="Confirma o email e redireciona para o frontend.", auth=None,)
+@ratelimit( key="ip", rate="20/h", block=True,)
+def verify_email_endpoint(request, uidb64: str, token: str):
+    """
+    Confirma o email e redireciona para o frontend.
+    """
+    try:
+        user = verify_email(uidb64, token)
+        redirect_url = f"{settings.FRONTEND_URL}/verificacao-concluida?status=success&email={user.email}"
+        return HttpResponseRedirect(redirect_url)
+    except InvalidToken as e:
+        redirect_url = f"{settings.FRONTEND_URL}/verificacao-concluida?status=error&message={str(e)}"
+        return HttpResponseRedirect(redirect_url)
+    
+@router.post("/resend-verification", response={200: MessageOut, 404: MessageOut}, summary="Reenviar email de verificação", auth=None, )
+@ratelimit(key="ip", rate="3/h", block=True,)
+def resend_verification_email(request, email: str):
+    """
+    Reenvia o email de verificação para um usuário não verificado.
+    """    
+    user = get_user_by_email(email)
+    if not user or user.is_active:
+        return 404, {"detail": "Usuário não encontrado ou já verificado."}
+    
+    send_verification_email.delay(user.pk)
+    return 200, {"detail": "Email de verificação reenviado com sucesso."}
+
+
+
+
+@router.post("/change-password",  response={200: TokenOut, 400: MessageOut, 429: MessageOut},
+        auth=JWTAuth(), summary="Alterar senha", description=(
+        "Troca a senha do usuário autenticado. "
+        "Todos os tokens anteriores são invalidados e um novo par é retornado."
+    ),
+)
+@ratelimit(key="user", rate="5/h", block=True)
+def change_password_router(request, payload: ChangePasswordIn):
+    try:
+        tokens = change_password(
+            user=request.auth,
+            old_password=payload.old_password,
+            new_password=payload.new_password,
+        )
+        return 200, tokens
+    except InvalidPassword as e:
+        return 400, {"detail": str(e)}
+    

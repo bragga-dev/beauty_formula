@@ -6,6 +6,9 @@ from django.http import JsonResponse
 from beauty_formula.apps.core.exceptions import PermissionDenied
 from beauty_formula.apps.accounts.api.auth import router as auth_router
 from django_ratelimit.exceptions import Ratelimited
+import logging
+from django.conf import settings
+logger = logging.getLogger("django")
 
 
 # from beauty_formula.apps.accounts.api.admin import router as admin_router
@@ -63,15 +66,6 @@ def ratelimit_error(request: HttpRequest, exc: Ratelimited):
     return api.create_response(request, {"detail": f"Muitas tentativas. Tente novamente mais tarde."}, status=429,)
 
 
-import logging
-
-from django.conf import settings
-
-logger = logging.getLogger("django")
-
-# ── Handlers de erro globais ──────────────────────────────────────────────────
-
-# ... seus handlers já existentes (ValidationError, AuthenticationError, PermissionDenied, Ratelimited) ...
 
 
 @api.exception_handler(Exception)
