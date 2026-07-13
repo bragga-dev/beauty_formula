@@ -80,7 +80,7 @@ def change_password_router(request, payload: ChangePasswordIn):
 
 
 @router.post("/password-reset/request", response={200: MessageOut}, auth=None, summary="Solicitar reset de senha",)
-@ratelimit(key="ip", rate="3/h", block=True,)
+@ratelimit(key="ip", rate="5/h", block=True,)
 def password_reset_request(request, payload: PasswordResetRequestIn):
     request_password_reset(payload.email)
     return 200, {"detail": "Se este e-mail estiver cadastrado, você receberá as instruções em breve."}
@@ -111,11 +111,11 @@ def refresh(request, payload: RefreshIn):
     
 
 
-@router.post("/register", response={201: TokenOut, 409: MessageOut}, auth=None, summary="Cadastro de Igreja ou Membro",)
+@router.post("/register", response={201: TokenOut, 409: MessageOut}, auth=None, summary="Cadastro de Cliente",)
 @ratelimit(key="ip", rate="5/h", block=True,)
 def register(request, payload: RegisterIn):
     """
-    Cria o usuário, o perfil (Church ou Member) e retorna tokens JWT.
+    Cria o usuário com role "client" e retorna tokens JWT.
     Um e-mail de verificação é enviado em background via Celery.
     """
     try:

@@ -2,13 +2,12 @@
 Tasks Celery — redefinição de senha.
 """
 
-from beauty_formula.apps.core.tokens.signing import generate_uid_token
-
 import logging
 from celery import shared_task
-from beauty_formula.apps.accounts.models.user import User
-from beauty_formula.apps.core.emails.sender import send_html_email
 
+from beauty_formula.apps.accounts.models.user import User
+from beauty_formula.apps.accounts.services.verification import build_password_reset_url
+from beauty_formula.apps.core.emails.sender import send_html_email
 
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,8 @@ def send_password_reset_email(self, user_id: str, uid: str, token: str) -> None:
     """
     try:
         user = User.objects.get(pk=user_id)
-        reset_url = generate_uid_token(user)
+
+        reset_url = build_password_reset_url(user)
 
         logger.info("Password reset URL generated: %s", reset_url)
 
@@ -34,7 +34,7 @@ def send_password_reset_email(self, user_id: str, uid: str, token: str) -> None:
         send_html_email(
             subject="Redefinição de senha — Fórmula da Beleza",
             to_email=user.email,
-            template_name="users/emails/password_reset.html",
+            template_name="accounts/emails/password_reset.html",
             context=context,
         )
 
