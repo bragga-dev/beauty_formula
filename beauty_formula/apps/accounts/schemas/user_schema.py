@@ -26,7 +26,6 @@ class RegisterIn(Schema):
     email:     EmailStr
     password:  str = Field(..., min_length=8)
     password2: str = Field(..., min_length=8)
-    role:      UserRoleEnum = UserRoleEnum.CLIENT
 
     @field_validator("password")
     @classmethod

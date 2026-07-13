@@ -1,0 +1,243 @@
+{% extends "core/emails/base.html" %}
+
+{% block title %}Bem-vindo à Equipe — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}Confirme seu e-mail e complete seu perfil para acessar todos os recursos da Fórmula da Beleza.{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .section-label {
+        display: inline-block;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        color: #d81e2a;
+        background: #fdecec;
+        padding: 5px 12px;
+        border-radius: 20px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin: 0 0 16px;
+    }
+
+    .heading {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 26px;
+        font-weight: 900;
+        color: #0a0a0a;
+        margin: 0 0 22px;
+        line-height: 1.3;
+    }
+
+    .greeting {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        color: #1a1a1a;
+        margin: 0 0 10px;
+        line-height: 1.7;
+    }
+
+    .body-text {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        color: #5a5a5a;
+        margin: 0 0 28px;
+        line-height: 1.75;
+    }
+
+    .info-box {
+        background: #fafafa;
+        border-radius: 18px;
+        padding: 20px 24px;
+        margin-bottom: 28px;
+    }
+
+    .info-box-title {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        color: #0a0a0a;
+        letter-spacing: 0.5px;
+        margin: 0 0 8px;
+    }
+
+    .info-box-text {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 14px;
+        color: #6a6a6a;
+        margin: 0;
+        line-height: 1.75;
+    }
+
+    .cta-wrap {
+        text-align: center;
+        margin: 8px 0 26px;
+    }
+
+    .cta-btn {
+        display: inline-block;
+        background: #d81e2a;
+        color: #ffffff !important;
+        text-decoration: none !important;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        padding: 17px 56px;
+        border-radius: 100px;
+        box-shadow: 0 10px 24px rgba(216,30,42,0.3);
+    }
+
+    .link-fallback {
+        text-align: center;
+        margin-bottom: 28px;
+    }
+
+    .link-fallback p {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        color: #aaaaaa;
+        margin: 0 0 8px;
+    }
+
+    .link-fallback a {
+        display: inline-block;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        color: #a8121c;
+        background: #fafafa;
+        border-radius: 12px;
+        padding: 10px 16px;
+        word-break: break-all;
+        text-decoration: none;
+    }
+
+    .warning-box {
+        background: #fafafa;
+        border-radius: 18px;
+        padding: 18px 22px;
+        margin-top: 28px;
+    }
+
+    .warning-box p {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        color: #6a6a6a;
+        margin: 0;
+        line-height: 1.7;
+    }
+
+    .password-highlight {
+        display: inline-block;
+        font-family: 'Courier New', monospace;
+        font-size: 16px;
+        font-weight: 700;
+        color: #d81e2a;
+        background: #fdecec;
+        padding: 4px 14px;
+        border-radius: 6px;
+        letter-spacing: 1px;
+        margin: 4px 0 8px;
+    }
+
+    @media only screen and (max-width: 600px) {
+        .heading { font-size: 22px !important; }
+        .cta-btn { display: block !important; padding: 17px 24px !important; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .heading { color: #f2f2f2 !important; }
+        .greeting { color: #e8e8e8 !important; }
+        .body-text { color: #b0b0b0 !important; }
+        .info-box, .warning-box { background: #1e1e1e !important; }
+        .info-box-text, .warning-box p { color: #b0b0b0 !important; }
+        .link-fallback a { background: #1e1e1e !important; }
+        .password-highlight { 
+            color: #ff6b6b !important; 
+            background: #2a1a1c !important;
+        }
+        .warning-box p strong { color: #f2f2f2 !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+    <span class="section-label">🎯 Você foi contratado</span>
+    <h1 class="heading">Bem-vindo à Equipe Fórmula da Beleza</h1>
+
+    <p class="greeting">
+        Olá, <strong style="color:#d81e2a;">{{ user_email }}</strong>!
+    </p>
+
+    <p class="body-text">
+        É com grande satisfação que damos as boas-vindas ao nosso time! 
+        Você está oficialmente contratado(a) e agora faz parte da 
+        família <strong>Fórmula da Beleza</strong>. 🎉
+    </p>
+
+    <p class="body-text">
+        Para começar a utilizar todos os recursos da sua conta e 
+        <strong>agendar seus serviços</strong>, confirme seu e-mail 
+        clicando no botão abaixo e depois complete seu perfil.
+    </p>
+
+    <!-- Info box com senha -->
+    <div class="info-box">
+        <p class="info-box-title">🔐 Sua senha de acesso</p>
+        <p class="info-box-text">
+            Sua conta já foi criada pela administração. Utilize a senha 
+            abaixo para acessar sua conta após confirmar o e-mail:
+        </p>
+        <div style="text-align: center; margin: 12px 0 4px;">
+            <span class="password-highlight">{{ temporary_password }}</span>
+        </div>
+        <p class="info-box-text" style="font-size: 12px; color: #999; margin-top: 8px;">
+            ⚡ <strong>Dica:</strong> Você poderá alterar sua senha após o primeiro acesso.
+        </p>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-wrap">
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ verify_url }}" style="height:52px;v-text-anchor:middle;width:240px;" arcsize="50%" stroke="f" fillcolor="#d81e2a">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;letter-spacing:1px;">CONFIRMAR E-MAIL</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ verify_url }}" class="cta-btn">
+            Confirmar E-mail
+        </a>
+        <!--<![endif]-->
+    </div>
+
+    <!-- Fallback link -->
+    <div class="link-fallback">
+        <p>Caso o botão não funcione, copie o link abaixo:</p>
+        <a href="{{ verify_url }}">{{ verify_url }}</a>
+    </div>
+
+    <!-- Próximos passos -->
+    <div class="info-box" style="background: #fafafa; border-radius: 18px; padding: 20px 24px; margin-bottom: 28px;">
+        <p class="info-box-title">📋 Próximos passos</p>
+        <p class="info-box-text">
+            Após confirmar seu e-mail:
+            <br>1️⃣ Acesse o sistema com seu e-mail e a senha fornecida
+            <br>2️⃣ Complete seu perfil profissional
+            <br>3️⃣ Configure sua disponibilidade de horários
+            <br>4️⃣ Comece a receber agendamentos de clientes!
+        </p>
+    </div>
+
+    <!-- Warning -->
+    <div class="warning-box">
+        <p>
+            ⚠️ <strong style="color:#0a0a0a;">Importante:</strong>
+            Este link de confirmação é válido por <strong style="color:#0a0a0a;">24 horas</strong>.
+            Caso você não tenha solicitado este cadastro ou tenha dúvidas, 
+            entre em contato com o administrador da <strong>Fórmula da Beleza</strong>.
+        </p>
+    </div>
+
+{% endblock %}

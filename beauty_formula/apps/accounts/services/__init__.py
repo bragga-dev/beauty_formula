@@ -8,7 +8,7 @@ from beauty_formula.apps.accounts.services.auth_service import (
 
 
 from beauty_formula.apps.accounts.services.user_service import (
- register_user,
+ register_user_default_client,
  deactivate_account,
 )
 
@@ -34,7 +34,7 @@ __all__ = [
     "logout_user",
     "refresh_access_token",
     "change_password",  
-    "register_user",
+    "register_user_default_client",
     "deactivate_account",
     "build_password_reset_url",
     "build_verification_url"

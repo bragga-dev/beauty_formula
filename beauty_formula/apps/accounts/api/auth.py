@@ -19,7 +19,9 @@ from beauty_formula.apps.accounts.services.auth_service import (
 )
 from beauty_formula.apps.accounts.services.user_service import (
     deactivate_account,
-    register_user,
+    register_user_default_client,
+    register_user_default_employee,
+    promote_client_to_employee,
 )
 from beauty_formula.apps.accounts.services.verification import verify_email
 
@@ -34,6 +36,7 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     RegisterIn,
     TokenOut,
 )
+from beauty_formula.apps.accounts.schemas.employee_schema import PromoteToEmployeeIn
 
 from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_email
 
@@ -46,6 +49,8 @@ from beauty_formula.apps.core.exceptions import (
     InvalidToken,
     UserAlreadyExists,
 )
+from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
+
 router = Router()
 
  
@@ -119,7 +124,7 @@ def register(request, payload: RegisterIn):
     Um e-mail de verificação é enviado em background via Celery.
     """
     try:
-        tokens = register_user(payload)
+        tokens = register_user_default_client(payload)
         return 201, tokens
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
@@ -175,4 +180,35 @@ def change_password_router(request, payload: ChangePasswordIn):
         return 200, tokens
     except InvalidPassword as e:
         return 400, {"detail": str(e)}
+    
+    
+
+@router.post("/register-employee", response={201: TokenOut, 409: MessageOut}, auth=AdminOnlyAuth(), summary="Cadastro de Funcionário",)
+@ratelimit(key="ip", rate="20/h", block=True,)
+def register_employee(request, payload: RegisterIn):
+    """
+    Cria o usuário com role "employee" e retorna tokens JWT.
+    Um e-mail de verificação é enviado em background via Celery.
+    """
+    try:
+        tokens = register_user_default_employee(payload)
+        return 201, tokens
+    except UserAlreadyExists as e:
+        return 409, {"detail": str(e)}
+    
+
+    
+
+@router.post("/promote-client-to-employee/{user_id}", response={201: TokenOut, 409: MessageOut}, auth=AdminOnlyAuth(), summary="Transforma Cliente em Funcionário",)
+@ratelimit(key="ip", rate="20/h", block=True,)
+def promote_to_employee(request, payload: PromoteToEmployeeIn):
+    """
+    Cria o usuário com role "employee" e retorna tokens JWT.
+    Um e-mail de verificação é enviado em background via Celery.
+    """
+    try:
+        tokens = promote_client_to_employee(payload)
+        return 201, tokens
+    except UserAlreadyExists as e:
+        return 409, {"detail": str(e)}
     

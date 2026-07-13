@@ -10,6 +10,7 @@ from beauty_formula.apps.accounts.schemas.employee_schema import (
     EmployeeOut,
     EmployeeCreateIn,
     EmployeeUpdateIn,
+    PromoteToEmployeeIn,
 )
 
 from beauty_formula.apps.accounts.schemas.user_schema import (
@@ -47,4 +48,5 @@ __all__ = [
     "EmployeeOut",
     "EmployeeCreateIn",
     "EmployeeUpdateIn",
+    "PromoteToEmployeeIn",
 ]

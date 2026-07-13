@@ -12,16 +12,21 @@ logger = logging.getLogger("django")
 
 
 # from beauty_formula.apps.accounts.api.admin import router as admin_router
+from beauty_formula.apps.core.permissions.auth_classes import (
+    AdminOnlyAuth,
+    EmployeeOnlyAuth,
+    ClientOnlyAuth,
+    VerifiedUserAuth,
+    ActiveUserAuth,
+)
 
 api = NinjaAPI(
     title="FÓRMULA DA BEZELA API",
     version="1.0.0",
     description="API para agendamento de serviços de beleza.",
-    auth=JWTAuth(),
+    auth=[JWTAuth(), AdminOnlyAuth(), EmployeeOnlyAuth(), ClientOnlyAuth(), VerifiedUserAuth(), ActiveUserAuth()],
     urls_namespace="api",
-    docs=Swagger(settings={
-        "persistAuthorization": True,
-    })
+    docs=Swagger(settings={"persistAuthorization": True}),
 )
 
 
