@@ -18,10 +18,12 @@ from beauty_formula.apps.accounts.tasks.verification_account import send_verific
 from beauty_formula.apps.accounts.tasks.send_verification_email_employee import send_verification_email_employee
 from beauty_formula.apps.core.tokens.jwt import make_tokens
 from beauty_formula.apps.core.utils.generate_password import generate_temp_password
-from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
+from beauty_formula.apps.accounts.selectors.user_selector import get_user_confirmed_by_role
 from beauty_formula.apps.core.exceptions.user import UserNotFound
 from beauty_formula.apps.accounts.models.employee import Employee
-
+from beauty_formula.apps.accounts.tasks.send_promote_employee import send_promote_employee
+import logging
+logger = logging.getLogger(__name__)
 
 @transaction.atomic
 def register_user_default_client(data: RegisterIn) -> dict:
@@ -43,7 +45,7 @@ def register_user_default_client(data: RegisterIn) -> dict:
 @transaction.atomic
 def register_user_default_employee(data: RegisterIn) -> dict:
     """
-    Cria o User + Eployee e dispara e-mail de verificação.
+    Cria o User + Employee e dispara e-mail de verificação.
     Retorna os tokens JWT diretamente para o cliente já poder operar.
     """
     if email_exists(data.email):
@@ -51,26 +53,33 @@ def register_user_default_employee(data: RegisterIn) -> dict:
     password = generate_temp_password()
     user = create_user(email=data.email, password=password, role=User.UserRole.EMPLOYEE)
 
-    
     if user.role == User.UserRole.EMPLOYEE:
         create_employee(user)
 
-    send_verification_email_employee.delay(user.pk)   
+    send_verification_email_employee.delay(user.pk, password)
     return make_tokens(user)
 
 
+@transaction.atomic
+def promote_client_to_employee(user_id: uuid.UUID, performed_by=None) -> Employee:
+    """
+    Promove um client existente para employee: valida que o usuário
+    existe e é client, muda a role, salva e cria o profile de Employee.
+    Restrito a admin (AdminOnlyAuth na rota).
+    """
+    role = User.UserRole.CLIENT
+    user = get_user_confirmed_by_role(user_id=user_id, role=role)
+    if not user or user.role != User.UserRole.CLIENT:
+        logger.warning(f"Promoção abortada: cliente {user_id} não encontrado ou não é client")
+        raise UserNotFound("Cliente não encontrado ou não é trusty")
 
-def promote_client_to_employee(user_id: uuid.UUID) -> Employee:
-    user = get_user_by_id(user_id=user_id)
-    if not user or not user.role == User.UserRole.CLIENT:
-        UserNotFound("Cliente não encontrado")
-    user = User.UserRole.EMPLOYEE
-    return user
+    user.role = User.UserRole.EMPLOYEE
+    user.save(update_fields=["role"])
 
+    employee = create_employee(user)
+    send_promote_employee.delay(user.pk)
 
-
-
-
+    return employee
 
 
 

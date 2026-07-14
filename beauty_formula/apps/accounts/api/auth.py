@@ -1,10 +1,9 @@
 """
 Login endpoint — autenticação de usuários.
 """
-
+import uuid
 from django.conf import settings
 from django.http import HttpResponseRedirect
-
 from django_ratelimit.decorators import ratelimit
 from ninja import Router
 from ninja_jwt.authentication import JWTAuth
@@ -25,7 +24,7 @@ from beauty_formula.apps.accounts.services.user_service import (
 )
 from beauty_formula.apps.accounts.services.verification import verify_email
 
-
+from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeOut
 from beauty_formula.apps.accounts.schemas.user_schema import (
     ChangePasswordIn,
     LoginIn,
@@ -49,6 +48,16 @@ from beauty_formula.apps.core.exceptions import (
     InvalidToken,
     UserAlreadyExists,
 )
+
+from beauty_formula.apps.core.exceptions import (
+    EmailNotVerified,
+    InvalidCredentials, 
+    InvalidPassword,
+    InvalidToken, 
+    UserAlreadyExists, 
+    UserNotFound,
+)
+
 from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
 
 router = Router()
@@ -183,6 +192,9 @@ def change_password_router(request, payload: ChangePasswordIn):
     
     
 
+
+
+
 @router.post("/register-employee", response={201: TokenOut, 409: MessageOut}, auth=AdminOnlyAuth(), summary="Cadastro de Funcionário",)
 @ratelimit(key="ip", rate="20/h", block=True,)
 def register_employee(request, payload: RegisterIn):
@@ -195,20 +207,14 @@ def register_employee(request, payload: RegisterIn):
         return 201, tokens
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
-    
 
-    
-
-@router.post("/promote-client-to-employee/{user_id}", response={201: TokenOut, 409: MessageOut}, auth=AdminOnlyAuth(), summary="Transforma Cliente em Funcionário",)
-@ratelimit(key="ip", rate="20/h", block=True,)
-def promote_to_employee(request, payload: PromoteToEmployeeIn):
-    """
-    Cria o usuário com role "employee" e retorna tokens JWT.
-    Um e-mail de verificação é enviado em background via Celery.
-    """
+@router.post("/promote-client-to-employee/{user_id}", response={201: EmployeeOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Promove Cliente a Funcionário.")
+@ratelimit(key="ip", rate="20/h", block=True)
+def promote_to_employee(request, user_id: uuid.UUID):
     try:
-        tokens = promote_client_to_employee(payload)
-        return 201, tokens
-    except UserAlreadyExists as e:
-        return 409, {"detail": str(e)}
-    
+        employee = promote_client_to_employee(user_id, performed_by=request.auth)
+        return 201, EmployeeOut.from_orm(employee=employee)
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": f"Erro ao promover cliente: {str(e)}"}

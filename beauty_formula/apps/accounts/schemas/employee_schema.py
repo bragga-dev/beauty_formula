@@ -30,7 +30,7 @@ class EmployeeOut(Schema):
     gender_label: str
     birth_date: Optional[date] = None
     bio: Optional[str] = None
-    services: Optional[List[uuid.UUID]] = None  
+      
     
     @classmethod
     def from_orm(cls, employee: Employee) -> "EmployeeOut":
@@ -47,7 +47,7 @@ class EmployeeOut(Schema):
             birth_date=employee.birth_date,
             bio=employee.bio,
             photo_url=employee.photo_url, 
-            services=[service.id for service in employee.services.all()] if employee.services.exists() else None,
+           
         )
 
 
@@ -62,7 +62,7 @@ class EmployeeCreateIn(Schema):
     gender: GenderEnum
     instagram: Optional[str] = None
     bio: Optional[str] = None
-    services: Optional[List[uuid.UUID]] = None  
+      
 
     @field_validator("birth_date")
     @classmethod
@@ -90,7 +90,7 @@ class EmployeeUpdateIn(Schema):
     instagram: Optional[str] = None
     bio: Optional[str] = None
     photo_url: Optional[str] = None 
-    services: Optional[List[uuid.UUID]] = None  
+      
 
     @field_validator("birth_date")
     @classmethod

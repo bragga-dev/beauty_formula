@@ -69,6 +69,9 @@ def get_staff_users() -> QuerySet[User]:
     """Retorna usuários com acesso ao admin."""
     return User.objects.filter(is_staff=True)
 
+def get_user_confirmed_by_role(user_id: uuid.UUID, role: str) -> Optional[User]:
+    """Retorna usuário confirmado pelo ID e Role"""
+    return User.objects.filter(pk=user_id, role=role, is_trusty=True, is_active=True).first()
 
 # ── Exclusões ─────────────────────────────────────────────────────────────────
 
