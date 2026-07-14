@@ -7,9 +7,6 @@ from beauty_formula.apps.accounts.services.auth_service import (
  request_password_reset,
 
 )
-
-
-
 from beauty_formula.apps.accounts.services.user_service import (
  register_user_default_client,
  register_user_default_employee,
@@ -18,21 +15,11 @@ from beauty_formula.apps.accounts.services.user_service import (
 
 )
 
-
-
-
 from beauty_formula.apps.accounts.services.verification import (
  build_password_reset_url,
  build_verification_url,
  verify_email,
 )
-
-
-
-
-
-
-
 
 
 __all__ = [
