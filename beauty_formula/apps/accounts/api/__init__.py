@@ -1,34 +1,34 @@
 from beauty_formula.apps.accounts.api.auth import (
-    refresh,
-    refresh_access_token,
-    register,
-    register_employee,
-    login,
-    logout,
-    password_reset_confirm,
-    password_reset_request,
-    promote_client_to_employee,
-    verify_email_endpoint,
-    resend_verification_email,
+    
+    refresh_router,
+    register_router,
+    register_employee_router,
+    login_router,
+    logout_router,
+    password_reset_confirm_router,
+    password_reset_request_router,
+    verify_email_endpoint_router,
+    resend_verification_email_router,
     change_password_router,
-
+    deactivate_account_router,
+    promote_to_employee_router,
 )
 
 
 
 __all__ = [
 
-    "refresh",
-    "refresh_access_token",
-    "register",
-    "register_employee",
-    "login",
-    "logout",
-    "password_reset_confirm",
-    "password_reset_request",
-    "promote_client_to_employee",
-    "verify_email_endpoint",
-    "resend_verification_email",
+    "refresh_router",
+    "register_router",
+    "register_employee_router",
+    "login_router",
+    "logout_router",
+    "password_reset_confirm_router",
+    "password_reset_request_router",
+    "verify_email_endpoint_router",
+    "resend_verification_email_router",
     "change_password_router",
-    
+    "deactivate_account_router",
+    "promote_to_employee_router",    
+
 ]
