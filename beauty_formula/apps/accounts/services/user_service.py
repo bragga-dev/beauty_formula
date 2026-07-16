@@ -7,7 +7,7 @@ from beauty_formula.apps.accounts.repositories.user_repository import create_use
 from beauty_formula.apps.accounts.repositories.employee_repository import create_employee
 from beauty_formula.apps.accounts.repositories.client_repository import create_client
 from beauty_formula.apps.core.exceptions import UserAlreadyExists
-from beauty_formula.apps.accounts.selectors.user_selector import email_exists
+from beauty_formula.apps.accounts.selectors.user_selector import email_exists, get_user_by_id, get_user_confirmed_by_role
 from beauty_formula.apps.accounts.schemas.user_schema import RegisterIn
 from django.db import transaction
 from ninja_jwt.token_blacklist.models import OutstandingToken, BlacklistedToken
@@ -18,7 +18,6 @@ from beauty_formula.apps.accounts.tasks.verification_account import send_verific
 from beauty_formula.apps.accounts.tasks.send_verification_email_employee import send_verification_email_employee
 from beauty_formula.apps.core.tokens.jwt import make_tokens
 from beauty_formula.apps.core.utils.generate_password import generate_temp_password
-from beauty_formula.apps.accounts.selectors.user_selector import get_user_confirmed_by_role
 from beauty_formula.apps.core.exceptions.user import UserNotFound
 from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.tasks.send_promote_employee import send_promote_employee
@@ -83,22 +82,22 @@ def promote_client_to_employee(user_id: uuid.UUID, performed_by=None) -> Employe
 
 
 
-@transaction.atomic
-def deactivate_account(user, performed_by=None, reason="Desativação de conta"):
-    """ Desativa usuário, revoga todos os tokens ativos e cria logger de auditória"""
+transaction.atomic
+def deactivate_account(user_id: uuid.UUID, performed_by=None, reason="Desativação de conta"):
+    """ Desativa usuário, revoga todos os tokens ativos e cria log de auditoria"""
+    user = get_user_by_id(user_id)
+    if not user:
+        logger.warning(f"Desativação abortada: usuário {user_id} não encontrado")
+        raise UserNotFound("Usuário não encontrado.")
+ 
+    if not user.is_active:
+        logger.warning(f"Desativação abortada: usuário {user_id} já está inativo")
+        raise UserNotFound("Usuário já está desativado.")
+ 
     for token in OutstandingToken.objects.filter(user=user):
         BlacklistedToken.objects.get_or_create(token=token)
+ 
     user.is_active = False
     user.save(update_fields=["is_active"])
-    AuditLog.objects.create(
-        action="DEACTIVATE_ACCOUNT",
-        user=user,
-        performed_by=performed_by,  
-        reason=reason,
-        timestamp=timezone.now(),
-        details={
-            "tokens_revoked": True,
-            "user_id": str(user.id),
-            "email": user.email,
-        }
-    )
+ 
+    return user

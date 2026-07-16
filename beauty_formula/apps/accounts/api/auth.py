@@ -59,7 +59,7 @@ from beauty_formula.apps.core.exceptions import (
 )
 
 from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
-
+from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 router = Router()
 
  
@@ -71,7 +71,7 @@ router = Router()
 
 @router.post("/login", response={200: TokenOut, 401: MessageOut, 403: MessageOut}, auth=None, summary="Login")
 @ratelimit(key="ip", rate="5/m", block=True)
-def login(request, payload: LoginIn):
+def login_router(request, payload: LoginIn):
     try:
         tokens = login_user(payload.email, payload.password)
         return 200, tokens
@@ -84,7 +84,7 @@ def login(request, payload: LoginIn):
 
 @router.post("/logout", response={200: MessageOut, 401: MessageOut},  auth=JWTAuth(), summary="Logout (blacklista o refresh token)",)
 @ratelimit(key="user", rate="30/m", block=True)
-def logout(request, payload: RefreshIn):
+def logout_router(request, payload: RefreshIn):
     try:
         logout_user(payload.refresh)
         return 200, {"detail": "Logout realizado com sucesso."}
@@ -95,14 +95,14 @@ def logout(request, payload: RefreshIn):
 
 @router.post("/password-reset/request", response={200: MessageOut}, auth=None, summary="Solicitar reset de senha",)
 @ratelimit(key="ip", rate="5/h", block=True,)
-def password_reset_request(request, payload: PasswordResetRequestIn):
+def password_reset_request_router(request, payload: PasswordResetRequestIn):
     request_password_reset(payload.email)
     return 200, {"detail": "Se este e-mail estiver cadastrado, você receberá as instruções em breve."}
 
 
 @router.post("/password-reset/confirm", response={200: MessageOut, 400: MessageOut},  auth=None, summary="Confirmar reset de senha",)
 @ratelimit(key="ip", rate="30/h",  block=True,)
-def password_reset_confirm(request, payload: PasswordResetConfirmIn):
+def password_reset_confirm_router(request, payload: PasswordResetConfirmIn):
     try:
         confirm_password_reset(
             uidb64=payload.uid,
@@ -116,7 +116,7 @@ def password_reset_confirm(request, payload: PasswordResetConfirmIn):
 
 @router.post("/refresh", response={200: dict, 401: MessageOut}, auth=None, summary="Renovar access token",)
 @ratelimit(key="ip", rate="30/m",  block=True,)
-def refresh(request, payload: RefreshIn):
+def refresh_router(request, payload: RefreshIn):
     try:
         data = refresh_access_token(payload.refresh)
         return 200, data
@@ -127,7 +127,7 @@ def refresh(request, payload: RefreshIn):
 
 @router.post("/register", response={201: TokenOut, 409: MessageOut}, auth=None, summary="Cadastro de Cliente",)
 @ratelimit(key="ip", rate="5/h", block=True,)
-def register(request, payload: RegisterIn):
+def register_router(request, payload: RegisterIn):
     """
     Cria o usuário com role "client" e retorna tokens JWT.
     Um e-mail de verificação é enviado em background via Celery.
@@ -144,7 +144,7 @@ def register(request, payload: RegisterIn):
 
 @router.get("/verify-email/{uidb64}/{token}", summary="Confirmar e-mail",  description="Confirma o email e redireciona para o frontend.", auth=None,)
 @ratelimit( key="ip", rate="20/h", block=True,)
-def verify_email_endpoint(request, uidb64: str, token: str):
+def verify_email_endpoint_router(request, uidb64: str, token: str):
     """
     Confirma o email e redireciona para o frontend.
     """
@@ -158,7 +158,7 @@ def verify_email_endpoint(request, uidb64: str, token: str):
     
 @router.post("/resend-verification", response={200: MessageOut, 404: MessageOut}, summary="Reenviar email de verificação", auth=None, )
 @ratelimit(key="ip", rate="3/h", block=True,)
-def resend_verification_email(request, email: str):
+def resend_verification_email_router(request, email: str):
     """
     Reenvia o email de verificação para um usuário não verificado.
     """    
@@ -197,7 +197,7 @@ def change_password_router(request, payload: ChangePasswordIn):
 
 @router.post("/register-employee", response={201: TokenOut, 409: MessageOut}, auth=AdminOnlyAuth(), summary="Cadastro de Funcionário",)
 @ratelimit(key="ip", rate="20/h", block=True,)
-def register_employee(request, payload: RegisterIn):
+def register_employee_router(request, payload: RegisterIn):
     """
     Cria o usuário com role "employee" e retorna tokens JWT.
     Um e-mail de verificação é enviado em background via Celery.
@@ -210,7 +210,7 @@ def register_employee(request, payload: RegisterIn):
 
 @router.post("/promote-client-to-employee/{user_id}", response={201: EmployeeOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Promove Cliente a Funcionário.")
 @ratelimit(key="ip", rate="20/h", block=True)
-def promote_to_employee(request, user_id: uuid.UUID):
+def promote_to_employee_router(request, user_id: uuid.UUID):
     try:
         employee = promote_client_to_employee(user_id, performed_by=request.auth)
         return 201, EmployeeOut.from_orm(employee=employee)
@@ -218,3 +218,16 @@ def promote_to_employee(request, user_id: uuid.UUID):
         return 404, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": f"Erro ao promover cliente: {str(e)}"}
+    
+
+@router.post("/deactive-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Desativa Usuário.")
+@ratelimit(key="ip", rate="20/h", block=True)
+def deactivate_account_router(request, user_id: uuid.UUID):
+    try:
+        user = deactivate_account(user_id, performed_by=request.auth)
+        return 201, UserOut.from_orm(user=user)
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": f"Erro ao desativar usuário: {str(e)}"}
+    
