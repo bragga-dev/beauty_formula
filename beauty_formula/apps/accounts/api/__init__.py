@@ -12,6 +12,7 @@ from beauty_formula.apps.accounts.api.auth import (
     change_password_router,
     deactivate_account_router,
     promote_to_employee_router,
+    me_router,
 )
 
 
@@ -29,6 +30,7 @@ __all__ = [
     "resend_verification_email_router",
     "change_password_router",
     "deactivate_account_router",
-    "promote_to_employee_router",    
+    "promote_to_employee_router",   
+    "me_router", 
 
 ]

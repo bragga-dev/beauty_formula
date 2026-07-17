@@ -26,6 +26,12 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     MessageOut,
 )
 
+from beauty_formula.apps.accounts.schemas.me_schema import (
+    EmployeeProfileOut,
+    ClientProfileOut,
+    MeOut,
+)
+
 __all__ = [
     # User schemas (auth e user)
     "UserRoleEnum",
@@ -49,4 +55,9 @@ __all__ = [
     "EmployeeCreateIn",
     "EmployeeUpdateIn",
     "PromoteToEmployeeIn",
+
+    # Me schemas
+    "EmployeeProfileOut",
+    "ClientProfileOut",
+    "MeOut",
 ]

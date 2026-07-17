@@ -22,6 +22,7 @@ from beauty_formula.apps.accounts.services.user_service import (
     register_user_default_client,
     register_user_default_employee,
     promote_client_to_employee,
+    get_current_user_profile,
 )
 from beauty_formula.apps.accounts.services.verification import verify_email
 
@@ -37,6 +38,9 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     RegisterIn,
     TokenOut,
 )
+
+from beauty_formula.apps.accounts.schemas.me_schema import MeOut
+
 from beauty_formula.apps.accounts.schemas.employee_schema import PromoteToEmployeeIn
 
 from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_email
@@ -66,8 +70,22 @@ from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 router = Router()
 
  
-
-
+@router.get(
+    "/me",
+    response={200: MeOut, 401: MessageOut, 404: MessageOut},
+    auth=JWTAuth(),
+    summary="Dados do usuário logado",
+    description=(
+        "Retorna o usuário autenticado junto com o profile correspondente "
+        "à sua role: `client` (Cliente), `employee` (Funcionário) ou nenhum "
+        "dos dois (Admin, que não tem profile)."
+    ),
+)
+def me_router(request):
+    try:
+        return 200, get_current_user_profile(request.auth.id)
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
 
 
 

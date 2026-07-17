@@ -8,8 +8,9 @@ from beauty_formula.apps.accounts.repositories.employee_repository import create
 from beauty_formula.apps.accounts.repositories.client_repository import create_client
 from beauty_formula.apps.core.exceptions import UserAlreadyExists, InvalidGoogleToken
 from beauty_formula.apps.core.oauth.google import verify_google_id_token
-from beauty_formula.apps.accounts.selectors.user_selector import email_exists, get_user_by_id, get_user_by_email, get_user_confirmed_by_role
+from beauty_formula.apps.accounts.selectors.user_selector import email_exists, get_user_by_id, get_user_by_email, get_user_confirmed_by_role, get_user_with_related
 from beauty_formula.apps.accounts.schemas.user_schema import RegisterIn
+from beauty_formula.apps.accounts.schemas.me_schema import MeOut
 from django.db import transaction
 from ninja_jwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from django.db import transaction
@@ -24,6 +25,17 @@ from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.tasks.send_promote_employee import send_promote_employee
 import logging
 logger = logging.getLogger(__name__)
+
+def get_current_user_profile(user_id: uuid.UUID) -> MeOut:
+    """
+    Monta o retorno de GET /auth/me: usuário autenticado + profile
+    correspondente à sua role (client/employee/nenhum, no caso de admin).
+    """
+    user = get_user_with_related(user_id)
+    if not user:
+        raise UserNotFound("Usuário não encontrado.")
+    return MeOut.from_user(user)
+
 
 @transaction.atomic
 def register_user_default_client(data: RegisterIn) -> dict:

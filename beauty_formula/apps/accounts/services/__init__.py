@@ -12,6 +12,7 @@ from beauty_formula.apps.accounts.services.user_service import (
  register_user_default_employee,
  promote_client_to_employee,
  deactivate_account,
+ get_current_user_profile,
 
 )
 
@@ -35,6 +36,7 @@ __all__ = [
     "register_user_default_employee",
     "promote_client_to_employee",
     "deactivate_account",
+    "get_current_user_profile",
 
     "build_password_reset_url",
     "build_verification_url",
