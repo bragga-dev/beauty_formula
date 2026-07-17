@@ -3,11 +3,12 @@ User Services — criação e atualização de usuário base.
 """
 import uuid
 from beauty_formula.apps.accounts.models.user import User
-from beauty_formula.apps.accounts.repositories.user_repository import create_user
+from beauty_formula.apps.accounts.repositories.user_repository import create_user, activate_user
 from beauty_formula.apps.accounts.repositories.employee_repository import create_employee
 from beauty_formula.apps.accounts.repositories.client_repository import create_client
-from beauty_formula.apps.core.exceptions import UserAlreadyExists
-from beauty_formula.apps.accounts.selectors.user_selector import email_exists, get_user_by_id, get_user_confirmed_by_role
+from beauty_formula.apps.core.exceptions import UserAlreadyExists, InvalidGoogleToken
+from beauty_formula.apps.core.oauth.google import verify_google_id_token
+from beauty_formula.apps.accounts.selectors.user_selector import email_exists, get_user_by_id, get_user_by_email, get_user_confirmed_by_role
 from beauty_formula.apps.accounts.schemas.user_schema import RegisterIn
 from django.db import transaction
 from ninja_jwt.token_blacklist.models import OutstandingToken, BlacklistedToken
@@ -39,6 +40,45 @@ def register_user_default_client(data: RegisterIn) -> dict:
 
     send_verification_email.delay(user.pk)   
     return make_tokens(user)
+
+
+@transaction.atomic
+def login_or_register_client_google(id_token: str) -> tuple[dict, bool]:
+    """
+    Login/Cadastro de Cliente via Google (Sign in with Google).
+
+    - Valida o id_token junto ao Google (assinatura, expiração, audience).
+    - Se já existe um usuário com o e-mail do token: apenas loga (e ativa
+      a conta, caso ainda não estivesse ativa — o Google já garante que
+      o e-mail é verificado).
+    - Se não existe: cria um Cliente novo, já ativo, sem senha utilizável
+      (login exclusivamente via Google até que o usuário defina uma senha).
+
+    Retorna (tokens, created) — created=True quando um novo usuário foi criado,
+    útil para o endpoint decidir entre 200 (login) e 201 (cadastro).
+    """
+    claims = verify_google_id_token(id_token)
+
+    if not claims.get("email_verified", False):
+        raise InvalidGoogleToken("E-mail da conta Google não verificado.")
+
+    email = claims["email"]
+    user = get_user_by_email(email)
+    created = False
+
+    if user is None:
+        user = create_user(email=email, password=None, role=User.UserRole.CLIENT)
+        create_client(
+            user,
+            first_name=claims.get("given_name"),
+            last_name=claims.get("family_name"),
+        )
+        created = True
+
+    if not user.is_active or not user.is_trusty:
+        user = activate_user(user)
+
+    return make_tokens(user), created
 
 
 @transaction.atomic

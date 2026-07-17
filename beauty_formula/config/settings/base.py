@@ -417,3 +417,9 @@ CACHES = {
 
 RATELIMIT_USE_CACHE = "default"
 RATELIMIT_FAIL_OPEN = False
+
+
+# =========================================================
+# GOOGLE OAUTH
+# =========================================================
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")

@@ -10,7 +10,7 @@ from beauty_formula.apps.core.constants.gender import Gender
 from phonenumber_field.modelfields import PhoneNumberField
 from phonenumbers import parse, format_number, PhoneNumberFormat
 from datetime import timezone
-
+from django.utils import timezone 
 
 
 def client_photo_path(instance, filename):
@@ -72,7 +72,7 @@ class Client(models.Model):
         return format_number(number, PhoneNumberFormat.E164)
 
     def clean(self):
-        if self.birth_date and self.birth_date > timezone.localdate():
+        if self.birth_date and self.birth_date > timezone.now().date():
             raise ValidationError(
                 {'birth_date': _('Data de nascimento não pode ser no futuro.')}
             )

@@ -18,6 +18,7 @@ from beauty_formula.apps.accounts.services.auth_service import (
 )
 from beauty_formula.apps.accounts.services.user_service import (
     deactivate_account,
+    login_or_register_client_google,
     register_user_default_client,
     register_user_default_employee,
     promote_client_to_employee,
@@ -27,6 +28,7 @@ from beauty_formula.apps.accounts.services.verification import verify_email
 from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeOut
 from beauty_formula.apps.accounts.schemas.user_schema import (
     ChangePasswordIn,
+    GoogleLoginIn,
     LoginIn,
     MessageOut,
     PasswordResetConfirmIn,
@@ -52,6 +54,7 @@ from beauty_formula.apps.core.exceptions import (
 from beauty_formula.apps.core.exceptions import (
     EmailNotVerified,
     InvalidCredentials, 
+    InvalidGoogleToken,
     InvalidPassword,
     InvalidToken, 
     UserAlreadyExists, 
@@ -81,6 +84,26 @@ def login_router(request, payload: LoginIn):
         return 401, {"detail": "E-mail ou senha inválidos."}
     
 
+@router.post(
+    "/google",
+    response={200: TokenOut, 201: TokenOut, 401: MessageOut},
+    auth=None,
+    summary="Login/Cadastro de Cliente via Google",
+    description=(
+        "Recebe o id_token (credential) emitido pelo Google Identity Services "
+        "no frontend. Se já existir um usuário com o e-mail da conta Google, "
+        "efetua login (200). Caso contrário, cria um novo Cliente já verificado (201). "
+        "Sempre cadastra/loga com role 'client'."
+    ),
+)
+@ratelimit(key="ip", rate="10/m", block=True)
+def google_login_router(request, payload: GoogleLoginIn):
+    try:
+        tokens, created = login_or_register_client_google(payload.id_token)
+        return (201 if created else 200), tokens
+    except InvalidGoogleToken as e:
+        return 401, {"detail": str(e)}
+
 
 @router.post("/logout", response={200: MessageOut, 401: MessageOut},  auth=JWTAuth(), summary="Logout (blacklista o refresh token)",)
 @ratelimit(key="user", rate="30/m", block=True)
@@ -91,7 +114,6 @@ def logout_router(request, payload: RefreshIn):
     except InvalidToken as e:
         return 401, {"detail": str(e)}
     
-
 
 @router.post("/password-reset/request", response={200: MessageOut}, auth=None, summary="Solicitar reset de senha",)
 @ratelimit(key="ip", rate="5/h", block=True,)
@@ -124,7 +146,6 @@ def refresh_router(request, payload: RefreshIn):
         return 401, {"detail": str(e)}
     
 
-
 @router.post("/register", response={201: TokenOut, 409: MessageOut}, auth=None, summary="Cadastro de Cliente",)
 @ratelimit(key="ip", rate="5/h", block=True,)
 def register_router(request, payload: RegisterIn):
@@ -138,7 +159,6 @@ def register_router(request, payload: RegisterIn):
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
     
-
 
 
 
@@ -190,7 +210,6 @@ def change_password_router(request, payload: ChangePasswordIn):
     except InvalidPassword as e:
         return 400, {"detail": str(e)}
     
-    
 
 
 
@@ -230,4 +249,3 @@ def deactivate_account_router(request, user_id: uuid.UUID):
         return 404, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": f"Erro ao desativar usuário: {str(e)}"}
-    

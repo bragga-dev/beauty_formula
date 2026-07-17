@@ -48,6 +48,14 @@ class LoginIn(Schema):
     password: str
 
 
+class GoogleLoginIn(Schema):
+    """
+    id_token: JWT (`credential`) emitido pelo Google Identity Services
+    no frontend após o usuário se autenticar com a conta Google.
+    """
+    id_token: str = Field(..., min_length=10)
+
+
 class TokenOut(Schema):
     access:  str
     refresh: str
@@ -132,6 +140,7 @@ __all__ = [
     "UserRoleEnum",
     "RegisterIn",
     "LoginIn",
+    "GoogleLoginIn",
     "TokenOut",
     "RefreshIn",
     "ChangePasswordIn",

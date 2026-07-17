@@ -5,8 +5,13 @@ from typing import Optional
 from beauty_formula.apps.accounts.models.user import User
 
 
-def create_user(*, email: str, password: str, role: str,    
+def create_user(*, email: str, password: Optional[str], role: str,
 ) -> User:
+    """
+    Cria o usuário base. Se password for None (ex.: cadastro via Google),
+    o Django automaticamente marca a senha como "unusable" — o usuário
+    não conseguirá logar com email/senha, apenas via provedor OAuth.
+    """
     user = User.objects.create_user(
         email=email,
         password=password,
