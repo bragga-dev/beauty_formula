@@ -14,16 +14,23 @@ from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.repositories.client_repository import (
     create_client,
     delete_client,
+    update_client,
 )
 from beauty_formula.apps.accounts.repositories.employee_repository import (
     create_employee,
+    update_employee,
 )
 from beauty_formula.apps.accounts.repositories.user_repository import (
     activate_user,
     create_user,
 )
-from beauty_formula.apps.accounts.schemas.me_schema import MeOut
+from beauty_formula.apps.accounts.schemas.me_schema import (
+    MeOut,
+
+    )
 from beauty_formula.apps.accounts.schemas.user_schema import RegisterIn
+from beauty_formula.apps.accounts.schemas.client_schema import ClientUpdateIn, ClientOut
+from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeUpdateIn, EmployeeOut
 from beauty_formula.apps.accounts.selectors.client_selector import (
     get_client_by_user_id,
 )
@@ -43,10 +50,11 @@ from beauty_formula.apps.accounts.tasks.send_verification_email_employee import 
 from beauty_formula.apps.accounts.tasks.verification_account import (
     send_verification_email,
 )
-from beauty_formula.apps.core.exceptions import (
-    InvalidGoogleToken,
-    UserAlreadyExists,
-)
+from beauty_formula.apps.core.exceptions.permissions import PermissionDenied
+from beauty_formula.apps.core.exceptions.auth import InvalidGoogleToken
+from beauty_formula.apps.core.exceptions.user import UserAlreadyExists
+
+
 from beauty_formula.apps.core.exceptions.user import UserNotFound
 from beauty_formula.apps.core.oauth.google import verify_google_id_token
 from beauty_formula.apps.core.tokens.jwt import make_tokens
@@ -65,6 +73,32 @@ def get_current_user_profile(user_id: uuid.UUID) -> MeOut:
     if not user:
         raise UserNotFound("Usuário não encontrado.")
     return MeOut.from_user(user)
+
+
+def update_client_profile(user_id: uuid.UUID, payload: ClientUpdateIn) -> ClientOut:
+    user = get_user_with_related(user_id)
+    if not user:
+        raise UserNotFound("Usuário não encontrado.")
+
+    if user.role != User.UserRole.CLIENT:
+        raise PermissionDenied("Apenas clientes podem atualizar este perfil.")
+
+    fields = payload.dict(exclude_unset=True)
+    updated_client = update_client(client=user.client_profile, **fields)
+    return ClientOut.from_orm(updated_client)
+
+
+def update_employee_profile(user_id: uuid.UUID, payload: EmployeeUpdateIn) -> EmployeeOut:
+    user = get_user_with_related(user_id)
+    if not user:
+        raise UserNotFound("Usuário não encontrado.")
+
+    if user.role != User.UserRole.EMPLOYEE:
+        raise PermissionDenied("Apenas funcionários podem atualizar este perfil.")
+
+    fields = payload.dict(exclude_unset=True)
+    updated_employee = update_employee(employee=user.employee_profile, **fields)
+    return EmployeeOut.from_orm(updated_employee)
 
 
 @transaction.atomic

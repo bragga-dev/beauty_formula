@@ -8,6 +8,9 @@ from beauty_formula.apps.accounts.models.employee import Employee
 
 DEFAULT_EMPLOYEE_PHOTO = "default/employee_img.jpeg"
 DEFAULT_CLIENT_PHOTO = "default/client_img.jpg"
+
+
+
 class EmployeeOnlyAuth(JWTAuth):
     def authenticate(self, request, token):
         user = super().authenticate(request, token)

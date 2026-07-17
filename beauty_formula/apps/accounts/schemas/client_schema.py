@@ -7,7 +7,7 @@ import re
 from beauty_formula.apps.accounts.models import Client
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 from beauty_formula.apps.core.constants.gender import Gender
-
+from phonenumbers import parse, is_valid_number, NumberParseException
 from enum import Enum
 
 
@@ -84,14 +84,13 @@ class ClientCreateIn(Schema):
 
 
 class ClientUpdateIn(Schema):
-    username: Optional[str] = Field(None, min_length=3, max_length=150)
-    first_name: Optional[str] = Field(None, min_length=2, max_length=255)
-    last_name: Optional[str] = Field(None, min_length=2, max_length=255)
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     gender: Optional[GenderEnum] = None
     phone: Optional[str] = None
     birth_date: Optional[date] = None  
-    instagram: Optional[str] = None
-    photo_url: Optional[str] = None  
+    instagram: Optional[str] = None 
 
     @field_validator("birth_date")
     @classmethod
@@ -113,14 +112,14 @@ class ClientUpdateIn(Schema):
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if v:
-            import re
             cleaned = re.sub(r'[^\d+]', '', v)
-            if len(cleaned) < 10:
+            if len(cleaned) < 10: 
                 raise ValueError("Número de telefone inválido.")
         return v
 
 
 __all__ = [
+
     "ClientOut",
     "ClientCreateIn",
     "ClientUpdateIn",

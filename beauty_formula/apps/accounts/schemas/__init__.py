@@ -33,6 +33,7 @@ from beauty_formula.apps.accounts.schemas.me_schema import (
 )
 
 __all__ = [
+    
     # User schemas (auth e user)
     "UserRoleEnum",
     "RegisterIn",
@@ -60,4 +61,5 @@ __all__ = [
     "EmployeeProfileOut",
     "ClientProfileOut",
     "MeOut",
+
 ]

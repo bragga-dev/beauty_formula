@@ -3,11 +3,13 @@ from datetime import date
 from typing import Optional
 from ninja import Schema
 
+
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.models.client import Client
 from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 from beauty_formula.apps.accounts.schemas.client_schema import GenderEnum
+
 
 
 class ClientProfileOut(Schema):
@@ -92,4 +94,10 @@ class MeOut(Schema):
         )
 
 
-__all__ = ["MeOut", "ClientProfileOut", "EmployeeProfileOut"]
+__all__ = [
+
+    "MeOut", 
+    "ClientProfileOut", 
+    "EmployeeProfileOut",
+
+    ]

@@ -23,10 +23,13 @@ from beauty_formula.apps.accounts.services.user_service import (
     register_user_default_employee,
     promote_client_to_employee,
     get_current_user_profile,
+    update_client_profile,
+    update_employee_profile,
 )
 from beauty_formula.apps.accounts.services.verification import verify_email
 
-from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeOut
+from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeOut, EmployeeUpdateIn
+from beauty_formula.apps.accounts.schemas.client_schema import ClientOut, ClientUpdateIn
 from beauty_formula.apps.accounts.schemas.user_schema import (
     ChangePasswordIn,
     GoogleLoginIn,
@@ -39,7 +42,9 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     TokenOut,
 )
 
-from beauty_formula.apps.accounts.schemas.me_schema import MeOut
+from beauty_formula.apps.accounts.schemas.me_schema import (
+    MeOut,
+    )
 
 from beauty_formula.apps.accounts.schemas.employee_schema import PromoteToEmployeeIn
 
@@ -65,8 +70,11 @@ from beauty_formula.apps.core.exceptions import (
     UserNotFound,
 )
 
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth, EmployeeOnlyAuth, ClientOnlyAuth
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
+from beauty_formula.apps.accounts.models.user import User
+
+
 router = Router()
 
  
@@ -81,6 +89,7 @@ router = Router()
         "dos dois (Admin, que não tem profile)."
     ),
 )
+@ratelimit(key="ip", rate="15/m", block=True)
 def me_router(request):
     try:
         return 200, get_current_user_profile(request.auth.id)
@@ -267,3 +276,32 @@ def deactivate_account_router(request, user_id: uuid.UUID):
         return 404, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": f"Erro ao desativar usuário: {str(e)}"}
+
+
+@router.patch("/update-client-profile", response={200: ClientOut, 404: MessageOut, 400: MessageOut}, auth=ClientOnlyAuth(), summary="Atualiza perfil do Cliente logado.")
+@ratelimit(key="ip", rate="20/h", block=True)
+def update_profile_client_router(request, payload: ClientUpdateIn):
+    try:
+        user: User = request.auth
+        client_updated = update_client_profile(user_id=user.id, payload=payload)
+        return 200, client_updated 
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": f"Erro ao atualizar perfil: {str(e)}"}
+
+
+
+@router.patch("/update-employee-profile", response={200: EmployeeOut, 404: MessageOut, 400: MessageOut}, auth=EmployeeOnlyAuth(), summary="Atualiza perfil do Funcionário logado.")
+@ratelimit(key="ip", rate="20/h", block=True)
+def update_profile_employee_router(request, payload: EmployeeUpdateIn):
+    try:
+        user: User = request.auth
+        client_updated = update_employee_profile(user_id=user.id, payload=payload)
+        return 200, client_updated 
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": f"Erro ao atualizar perfil: {str(e)}"}
+
+

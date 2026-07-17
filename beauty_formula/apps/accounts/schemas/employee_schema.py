@@ -3,7 +3,7 @@ from datetime import date
 from typing import Optional, List
 from ninja import Schema, Field
 from pydantic import field_validator
-
+from phonenumbers import parse, is_valid_number, NumberParseException
 from beauty_formula.apps.accounts.models import Employee
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 from beauty_formula.apps.core.constants.gender import Gender
@@ -53,9 +53,9 @@ class EmployeeOut(Schema):
 
 class EmployeeCreateIn(Schema):
     user_id: uuid.UUID
-    username: str = Field(..., min_length=2, max_length=150)
-    first_name: str = Field(..., min_length=2, max_length=255)
-    last_name: str = Field(..., min_length=2, max_length=255)
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     photo_url: Optional[str] = None  
     phone: Optional[str] = None
     birth_date: Optional[date] = None
@@ -81,16 +81,15 @@ class EmployeeCreateIn(Schema):
 
 
 class EmployeeUpdateIn(Schema):
-    username: Optional[str] = Field(None, min_length=3, max_length=150)
-    first_name: Optional[str] = Field(None, min_length=2, max_length=255)
-    last_name: Optional[str] = Field(None, min_length=2, max_length=255)
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     gender: Optional[GenderEnum] = None
     phone: Optional[str] = None
     birth_date: Optional[date] = None
     instagram: Optional[str] = None
     bio: Optional[str] = None
-    photo_url: Optional[str] = None 
-      
+        
 
     @field_validator("birth_date")
     @classmethod
@@ -108,6 +107,17 @@ class EmployeeUpdateIn(Schema):
                 raise ValueError("Username inválido. Use apenas letras, números e @/./+/-/_.")
         return v
 
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip():
+            try:
+                parsed = parse(v, "BR")
+                if not is_valid_number(parsed):
+                    raise ValueError("Número de telefone inválido.")
+            except NumberParseException:
+                raise ValueError("Número de telefone inválido.")
+        return 
 
 class PromoteToEmployeeIn(Schema):
     """
