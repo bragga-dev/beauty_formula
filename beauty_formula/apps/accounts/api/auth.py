@@ -5,7 +5,7 @@ import uuid
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django_ratelimit.decorators import ratelimit
-from ninja import Router
+from ninja import File, Router, UploadedFile
 from ninja_jwt.authentication import JWTAuth
 
 from beauty_formula.apps.accounts.services.auth_service import (
@@ -25,6 +25,17 @@ from beauty_formula.apps.accounts.services.user_service import (
     get_current_user_profile,
     update_client_profile,
     update_employee_profile,
+    
+    
+)
+from beauty_formula.apps.accounts.services.client_service import (
+    upload_client_profile_photo,
+    delete_client_profile_photo,
+)
+
+from beauty_formula.apps.accounts.services.employee_service import (
+    upload_employee_profile_photo,
+    delete_employee_profile_photo,
 )
 from beauty_formula.apps.accounts.services.verification import verify_email
 
@@ -64,6 +75,7 @@ from beauty_formula.apps.core.exceptions import (
     EmailNotVerified,
     InvalidCredentials, 
     InvalidGoogleToken,
+    InvalidImageFile,
     InvalidPassword,
     InvalidToken, 
     UserAlreadyExists, 
@@ -305,3 +317,49 @@ def update_profile_employee_router(request, payload: EmployeeUpdateIn):
         return 400, {"detail": f"Erro ao atualizar perfil: {str(e)}"}
 
 
+@router.post("/upload-client-photo", response={200: ClientOut, 400: MessageOut, 404: MessageOut}, auth=ClientOnlyAuth(), summary="Upload da foto do Cliente logado.")
+@ratelimit(key="user", rate="10/h", block=True)
+def upload_client_photo_router(request, photo: UploadedFile = File(...)):
+    try:
+        user: User = request.auth
+        client_updated = upload_client_profile_photo(user=user, photo=photo)
+        return 200, client_updated
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
+    except InvalidImageFile as e:
+        return 400, {"detail": str(e)}
+
+
+@router.delete("/delete-client-photo", response={200: ClientOut, 404: MessageOut}, auth=ClientOnlyAuth(), summary="Remove a foto do Cliente logado (volta para a foto padrão).")
+@ratelimit(key="user", rate="10/h", block=True)
+def delete_client_photo_router(request):
+    try:
+        user: User = request.auth
+        client_updated = delete_client_profile_photo(user=user)
+        return 200, client_updated
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
+
+
+@router.post("/upload-employee-photo", response={200: EmployeeOut, 400: MessageOut, 404: MessageOut}, auth=EmployeeOnlyAuth(), summary="Upload da foto do Funcionário logado.")
+@ratelimit(key="user", rate="10/h", block=True)
+def upload_employee_photo_router(request, photo: UploadedFile = File(...)):
+    try:
+        user: User = request.auth
+        employee_updated = upload_employee_profile_photo(user=user, photo=photo)
+        return 200, employee_updated
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
+    except InvalidImageFile as e:
+        return 400, {"detail": str(e)}
+
+
+@router.delete("/delete-employee-photo", response={200: EmployeeOut, 404: MessageOut}, auth=EmployeeOnlyAuth(), summary="Remove a foto do Funcionário logado (volta para a foto padrão).")
+@ratelimit(key="user", rate="10/h", block=True)
+def delete_employee_photo_router(request):
+    try:
+        user: User = request.auth
+        employee_updated = delete_employee_profile_photo(user=user)
+        return 200, employee_updated
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}

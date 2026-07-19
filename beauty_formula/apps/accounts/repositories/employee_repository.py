@@ -2,6 +2,7 @@
 Client Repository — persistência de perfil Membro.
 """
 from typing import Optional
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.schemas.client_schema import GenderEnum
@@ -49,3 +50,19 @@ def update_employee(employee: Employee, **fields) -> Employee:
 def delete_employee(employee: Employee) -> None:
     employee.delete()
 
+
+
+def set_employee_photo(employee: Employee, photo: InMemoryUploadedFile) -> Employee:
+    if employee.photo and employee.photo.name != "default/employee_img.jpeg":
+        employee.photo.delete(save=False)
+    employee.photo = photo
+    employee.save(update_fields=["photo"])
+    return employee
+
+
+def remove_employee_photo(employee: Employee) -> Employee:
+    if employee.photo and employee.photo.name != "default/employee_img.jpeg":
+        employee.photo.delete(save=False)
+    employee.photo = "default/employee_img.jpeg"
+    employee.save(update_fields=["photo"])
+    return employee
