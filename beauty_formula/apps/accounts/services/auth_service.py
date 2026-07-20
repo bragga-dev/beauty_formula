@@ -2,7 +2,10 @@
 Auth Services — autenticação, login, logout, refresh token.
 """
 from django.contrib.auth import authenticate
+from django.db.models import QuerySet
 from ninja_jwt.tokens import RefreshToken
+
+from django.utils import timezone
 from ninja_jwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from beauty_formula.apps.core.tokens.jwt import make_tokens, revoke_all_tokens
 from beauty_formula.apps.core.exceptions import (
@@ -10,7 +13,10 @@ from beauty_formula.apps.core.exceptions import (
     InvalidToken,
     InvalidPassword,
     EmailNotVerified,
+    SessionNotFound,
 )
+
+from django.contrib.auth import authenticate
 
 
 from django.contrib.auth.tokens import default_token_generator
@@ -98,3 +104,41 @@ def confirm_password_reset(uidb64: str, token: str, new_password: str) -> None:
 
     user.set_password(new_password)
     user.save(update_fields=["password"])
+
+
+
+def logout_all_sessions(user) -> None:
+    """Blacklista todos os refresh tokens do usuário (logout em todos os dispositivos)."""
+    revoke_all_tokens(user)
+
+
+def list_active_sessions(user) -> QuerySet:
+    """
+    Retorna os refresh tokens ainda válidos (não expirados e não blacklistados)
+    do usuário, do mais recente para o mais antigo.
+    """
+    return (
+        OutstandingToken.objects
+        .filter(user=user, expires_at__gt=timezone.now())
+        .exclude(blacklistedtoken__isnull=False)
+        .order_by("-created_at")
+    )
+
+
+def revoke_session(user, session_id: int) -> None:
+    """Blacklista um refresh token específico do usuário (revoga uma sessão/dispositivo)."""
+    try:
+        token = OutstandingToken.objects.get(id=session_id, user=user)
+    except OutstandingToken.DoesNotExist:
+        raise SessionNotFound()
+
+    BlacklistedToken.objects.get_or_create(token=token)
+
+
+
+def refresh_access_token(refresh_token: str) -> dict:
+    try:
+        token = RefreshToken(refresh_token)
+        return {"access": str(token.access_token)}
+    except Exception:
+        raise InvalidToken()

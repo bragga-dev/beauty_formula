@@ -131,6 +131,20 @@ class UserOut(Schema):
         )
 
 
+class SessionOut(Schema):
+    """Representa um refresh token ativo (uma sessão/dispositivo logado)."""
+    id:         int
+    created_at: Optional[datetime] = None
+    expires_at: datetime
+
+    @classmethod
+    def from_orm(cls, token) -> "SessionOut":
+        return cls(
+            id=token.id,
+            created_at=token.created_at,
+            expires_at=token.expires_at,
+        )
+
 # ── Mensagem genérica (respostas simples) ───────────────────────────────────
 
 class MessageOut(Schema):
@@ -148,5 +162,6 @@ __all__ = [
     "PasswordResetRequestIn",
     "PasswordResetConfirmIn",
     "UserOut",
+    "SessionOut",
     "MessageOut",
 ]

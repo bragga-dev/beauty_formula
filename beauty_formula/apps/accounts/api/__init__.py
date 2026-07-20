@@ -13,6 +13,9 @@ from beauty_formula.apps.accounts.api.auth import (
     deactivate_account_router,
     promote_to_employee_router,
     me_router,
+    logout_all_router,
+    list_sessions_router,
+    revoke_session_router,
 )
 
 
@@ -32,5 +35,9 @@ __all__ = [
     "deactivate_account_router",
     "promote_to_employee_router",   
     "me_router", 
+    "logout_all_router",
+    "list_sessions_router",
+    "revoke_session_router",
+
 
 ]

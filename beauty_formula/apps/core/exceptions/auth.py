@@ -23,3 +23,9 @@ class InvalidGoogleToken(Exception):
     def __init__(self, message=None):
         self.message = message or _("Token do Google inválido ou expirado.")
         super().__init__(self.message)
+
+
+class SessionNotFound(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Sessão não encontrada.")
+        super().__init__(self.message)

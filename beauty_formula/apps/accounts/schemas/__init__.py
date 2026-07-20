@@ -23,6 +23,7 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     PasswordResetRequestIn,
     PasswordResetConfirmIn,
     UserOut,
+    SessionOut,
     MessageOut,
 )
 
@@ -44,6 +45,7 @@ __all__ = [
     "PasswordResetRequestIn",
     "PasswordResetConfirmIn",
     "UserOut",
+    "SessionOut",
     "MessageOut",
     
     # Client schemas

@@ -11,10 +11,13 @@ from ninja_jwt.authentication import JWTAuth
 from beauty_formula.apps.accounts.services.auth_service import (
     change_password,
     confirm_password_reset,
+    list_active_sessions,
     login_user,
+    logout_all_sessions,
     logout_user,
     refresh_access_token,
     request_password_reset,
+    revoke_session,
 )
 from beauty_formula.apps.accounts.services.user_service import (
     deactivate_account,
@@ -50,6 +53,7 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     PasswordResetRequestIn,
     RefreshIn,
     RegisterIn,
+    SessionOut,
     TokenOut,
 )
 
@@ -78,6 +82,7 @@ from beauty_formula.apps.core.exceptions import (
     InvalidImageFile,
     InvalidPassword,
     InvalidToken, 
+    SessionNotFound,
     UserAlreadyExists, 
     UserNotFound,
 )
@@ -152,6 +157,49 @@ def logout_router(request, payload: RefreshIn):
         return 200, {"detail": "Logout realizado com sucesso."}
     except InvalidToken as e:
         return 401, {"detail": str(e)}
+
+
+@router.post(
+    "/logout-all",
+    response={200: MessageOut},
+    auth=JWTAuth(),
+    summary="Logout em todos os dispositivos",
+    description="Blacklista todos os refresh tokens ativos do usuário logado, encerrando todas as sessões.",
+)
+@ratelimit(key="user", rate="10/h", block=True)
+def logout_all_router(request):
+    logout_all_sessions(request.auth)
+    return 200, {"detail": "Sessões encerradas em todos os dispositivos."}
+
+
+@router.get(
+    "/sessions",
+    response={200: list[SessionOut]},
+    auth=JWTAuth(),
+    summary="Lista sessões ativas",
+    description="Lista os refresh tokens ainda válidos (sessões/dispositivos logados) do usuário autenticado.",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def list_sessions_router(request):
+    sessions = list_active_sessions(request.auth)
+    return 200, [SessionOut.from_orm(token) for token in sessions]
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    response={200: MessageOut, 404: MessageOut},
+    auth=JWTAuth(),
+    summary="Revoga uma sessão específica",
+    description="Blacklista o refresh token correspondente, encerrando aquela sessão/dispositivo.",
+)
+@ratelimit(key="user", rate="20/h", block=True)
+def revoke_session_router(request, session_id: int):
+    try:
+        revoke_session(user=request.auth, session_id=session_id)
+        return 200, {"detail": "Sessão revogada com sucesso."}
+    except SessionNotFound as e:
+        return 404, {"detail": str(e)}
+
     
 
 @router.post("/password-reset/request", response={200: MessageOut}, auth=None, summary="Solicitar reset de senha",)
@@ -198,7 +246,6 @@ def register_router(request, payload: RegisterIn):
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
     
-
 
 
 @router.get("/verify-email/{uidb64}/{token}", summary="Confirmar e-mail",  description="Confirma o email e redireciona para o frontend.", auth=None,)
