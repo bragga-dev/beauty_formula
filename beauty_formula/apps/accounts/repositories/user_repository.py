@@ -32,3 +32,7 @@ def deactivate_user(user: User) -> User:
         user.is_trusty = False
         user.save(update_fields=["is_active", "is_trusty"])
     return user
+
+
+def delete_user(user: User) -> None:
+    user.delete()

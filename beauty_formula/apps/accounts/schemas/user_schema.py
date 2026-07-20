@@ -87,6 +87,11 @@ class ChangePasswordIn(Schema):
         return self
 
 
+class DeleteAccountIn(Schema):
+    """Confirmação de senha exigida para exclusão da própria conta (LGPD)."""
+    password: str
+
+
 class PasswordResetRequestIn(Schema):
     email: str
 
@@ -145,6 +150,7 @@ class SessionOut(Schema):
             expires_at=token.expires_at,
         )
 
+
 # ── Mensagem genérica (respostas simples) ───────────────────────────────────
 
 class MessageOut(Schema):
@@ -159,6 +165,7 @@ __all__ = [
     "TokenOut",
     "RefreshIn",
     "ChangePasswordIn",
+    "DeleteAccountIn",
     "PasswordResetRequestIn",
     "PasswordResetConfirmIn",
     "UserOut",

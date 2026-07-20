@@ -21,7 +21,10 @@ from beauty_formula.apps.accounts.services.auth_service import (
 )
 from beauty_formula.apps.accounts.services.user_service import (
     deactivate_account,
+    delete_own_account,
+    export_user_data,
     login_or_register_client_google,
+    reactivate_user,
     register_user_default_client,
     register_user_default_employee,
     promote_client_to_employee,
@@ -46,6 +49,7 @@ from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeOut, Em
 from beauty_formula.apps.accounts.schemas.client_schema import ClientOut, ClientUpdateIn
 from beauty_formula.apps.accounts.schemas.user_schema import (
     ChangePasswordIn,
+    DeleteAccountIn,
     GoogleLoginIn,
     LoginIn,
     MessageOut,
@@ -87,7 +91,15 @@ from beauty_formula.apps.core.exceptions import (
     UserNotFound,
 )
 
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth, EmployeeOnlyAuth, ClientOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import (
+    AdminOnlyAuth, 
+    EmployeeOnlyAuth, 
+    ClientOnlyAuth,
+    EmployeeOrClientAuth,
+    AllRolesAuth,
+    AdminOrClientAuth,
+    AdminOrEmployeeAuth,
+    )
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 from beauty_formula.apps.accounts.models.user import User
 
@@ -98,7 +110,7 @@ router = Router()
 @router.get(
     "/me",
     response={200: MeOut, 401: MessageOut, 404: MessageOut},
-    auth=JWTAuth(),
+    auth=AllRolesAuth(),
     summary="Dados do usuário logado",
     description=(
         "Retorna o usuário autenticado junto com o profile correspondente "
@@ -149,7 +161,7 @@ def google_login_router(request, payload: GoogleLoginIn):
         return 401, {"detail": str(e)}
 
 
-@router.post("/logout", response={200: MessageOut, 401: MessageOut},  auth=JWTAuth(), summary="Logout (blacklista o refresh token)",)
+@router.post("/logout", response={200: MessageOut, 401: MessageOut},  auth=AllRolesAuth(), summary="Logout (blacklista o refresh token)",)
 @ratelimit(key="user", rate="30/m", block=True)
 def logout_router(request, payload: RefreshIn):
     try:
@@ -175,7 +187,7 @@ def logout_all_router(request):
 @router.get(
     "/sessions",
     response={200: list[SessionOut]},
-    auth=JWTAuth(),
+    auth=AllRolesAuth(),
     summary="Lista sessões ativas",
     description="Lista os refresh tokens ainda válidos (sessões/dispositivos logados) do usuário autenticado.",
 )
@@ -188,7 +200,7 @@ def list_sessions_router(request):
 @router.delete(
     "/sessions/{session_id}",
     response={200: MessageOut, 404: MessageOut},
-    auth=JWTAuth(),
+    auth=AllRolesAuth(),
     summary="Revoga uma sessão específica",
     description="Blacklista o refresh token correspondente, encerrando aquela sessão/dispositivo.",
 )
@@ -248,6 +260,7 @@ def register_router(request, payload: RegisterIn):
     
 
 
+
 @router.get("/verify-email/{uidb64}/{token}", summary="Confirmar e-mail",  description="Confirma o email e redireciona para o frontend.", auth=None,)
 @ratelimit( key="ip", rate="20/h", block=True,)
 def verify_email_endpoint_router(request, uidb64: str, token: str):
@@ -279,7 +292,7 @@ def resend_verification_email_router(request, email: str):
 
 
 @router.post("/change-password",  response={200: TokenOut, 400: MessageOut, 429: MessageOut},
-        auth=JWTAuth(), summary="Alterar senha", description=(
+        auth=AllRolesAuth(), summary="Alterar senha", description=(
         "Troca a senha do usuário autenticado. "
         "Todos os tokens anteriores são invalidados e um novo par é retornado."
     ),
@@ -296,6 +309,44 @@ def change_password_router(request, payload: ChangePasswordIn):
     except InvalidPassword as e:
         return 400, {"detail": str(e)}
     
+
+
+@router.delete(
+    "/delete-account",
+    response={200: MessageOut, 400: MessageOut},
+    auth=EmployeeOrClientAuth(),
+    summary="Exclui a própria conta",
+    description=(
+        "Exclusão de conta pelo próprio usuário (LGPD — direito de eliminação). "
+        "Exige confirmação de senha. Não é um hard-delete: o registro é mantido "
+        "para preservar vínculos (agendamentos, pagamentos, etc.), mas todo dado "
+        "pessoal do perfil é apagado/anonimizado, a senha se torna inutilizável "
+        "e todas as sessões são revogadas imediatamente."
+    ),
+)
+@ratelimit(key="user", rate="5/h", block=True)
+def delete_account_router(request, payload: DeleteAccountIn):
+    try:
+        delete_own_account(user=request.auth, password=payload.password)
+        return 200, {"detail": "Conta excluída com sucesso."}
+    except InvalidPassword as e:
+        return 400, {"detail": str(e)}
+
+
+@router.get(
+    "/export-my-data",
+    response={200: dict},
+    auth=AllRolesAuth(),
+    summary="Exporta os dados pessoais do usuário logado",
+    description=(
+        "Direito de portabilidade (LGPD): retorna os dados pessoais do usuário "
+        "autenticado (conta + perfil) em formato estruturado."
+    ),
+)
+@ratelimit(key="user", rate="10/h", block=True)
+def export_my_data_router(request):
+    return 200, export_user_data(request.auth.id)
+
 
 
 
@@ -335,6 +386,18 @@ def deactivate_account_router(request, user_id: uuid.UUID):
         return 404, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": f"Erro ao desativar usuário: {str(e)}"}
+
+
+@router.post("/reactivate-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Reativa Usuário.")
+@ratelimit(key="ip", rate="20/h", block=True)
+def reactivate_user_router(request, user_id: uuid.UUID):
+    try:
+        user = reactivate_user(user_id, performed_by=request.auth)
+        return 201, UserOut.from_orm(user=user)
+    except UserNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": f"Erro ao reativar usuário: {str(e)}"}
 
 
 @router.patch("/update-client-profile", response={200: ClientOut, 404: MessageOut, 400: MessageOut}, auth=ClientOnlyAuth(), summary="Atualiza perfil do Cliente logado.")
