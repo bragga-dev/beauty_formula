@@ -207,7 +207,7 @@ def promote_client_to_employee(user_id: uuid.UUID, performed_by=None) -> Employe
 
 
 
-transaction.atomic
+@transaction.atomic
 def deactivate_account(user_id: uuid.UUID, performed_by=None, reason="Desativação de conta"):
     """ Desativa usuário, revoga todos os tokens ativos e cria log de auditoria"""
     user = get_user_by_id(user_id)

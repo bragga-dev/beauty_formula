@@ -11,7 +11,6 @@ from beauty_formula.apps.core.permissions.roles import (
     is_employee,
     is_verified,
 )
-from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.models.user import User
 
 DEFAULT_EMPLOYEE_PHOTO = "default/employee_img.jpeg"
@@ -22,7 +21,7 @@ DEFAULT_CLIENT_PHOTO = "default/client_img.jpg"
 class EmployeeOnlyAuth(JWTAuth):
     def authenticate(self, request, token):
         user = super().authenticate(request, token)
-        if user and not is_verified(user):  
+        if user and not is_admin(user) and not is_verified(user):
             raise PermissionDenied("Verifique seu e-mail para acessar.")
         if user and not is_admin(user) and not is_employee(user):
             raise PermissionDenied("Apenas funcionários podem acessar este recurso.")
@@ -36,11 +35,10 @@ class EmployeeCompleteProfileAuth(JWTAuth):
             return None
         if not is_admin(user) and not is_employee(user):
             raise PermissionDenied("Apenas funcionários podem acessar este recurso.")
-        try:
-            employee = user.employee_profile
-            client = user.client_profile
-        except Employee.DoesNotExist:
-            raise PermissionDenied("Usuário não possui funcionário vinculada.")
+
+        employee = getattr(user, "employee_profile", None)
+        if not employee:
+            raise PermissionDenied("Usuário não possui funcionário vinculado.")
 
         required_fields = {
             "Nome completo": employee.full_name,
@@ -48,16 +46,12 @@ class EmployeeCompleteProfileAuth(JWTAuth):
             "Telefone": employee.phone,
             "Banner": employee.banner,
             "Descrição": employee.about,
-            "Foto": employee.user.photo,
             "Instagram": employee.instagram,
         }
 
         missing = [field for field, value in required_fields.items() if not value]
 
-        if employee.photo == DEFAULT_CLIENT_PHOTO:
-            missing.append("Foto (não pode ser a foto padrão)")
-
-        if client.photo == DEFAULT_EMPLOYEE_PHOTO:
+        if employee.photo == DEFAULT_EMPLOYEE_PHOTO:
             missing.append("Foto (não pode ser a foto padrão)")
 
         if missing:
@@ -70,7 +64,7 @@ class EmployeeCompleteProfileAuth(JWTAuth):
             )
 
         if not employee.is_verified:
-            raise PermissionDenied("A funcionário precisa ser verificada para acessar.")
+            raise PermissionDenied("O funcionário precisa ser verificado para acessar.")
         return user
 
 
