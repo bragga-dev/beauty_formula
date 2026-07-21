@@ -5,6 +5,7 @@ from django.http import HttpRequest
 from django.http import JsonResponse
 from beauty_formula.apps.core.exceptions import PermissionDenied
 from beauty_formula.apps.accounts.api.auth import router as auth_router
+from beauty_formula.apps.accounts.api.employees import router as employees_router
 from django_ratelimit.exceptions import Ratelimited
 import logging
 from django.conf import settings
@@ -34,6 +35,7 @@ api = NinjaAPI(
 
 
 api.add_router("/auth/", auth_router, tags=["Auth"])
+api.add_router("/employees/", employees_router, tags=["Employees"])
 
 
 # api.add_router("/admin/", admin_router, tags=["Admin"])

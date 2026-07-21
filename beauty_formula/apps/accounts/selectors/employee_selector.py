@@ -4,7 +4,7 @@ Queries de Funcionário - Funções para buscar e filtrar funcionários.
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import date
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Prefetch, QuerySet
 from django.shortcuts import get_object_or_404
 
 from beauty_formula.apps.accounts.models import Employee
@@ -394,7 +394,9 @@ def get_employees_by_gender(gender: str) -> List[Employee]:
 
 def get_employees_by_service(service_id: UUID) -> List[Employee]:
     """
-    Retorna funcionários que prestam um serviço específico.
+    Retorna funcionários ativos/aptos que prestam um serviço específico.
+    (A relação real é via EmployeeService.service_assignments, não um
+    campo `services` direto — Employee não tem esse M2M.)
     
     Args:
         service_id: UUID do serviço
@@ -403,7 +405,8 @@ def get_employees_by_service(service_id: UUID) -> List[Employee]:
         List[Employee]: Lista de funcionários encontrados
     """
     return Employee.objects.filter(
-        services__id=service_id
+        service_assignments__service_id=service_id,
+        service_assignments__active=True,
     ).select_related('user').distinct()
 
 
@@ -421,7 +424,8 @@ def get_employees_by_services(service_ids: List[UUID]) -> List[Employee]:
         return []
     
     return Employee.objects.filter(
-        services__id__in=service_ids
+        service_assignments__service_id__in=service_ids,
+        service_assignments__active=True,
     ).select_related('user').distinct()
 
 
@@ -433,7 +437,7 @@ def get_employees_with_services() -> List[Employee]:
         List[Employee]: Lista de funcionários com serviços
     """
     return Employee.objects.filter(
-        services__isnull=False
+        service_assignments__active=True
     ).select_related('user').distinct()
 
 
@@ -444,9 +448,24 @@ def get_employees_without_services() -> List[Employee]:
     Returns:
         List[Employee]: Lista de funcionários sem serviços
     """
-    return Employee.objects.filter(
-        services__isnull=True
-    ).select_related('user')
+    return Employee.objects.exclude(
+        service_assignments__active=True
+    ).select_related('user').distinct()
+
+
+def get_public_team_employees(service_id: Optional[UUID] = None) -> QuerySet:
+    """
+    Retorna os funcionários elegíveis pra aparecer na página pública
+    "Nosso Time": só usuários ativos (conta desativada não deve aparecer
+    numa vitrine pública). Filtro opcional por serviço.
+    """
+    qs = Employee.objects.filter(user__is_active=True).select_related('user')
+    if service_id:
+        qs = qs.filter(
+            service_assignments__service_id=service_id,
+            service_assignments__active=True,
+        )
+    return qs.distinct().order_by('first_name', 'last_name')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -593,7 +612,7 @@ def filter_employees(
         q &= Q(birth_date__lte=birth_date_before)
     
     if service_id:
-        q &= Q(services__id=service_id)
+        q &= Q(service_assignments__service_id=service_id, service_assignments__active=True)
     
     # Filtros de campos preenchidos
     if has_phone is not None:
@@ -622,9 +641,9 @@ def filter_employees(
     
     if has_services is not None:
         if has_services:
-            q &= Q(services__isnull=False)
+            q &= Q(service_assignments__active=True)
         else:
-            q &= Q(services__isnull=True)
+            q &= ~Q(service_assignments__active=True)
     
     if not q:
         return []
@@ -783,6 +802,7 @@ __all__ = [
     'get_employees_by_services',
     'get_employees_with_services',
     'get_employees_without_services',
+    'get_public_team_employees',
     
     # Por Bio
     'get_employees_by_bio_keyword',

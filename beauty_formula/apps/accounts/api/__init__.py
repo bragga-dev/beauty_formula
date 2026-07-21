@@ -18,6 +18,12 @@ from beauty_formula.apps.accounts.api.auth import (
     revoke_session_router,
 )
 
+from beauty_formula.apps.accounts.api.employees import (
+    team_detail_router,
+    team_list_router,
+
+)
+
 
 
 __all__ = [
@@ -38,6 +44,9 @@ __all__ = [
     "logout_all_router",
     "list_sessions_router",
     "revoke_session_router",
+
+    "team_detail_router",
+    "team_list_router",
 
 
 ]
