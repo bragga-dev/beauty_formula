@@ -32,7 +32,7 @@ from beauty_formula.apps.accounts.schemas.me_schema import (
     MeOut,
 
     )
-from beauty_formula.apps.accounts.schemas.user_schema import RegisterIn
+from beauty_formula.apps.accounts.schemas.user_schema import RegisterIn, RegisterEmployeeIn
 from beauty_formula.apps.accounts.schemas.client_schema import ClientUpdateIn, ClientOut
 from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeUpdateIn, EmployeeOut
 from beauty_formula.apps.accounts.selectors.client_selector import (
@@ -162,7 +162,7 @@ def login_or_register_client_google(id_token: str) -> tuple[dict, bool]:
 
 
 @transaction.atomic
-def register_user_default_employee(data: RegisterIn) -> dict:
+def register_user_default_employee(data: RegisterEmployeeIn) -> dict:
     """
     Cria o User + Employee e dispara e-mail de verificação.
     Retorna os tokens JWT diretamente para o cliente já poder operar.

@@ -57,6 +57,7 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     PasswordResetRequestIn,
     RefreshIn,
     RegisterIn,
+    RegisterEmployeeIn,
     SessionOut,
     TokenOut,
 )
@@ -353,7 +354,7 @@ def export_my_data_router(request):
 
 @router.post("/register-employee", response={201: TokenOut, 409: MessageOut}, auth=AdminOnlyAuth(), summary="Cadastro de Funcionário",)
 @ratelimit(key="ip", rate="20/h", block=True,)
-def register_employee_router(request, payload: RegisterIn):
+def register_employee_router(request, payload: RegisterEmployeeIn):
     """
     Cria o usuário com role "employee" e retorna tokens JWT.
     Um e-mail de verificação é enviado em background via Celery.

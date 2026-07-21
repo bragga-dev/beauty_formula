@@ -44,6 +44,16 @@ class RegisterIn(Schema):
         return self
 
 
+class RegisterEmployeeIn(Schema):
+    """
+    Cadastro de Funcionário pelo Admin. Diferente de `RegisterIn`
+    (cadastro de Client), aqui o Admin informa apenas o e-mail: a senha
+    é gerada automaticamente (ver `generate_temp_password`) e enviada
+    ao funcionário por e-mail para o primeiro acesso.
+    """
+    email: EmailStr
+
+
 class LoginIn(Schema):
     email:    str
     password: str
@@ -160,6 +170,7 @@ class MessageOut(Schema):
 __all__ = [
     "UserRoleEnum",
     "RegisterIn",
+    "RegisterEmployeeIn",
     "LoginIn",
     "GoogleLoginIn",
     "TokenOut",
