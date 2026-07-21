@@ -10,7 +10,7 @@ from beauty_formula.apps.core.constants.gender import Gender
 from phonenumber_field.modelfields import PhoneNumberField
 from phonenumbers import parse, format_number, PhoneNumberFormat
 from datetime import timezone
-
+from django.utils import timezone 
 
 
 def client_photo_path(instance, filename):
@@ -28,7 +28,7 @@ class Client(models.Model):
     first_name = models.CharField(_("Nome"), max_length=255, blank=True, null=True)
     last_name = models.CharField(_("Sobrenome"), max_length=255, blank=True, null=True)
     username = models.CharField(_("Nome de usuário"), max_length=150, unique=True, blank=True, null=True)
-    phone = PhoneNumberField(region="BR", blank=True, default="", null=False, help_text=_('Número de telefone no formato internacional, ex: +55 11 99999-8888.'),)
+    phone = PhoneNumberField(region="BR", blank=True, default="", null=True, help_text=_('Número de telefone no formato internacional, ex: +55 11 99999-8888.'),)
     gender = models.CharField(_("Gênero"), max_length=10, choices=Gender.CHOICES, default=Gender.OTHER)
     birth_date = models.DateField(_("Data de nascimento"), blank=True, null=True)
     instagram = models.URLField(_("Instagram"), max_length=255, blank=True, null=True, help_text=_("URL do perfil do Instagram do cliente."))
@@ -72,9 +72,9 @@ class Client(models.Model):
         return format_number(number, PhoneNumberFormat.E164)
 
     def clean(self):
-        if self.date_of_birth and self.date_of_birth > timezone.localdate():
+        if self.birth_date and self.birth_date > timezone.now().date():
             raise ValidationError(
-                {'date_of_birth': _('Data de nascimento não pode ser no futuro.')}
+                {'birth_date': _('Data de nascimento não pode ser no futuro.')}
             )
 
     def save(self, *args, **kwargs):

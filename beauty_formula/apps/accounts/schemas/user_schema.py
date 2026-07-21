@@ -16,6 +16,7 @@ from beauty_formula.apps.accounts.models.user import User
 # ── Enums ─────────────────────────────────────────────────────────────────────
 
 class UserRoleEnum(str, Enum):
+    ADMIN = User.UserRole.ADMIN
     CLIENT = User.UserRole.CLIENT
     EMPLOYEE = User.UserRole.EMPLOYEE
 
@@ -26,7 +27,6 @@ class RegisterIn(Schema):
     email:     EmailStr
     password:  str = Field(..., min_length=8)
     password2: str = Field(..., min_length=8)
-    role:      UserRoleEnum = UserRoleEnum.CLIENT
 
     @field_validator("password")
     @classmethod
@@ -47,6 +47,14 @@ class RegisterIn(Schema):
 class LoginIn(Schema):
     email:    str
     password: str
+
+
+class GoogleLoginIn(Schema):
+    """
+    id_token: JWT (`credential`) emitido pelo Google Identity Services
+    no frontend após o usuário se autenticar com a conta Google.
+    """
+    id_token: str = Field(..., min_length=10)
 
 
 class TokenOut(Schema):
@@ -77,6 +85,11 @@ class ChangePasswordIn(Schema):
         if self.new_password != self.new_password2:
             raise ValueError("As senhas não coincidem.")
         return self
+
+
+class DeleteAccountIn(Schema):
+    """Confirmação de senha exigida para exclusão da própria conta (LGPD)."""
+    password: str
 
 
 class PasswordResetRequestIn(Schema):
@@ -123,6 +136,21 @@ class UserOut(Schema):
         )
 
 
+class SessionOut(Schema):
+    """Representa um refresh token ativo (uma sessão/dispositivo logado)."""
+    id:         int
+    created_at: Optional[datetime] = None
+    expires_at: datetime
+
+    @classmethod
+    def from_orm(cls, token) -> "SessionOut":
+        return cls(
+            id=token.id,
+            created_at=token.created_at,
+            expires_at=token.expires_at,
+        )
+
+
 # ── Mensagem genérica (respostas simples) ───────────────────────────────────
 
 class MessageOut(Schema):
@@ -133,11 +161,14 @@ __all__ = [
     "UserRoleEnum",
     "RegisterIn",
     "LoginIn",
+    "GoogleLoginIn",
     "TokenOut",
     "RefreshIn",
     "ChangePasswordIn",
+    "DeleteAccountIn",
     "PasswordResetRequestIn",
     "PasswordResetConfirmIn",
     "UserOut",
+    "SessionOut",
     "MessageOut",
 ]

@@ -10,10 +10,10 @@
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::beauty_formula-media",
-        "arn:aws:s3:::beauty_formula-media/*",
-        "arn:aws:s3:::beauty_formula-private",
-        "arn:aws:s3:::beauty_formula-private/*"
+        "arn:aws:s3:::beautyformulamedia",
+        "arn:aws:s3:::beautyformulamedia/*",
+        "arn:aws:s3:::beautyformulaprivate",
+        "arn:aws:s3:::beautyformulaprivate/*"
       ]
     },
     {
@@ -23,8 +23,8 @@
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::beauty_formula-static",
-        "arn:aws:s3:::beauty_formula-static/*"
+        "arn:aws:s3:::beautyformulastatic",
+        "arn:aws:s3:::beautyformulastatic/*"
       ]
     }
   ]

@@ -69,6 +69,9 @@ def get_staff_users() -> QuerySet[User]:
     """Retorna usuários com acesso ao admin."""
     return User.objects.filter(is_staff=True)
 
+def get_user_confirmed_by_role(user_id: uuid.UUID, role: str) -> Optional[User]:
+    """Retorna usuário confirmado pelo ID e Role"""
+    return User.objects.filter(pk=user_id, role=role, is_trusty=True, is_active=True).first()
 
 # ── Exclusões ─────────────────────────────────────────────────────────────────
 
@@ -99,12 +102,12 @@ def get_active_users_by_role(role: str) -> QuerySet[User]:
 
 def get_user_with_related(user_id: uuid.UUID) -> Optional[User]:
     """
-    Busca usuário com select_related para employee ou client.
-    Evita N+1 quando você vai acessar user.employee ou user.client logo depois.
+    Busca usuário com select_related para employee_profile ou client_profile.
+    Evita N+1 quando você vai acessar user.client_profile ou user.employee_profile logo depois.
     """
     return (
         User.objects
-        .select_related("employee", "client")
+        .select_related("employee_profile", "client_profile")
         .filter(pk=user_id)
         .first()
     )

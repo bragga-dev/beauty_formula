@@ -10,6 +10,7 @@ from beauty_formula.apps.accounts.schemas.employee_schema import (
     EmployeeOut,
     EmployeeCreateIn,
     EmployeeUpdateIn,
+    PromoteToEmployeeIn,
 )
 
 from beauty_formula.apps.accounts.schemas.user_schema import (
@@ -22,10 +23,18 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     PasswordResetRequestIn,
     PasswordResetConfirmIn,
     UserOut,
+    SessionOut,
     MessageOut,
 )
 
+from beauty_formula.apps.accounts.schemas.me_schema import (
+    EmployeeProfileOut,
+    ClientProfileOut,
+    MeOut,
+)
+
 __all__ = [
+    
     # User schemas (auth e user)
     "UserRoleEnum",
     "RegisterIn",
@@ -36,6 +45,7 @@ __all__ = [
     "PasswordResetRequestIn",
     "PasswordResetConfirmIn",
     "UserOut",
+    "SessionOut",
     "MessageOut",
     
     # Client schemas
@@ -47,4 +57,11 @@ __all__ = [
     "EmployeeOut",
     "EmployeeCreateIn",
     "EmployeeUpdateIn",
+    "PromoteToEmployeeIn",
+
+    # Me schemas
+    "EmployeeProfileOut",
+    "ClientProfileOut",
+    "MeOut",
+
 ]

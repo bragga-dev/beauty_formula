@@ -1,4 +1,3 @@
-
 import uuid
 
 
@@ -24,6 +23,20 @@ class Service(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def image_url(self) -> str:
+        """
+        Retorna a URL da imagem no MinIO.
+        Nunca lança erro: se a imagem não existir no bucket, devolve a URL do padrão.
+        """
+        default_image = self._meta.get_field("image").default
+        if self.image and self.image.name != default_image:
+            try:
+                return self.image.url
+            except Exception:
+                pass
+        return self.image.storage.url(default_image)
     
     class Meta:
         verbose_name = _("Serviço")

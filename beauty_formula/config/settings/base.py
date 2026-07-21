@@ -231,11 +231,11 @@ REDIS_URL = env(
 )
 
 # =========================================================
-# CELERY / RABBITMQ
+# CELERY (REDIS)
 # =========================================================
 CELERY_BROKER_URL = env(
     "CELERY_BROKER_URL",
-    default=f"amqp://{env('RABBITMQ_USER')}:{env('RABBITMQ_PASSWORD')}@{env('RABBITMQ_HOST')}:{env('RABBITMQ_PORT')}/{env('RABBITMQ_VHOST', default='')}"
+    default=REDIS_URL,
 )
 
 CELERY_RESULT_BACKEND = env(
@@ -416,4 +416,10 @@ CACHES = {
 }
 
 RATELIMIT_USE_CACHE = "default"
-RATELIMIT_FAIL_OPEN = False  
+RATELIMIT_FAIL_OPEN = False
+
+
+# =========================================================
+# GOOGLE OAUTH
+# =========================================================
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")

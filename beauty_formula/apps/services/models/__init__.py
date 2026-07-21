@@ -7,7 +7,7 @@ from beauty_formula.apps.services.models.scheduling import Scheduling
 
 
 
-___all__ = [
+__all__ = [
     'Service',
     'AverageRating',
     'EmployeeTimeOff',

@@ -1,12 +1,12 @@
 
 class Gender:
-    MALE = 'M'
-    FEMALE = 'F'
-    OTHER = 'O'
+    MALE = 'Masculino'
+    FEMALE = 'Feminino'
+    OTHER = 'Outro'
 
     CHOICES = [
         (MALE, 'Masculino'),
         (FEMALE, 'Feminino'),
-        (OTHER, 'Prefiro não informar'),
+        (OTHER, 'Outro'),
     ]
 
