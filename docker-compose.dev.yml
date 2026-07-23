@@ -161,7 +161,8 @@ services:
         # ── 6. Upload de arquivos padrão ───────────────────────────
         mc cp /default/client_img.jpg local/"$MINIO_BUCKET_MEDIA"/default/client_img.jpg
         mc cp /default/employee_img.jpeg   local/"$MINIO_BUCKET_MEDIA"/default/employee_img.jpeg
-
+        mc cp /default/service_img.png   local/"$MINIO_BUCKET_MEDIA"/default/service_img.png
+        
         echo "✅ MinIO setup concluído"
 
 # =========================================================
