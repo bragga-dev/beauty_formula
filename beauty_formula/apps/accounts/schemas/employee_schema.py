@@ -144,7 +144,7 @@ class EmployeeTeamOut(Schema):
             instagram=employee.instagram,
         )
  
- 
+    
 class EmployeeTeamDetailOut(EmployeeTeamOut):
     """Página de detalhe pública de um funcionário: card + serviços que ele presta."""
     services: List[ServiceOut] = []
