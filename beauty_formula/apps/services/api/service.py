@@ -15,6 +15,10 @@ from beauty_formula.apps.services.services.service_service import (
     list_all_public_services,
     detail_service,
     delete_service_for_admin,
+    deactivate_service_for_admin,
+    activate_service_for_admin,
+    list_all_private_services,
+    update_image_service_for_admin,
 )
 from beauty_formula.apps.accounts.services.user_service import (
     deactivate_account,
@@ -64,6 +68,9 @@ from beauty_formula.apps.services.schemas.service_schema import (
     ServiceOut,
     ServiceFilter,
     ServiceUpdateIn,
+    ServiceUpdateStatusIn,
+    ServicePrivateOut
+
     )
 
 from beauty_formula.apps.accounts.schemas.employee_schema import PromoteToEmployeeIn
@@ -105,16 +112,11 @@ from beauty_formula.apps.core.exceptions.service_exception import ServiceNotFoun
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.core.exceptions.permissions import PermissionDenied
-from beauty_formula.apps.core.utils.pagination import paginate_queryset
+from beauty_formula.apps.core.utils.pagination import paginate_queryset, PageOut, PAGE_SIZE_DEFAULT
 
 router = Router()
 
 
-
-router = Router()
-
-from beauty_formula.apps.core.schemas.deafult_schema import PageOut
-from beauty_formula.apps.core.utils.pagination import paginate_queryset
 
 @router.get(
     "/list-services",
@@ -134,6 +136,34 @@ def list_services_router(request, page: int = 1, page_size: int = 20):
     """
     try:
         services_qs = list_all_public_services()
+        result = paginate_queryset(services_qs, page, page_size, lambda service: service)
+        return 200, result
+    except PermissionDenied:
+        return 403, {"detail": "Acesso negado"}
+    except ServiceNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+@router.get(
+    "/list-private-services",
+    response={
+        200: PageOut[ServicePrivateOut],
+        400: MessageOut,
+        403: MessageOut,
+        404: MessageOut,
+    },
+    auth=AdminOnlyAuth(),
+    summary="Retorna todos os Serviços ",
+)
+@ratelimit(key="ip", rate="10/m", block=True)
+def list_private_services_router(request, page: int = 1, page_size: int = 20):
+    """
+    Endpoint público para listar todos os serviços ativos.
+    """
+    try:
+        user: User = request.auth
+        services_qs = list_all_private_services(user_id=user.id)
         result = paginate_queryset(services_qs, page, page_size, lambda service: service)
         return 200, result
     except PermissionDenied:
@@ -175,8 +205,9 @@ def detail_service_router(request, service_id: uuid.UUID):
 @router.post("/create-service", response={201: ServiceOut, 400: MessageOut, 403: MessageOut},  auth=AdminOnlyAuth(), summary="Cria/Registra um serviço da Barbearia/Salão",)
 @ratelimit(key="user", rate="30/m", block=True)
 def create_service_router(request, payload: ServiceCreateIn, image: Optional[UploadedFile] = File(None)):
-    user: User = request.auth
+    
     try:
+        user: User = request.auth
         service = create_service_for_admin(user.id, payload, image=image)
         return 201, service
     except PermissionDenied:
@@ -187,7 +218,7 @@ def create_service_router(request, payload: ServiceCreateIn, image: Optional[Upl
 
 
 @router.patch(
-    "/{service_id}",
+    "/update-service/{service_id}",
     response={200: ServiceOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
     auth=AdminOnlyAuth(),
     summary="Atualiza um serviço existente",
@@ -207,9 +238,8 @@ def update_service_router(request, service_id: uuid.UUID, payload: ServiceUpdate
 
 
 
-
 @router.delete(
-    "/{service_id}",
+    "/delete-service/{service_id}",
     response={200: None, 400: MessageOut, 403: MessageOut, 404: MessageOut},
     auth=AdminOnlyAuth(),
     summary="Deleta um serviço existente",
@@ -227,3 +257,64 @@ def delete_service_router(request, service_id: uuid.UUID):
     except Exception as e:
         return 400, {"detail": str(e)}
 
+
+@router.patch(
+    "/deactivate-service/{service_id}",
+    response={201: ServiceOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Desativa serviço",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def deactivate_service_router(request, service_id: uuid.UUID):
+    user: User = request.auth
+    try:
+        service = deactivate_service_for_admin(user.id, service_id)
+        return 201, service
+    except PermissionDenied:
+        raise
+    except ServiceNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+@router.patch(
+    "/activate-service/{service_id}",
+    response={201: ServiceOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Ativa serviço",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def activate_service_router(request, service_id: uuid.UUID):
+    user: User = request.auth
+    try:
+        service = activate_service_for_admin(user.id, service_id)
+        return 201, service
+    except PermissionDenied:
+        raise
+    except ServiceNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+
+@router.patch(
+    "/update-image-service/{service_id}",
+    response={200: ServiceOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Atualiza somente a foto de um serviço existente",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def update_image_service_router(request, service_id: uuid.UUID, image: UploadedFile = File(...)):
+    try:
+        user: User = request.auth
+        service = update_image_service_for_admin(user.id, service_id, image=image)
+        return 200, service
+    except PermissionDenied:
+        raise
+    except ServiceNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+ 

@@ -15,12 +15,12 @@ from beauty_formula.apps.services.models.service import Service, DEFAULT_SERVICE
 
 def get_all_services() -> QuerySet[Service]:
     """Retorna todos os serviços, sem filtro."""
-    return Service.objects.all()
+    return Service.objects.all().order_by("name")
 
 
 def get_active_services() -> QuerySet[Service]:
     """Retorna apenas serviços ativos."""
-    return Service.objects.filter(is_active=True)
+    return Service.objects.filter(is_active=True).order_by("name")
 
 
 def get_inactive_services() -> QuerySet[Service]:
@@ -34,10 +34,17 @@ def get_inactive_services() -> QuerySet[Service]:
 def get_service_by_id(service_id: UUID) -> Optional[Service]:
     """Retorna o serviço pelo ID, ou None se não existir."""
     try:
-        return Service.objects.filter(id=service_id, is_active=True).first()
+        return Service.objects.filter(id=service_id).first()
     except Service.DoesNotExist:
         return None
 
+
+def get_service_by_id_inactivate(service_id: UUID) -> Optional[Service]:
+    """Retorna o serviço pelo ID, que estejam inativos."""
+    try:
+        return Service.objects.filter(id=service_id, is_active=False).first()
+    except Service.DoesNotExist:
+        return None
 
 def get_services_by_ids(service_ids: List[UUID]) -> QuerySet[Service]:
     """Retorna múltiplos serviços por uma lista de IDs."""

@@ -56,6 +56,23 @@ class ServiceOut(Schema):
     def resolve_duration_minutes(service: Service) -> int:
         return int(service.duration.total_seconds() // 60)
 
+class ServicePrivateOut(Schema):
+    """
+    Representação pública de um serviço. Deliberadamente NÃO inclui
+    `commission_percentage` nem `total_bookings` — dado interno de
+    negócio, não deveria ser exposto numa página pública.
+    """
+    id: uuid.UUID
+    name: str
+    description: Optional[str] = None
+    price: Decimal
+    image_url: str
+    duration_minutes: int
+    is_active: bool
+
+    @staticmethod
+    def resolve_duration_minutes(service: Service) -> int:
+        return int(service.duration.total_seconds() // 60)
 
 class ServiceCreateIn(Schema):
     name: str
@@ -83,8 +100,20 @@ class ServiceUpdateIn(Schema):
     _duration_validator = field_validator("duration_minutes")(_validate_duration_minutes)
 
 
+
+class ServiceUpdateStatusIn(Schema):
+    is_active: bool
+
 class ServiceFilter(Schema):
     search: Optional[str] = None
 
 
-__all__ = ["ServiceOut", "ServiceCreateIn", "ServiceUpdateIn", "ServiceFilter"]
+__all__ = [
+
+    "ServiceOut", 
+    "ServiceCreateIn", 
+    "ServiceUpdateIn", 
+    "ServiceFilter",
+    "ServiceActivateIn",
+
+    ]
