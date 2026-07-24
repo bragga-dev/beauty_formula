@@ -17,6 +17,8 @@ from django.db import transaction
 from beauty_formula.apps.services.models.service import DEFAULT_SERVICE_PHOTO, Service
 
 
+UPDATABLE_SERVICE_FIELDS = {"name", "description", "price", "commission_percentage", "duration"}
+
 @transaction.atomic
 def create_service(
     *,
@@ -44,32 +46,28 @@ def create_service(
 
 
 @transaction.atomic
-def update_service(
-    service: Service,
-    *,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
-    price: Optional[Decimal] = None,
-    commission_percentage: Optional[Decimal] = None,
-    duration: Optional[timedelta] = None,
-) -> Service:
+def update_service(service: Service, **fields) -> Service:
     """
-    Atualiza campos de um serviço existente. Apenas os campos passados
-    (diferentes de None) são alterados — atualização parcial.
-    """
-    if name is not None:
-        service.name = name
-    if description is not None:
-        service.description = description
-    if price is not None:
-        service.price = price
-    if commission_percentage is not None:
-        service.commission_percentage = commission_percentage
-    if duration is not None:
-        service.duration = duration
+    Atualiza parcialmente um serviço.
 
-    service.full_clean()
-    service.save()
+    Só os campos presentes em `fields` são alterados — inclusive se o
+    valor for `None` (ex: `description=None` limpa a descrição de
+    propósito). Campos que o chamador não passou permanecem intocados.
+    O chamador (camada de `services.py`) é quem decide quais campos
+    entram aqui, tipicamente usando `payload.model_dump(exclude_unset=True)`
+    pra distinguir "não veio no request" de "veio como null".
+    """
+    unknown = set(fields) - UPDATABLE_SERVICE_FIELDS
+    if unknown:
+        raise ValueError(f"Campos não atualizáveis em Service: {', '.join(sorted(unknown))}")
+
+    if not fields:
+        return service
+
+    for field, value in fields.items():
+        setattr(service, field, value)
+
+    service.save()  # Service.save() já roda full_clean() internamente
     return service
 
 

@@ -34,7 +34,7 @@ def get_inactive_services() -> QuerySet[Service]:
 def get_service_by_id(service_id: UUID) -> Optional[Service]:
     """Retorna o serviço pelo ID, ou None se não existir."""
     try:
-        return Service.objects.get(id=service_id)
+        return Service.objects.filter(id=service_id, is_active=True).first()
     except Service.DoesNotExist:
         return None
 
