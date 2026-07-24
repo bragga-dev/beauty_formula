@@ -14,6 +14,7 @@ from beauty_formula.apps.services.services.service_service import (
     update_service_for_admin,
     list_all_public_services,
     detail_service,
+    delete_service_for_admin,
 )
 from beauty_formula.apps.accounts.services.user_service import (
     deactivate_account,
@@ -205,4 +206,24 @@ def update_service_router(request, service_id: uuid.UUID, payload: ServiceUpdate
         return 400, {"detail": str(e)}
 
 
+
+
+@router.delete(
+    "/{service_id}",
+    response={200: None, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Deleta um serviço existente",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def delete_service_router(request, service_id: uuid.UUID):
+    user: User = request.auth
+    try:
+        delete_service_for_admin(user.id, service_id)
+        return 200, {"detail": "Serviço excluído com sucesso !!!"}
+    except PermissionDenied:
+        raise
+    except ServiceNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
 

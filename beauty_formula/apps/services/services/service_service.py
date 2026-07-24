@@ -80,3 +80,14 @@ def detail_service(service_id: uuid.UUID) -> ServiceOut:
     if service is None:
         raise ServiceNotFound()
     return service
+
+
+def delete_service_for_admin(user_id: uuid.UUID, service_id:uuid.UUID) -> None:
+    user = get_user_by_id(user_id=user_id)
+    if not user.role == User.UserRole.ADMIN:
+        raise PermissionDenied("Apenas Administradores podem executar essa ação")
+    service = get_service_by_id(service_id=service_id)
+    if service is None:
+        raise ServiceNotFound()
+    delete_service(service=service)
+    
