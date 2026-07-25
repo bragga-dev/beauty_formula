@@ -96,11 +96,11 @@ def search_services(query: str) -> QuerySet[Service]:
 def get_services_for_employee(employee_id: UUID) -> QuerySet[Service]:
     """
     Retorna os serviços que um funcionário está apto a atender
-    (via EmployeeService.active=True).
+    (via EmployeeService.is_active=True).
     """
     return Service.objects.filter(
         employee_assignments__employee_id=employee_id,
-        employee_assignments__active=True,
+        employee_assignments__is_active=True,
     ).distinct().order_by("name")
 
 
@@ -260,5 +260,3 @@ def validate_service_name_available(name: str, exclude_id: Optional[UUID] = None
     if exclude_id:
         qs = qs.exclude(id=exclude_id)
     return not qs.exists()
-
-

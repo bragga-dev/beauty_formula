@@ -56,6 +56,17 @@ class Employee(models.Model):
             except Exception:
                 pass
         return self.photo.storage.url(DEFAULT_EMPLOYEE_PHOTO)    
+
+    @property
+    def gender_label(self) -> str:
+        """
+        Rótulo legível do gênero (ex: 'Masculino'). Property no model, não
+        só na schema — assim resolve certo mesmo quando EmployeeOut é usado
+        aninhado dentro de outro schema (resolução automática via getattr,
+        que não passa pelo from_orm() custom).
+        """
+        return self.get_gender_display()
+
     
     def get_full_name(self):
         full_name = f"{self.first_name} {self.last_name}".strip()

@@ -158,7 +158,7 @@ class EmployeeTeamDetailOut(EmployeeTeamOut):
             photo_url=employee.photo_url,
             bio=employee.bio,
             instagram=employee.instagram,
-            services=[ServiceOut.from_orm(s) for s in (services or [])],
+            services=list(services or []),
         )
  
  
