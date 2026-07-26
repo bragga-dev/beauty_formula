@@ -35,12 +35,8 @@ router = Router()
 def create_employee_service_router(request, payload: EmployeeServiceCreateIn):
     user: User = request.auth
 
-    employee = get_employee_by_user_id(user.id)
-    if employee is None:
-        return 404, {"detail": "Perfil de funcionário não encontrado para este usuário."}
-
     try:
-        employee_service = create_employee_service_for_employee(employee.id, payload)
+        employee_service = create_employee_service_for_employee(user_id=user.id, data=payload)
         return 201, employee_service
     except EmployeeNotFoundError:
         return 404, {"detail": "Funcionário não encontrado."}

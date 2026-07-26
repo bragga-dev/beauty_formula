@@ -9,6 +9,7 @@ from beauty_formula.apps.services.schemas.employee_service_schema import (
 
 from beauty_formula.apps.accounts.selectors.employee_selector import (
     get_employee_by_id,
+    get_employee_by_user_id,
 )
 
 from beauty_formula.apps.services.selectors.service_selector import (
@@ -32,9 +33,12 @@ from beauty_formula.apps.services.repositories.employee_service_repository impor
     delete_employee_service,
     activate_employee_service,
 )
+from beauty_formula.apps.accounts.selectors.user_selector import (
+    get_user_with_related,
 
+)
 
-def create_employee_service_for_employee(employee_id: uuid.UUID, data: EmployeeServiceCreateIn) -> EmployeeServicePrivateOut:
+def create_employee_service_for_employee(user_id: uuid.UUID, data: EmployeeServiceCreateIn) -> EmployeeServicePrivateOut:
     """
     Funcionário vincula um serviço que passa a atender.
 
@@ -43,7 +47,7 @@ def create_employee_service_for_employee(employee_id: uuid.UUID, data: EmployeeS
     duplicata de qualquer forma, mas assim devolvemos um resultado útil
     em vez de deixar estourar erro de integridade do banco.
     """
-    employee = get_employee_by_id(employee_id=employee_id)
+    employee = get_employee_by_user_id(user_id=user_id)
     if employee is None:
         raise EmployeeNotFoundError()
 
@@ -51,7 +55,7 @@ def create_employee_service_for_employee(employee_id: uuid.UUID, data: EmployeeS
     if service is None:
         raise ServiceNotFound()
 
-    existing = get_employee_service(employee_id=employee_id, service_id=data.service_id)
+    existing = get_employee_service(employee_id=employee.id, service_id=data.service_id)
     if existing is not None:
         if existing.is_active:
             raise AssociationAlreadyExists()
