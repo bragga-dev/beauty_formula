@@ -64,3 +64,46 @@ def create_employee_service_for_employee(user_id: uuid.UUID, data: EmployeeServi
 
     association_created = create_employee_service(employee=employee, service=service)
     return EmployeeServicePrivateOut.from_orm(association_created)
+
+
+def _get_own_employee_service(user_id: uuid.UUID, employee_service_id: uuid.UUID):
+    """
+    Resolve o Employee dono do vínculo e o EmployeeService pelo ID,
+    garantindo que o vínculo pertence a esse funcionário.
+    """
+    employee = get_employee_by_user_id(user_id=user_id)
+    if employee is None:
+        raise EmployeeNotFoundError()
+
+    employee_service = get_employee_service_by_id(employee_service_id=employee_service_id)
+    if employee_service is None or employee_service.employee_id != employee.id:
+        raise AssociationNotFound()
+
+    return employee_service
+
+
+def activate_employee_service_for_employee(user_id: uuid.UUID, employee_service_id: uuid.UUID) -> EmployeeServicePrivateOut:
+    """Funcionário reativa um vínculo próprio que estava desativado."""
+    employee_service = _get_own_employee_service(user_id, employee_service_id)
+    employee_service = activate_employee_service(employee_service)
+    return EmployeeServicePrivateOut.from_orm(employee_service)
+
+
+def deactivate_employee_service_for_employee(user_id: uuid.UUID, employee_service_id: uuid.UUID) -> EmployeeServicePrivateOut:
+    """
+    Funcionário desativa um vínculo próprio (soft delete) — preserva o
+    histórico de agendamentos feitos enquanto o vínculo estava ativo.
+    """
+    employee_service = _get_own_employee_service(user_id, employee_service_id)
+    employee_service = deactivate_employee_service(employee_service)
+    return EmployeeServicePrivateOut.from_orm(employee_service)
+
+
+def delete_employee_service_for_employee(user_id: uuid.UUID, employee_service_id: uuid.UUID) -> None:
+    """
+    Funcionário exclui permanentemente um vínculo próprio.
+    Use com cautela — prefira `deactivate_employee_service_for_employee` na
+    maioria dos casos, já que isso apaga o registro do banco de vez.
+    """
+    employee_service = _get_own_employee_service(user_id, employee_service_id)
+    delete_employee_service(employee_service)

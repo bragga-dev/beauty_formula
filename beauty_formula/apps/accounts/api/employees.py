@@ -14,7 +14,9 @@ from beauty_formula.apps.accounts.selectors.employee_selector import (
     get_employee_by_id,
     get_public_team_employees,
 )
-from beauty_formula.apps.services.selectors.service_selector import get_services_for_employee
+from beauty_formula.apps.services.selectors.employee_service_selector import (
+    get_services_for_employee,
+)
 from beauty_formula.apps.core.utils.pagination import paginate_queryset
 from beauty_formula.apps.core.schemas.deafult_schema import PageOut
 
