@@ -66,10 +66,31 @@ def create_employee_service_for_employee(user_id: uuid.UUID, data: EmployeeServi
     return EmployeeServicePrivateOut.from_orm(association_created)
 
 
+def list_own_employee_services(user_id: uuid.UUID, active_only: bool = False):
+    """
+    Lista os vínculos de serviço do próprio funcionário — por padrão
+    inclui ativos e inativos, já que é o próprio funcionário gerenciando
+    (ativar/desativar/excluir) e precisa ver o estado de cada um.
+
+    Retorna o queryset cru (EmployeeService), não convertido pra schema
+    aqui: a conversão acontece uma única vez, no response model do
+    router (EmployeeServiceOut), evitando revalidação de instância já
+    convertida — mesmo problema que já resolvemos no team_detail_router.
+    """
+    employee = get_employee_by_user_id(user_id=user_id)
+    if employee is None:
+        raise EmployeeNotFoundError()
+
+    return get_services_for_employee(employee_id=employee.id, active_only=active_only)
+
+
 def _get_own_employee_service(user_id: uuid.UUID, employee_service_id: uuid.UUID):
     """
     Resolve o Employee dono do vínculo e o EmployeeService pelo ID,
     garantindo que o vínculo pertence a esse funcionário.
+
+    Centralizado aqui porque activate/deactivate/delete repetem exatamente
+    essa checagem de posse antes de agir.
     """
     employee = get_employee_by_user_id(user_id=user_id)
     if employee is None:

@@ -16,8 +16,10 @@ from beauty_formula.apps.core.exceptions.service_exception import (
     ServiceNotFound,
 )
 from beauty_formula.apps.core.permissions.auth_classes import EmployeeOnlyAuth
+from beauty_formula.apps.core.utils.pagination import paginate_queryset, PageOut, PAGE_SIZE_DEFAULT
 from beauty_formula.apps.services.schemas.employee_service_schema import (
     EmployeeServiceCreateIn,
+    EmployeeServiceOut,
     EmployeeServicePrivateOut,
 )
 from beauty_formula.apps.services.services.employee_service_service import (
@@ -25,9 +27,38 @@ from beauty_formula.apps.services.services.employee_service_service import (
     activate_employee_service_for_employee,
     deactivate_employee_service_for_employee,
     delete_employee_service_for_employee,
+    list_own_employee_services,
 )
 
 router = Router()
+
+
+@router.get(
+    "/list-my-services",
+    response={200: PageOut[EmployeeServiceOut], 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=EmployeeOnlyAuth(),
+    summary="Funcionário lista os próprios vínculos de serviço (ativos e inativos)",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def list_my_employee_services_router(
+    request, page: int = 1, page_size: int = PAGE_SIZE_DEFAULT, active_only: bool = False
+):
+    """
+    Lista TODOS os atributos de cada vínculo (incluindo is_active),
+    já que o próprio funcionário precisa enxergar o estado de cada
+    serviço pra decidir se ativa, desativa ou exclui. `active_only=True`
+    filtra só os ativos, se o client quiser.
+    """
+    user: User = request.auth
+
+    try:
+        services_qs = list_own_employee_services(user_id=user.id, active_only=active_only)
+        result = paginate_queryset(services_qs, page, page_size, lambda es: es)
+        return 200, result
+    except EmployeeNotFoundError:
+        return 404, {"detail": "Funcionário não encontrado."}
+    except Exception as e:
+        return 400, {"detail": str(e)}
 
 
 @router.post(

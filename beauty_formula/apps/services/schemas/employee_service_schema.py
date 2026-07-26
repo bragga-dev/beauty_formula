@@ -9,12 +9,18 @@ from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeOut
 class EmployeeServiceOut(Schema):
     """
     Vínculo entre funcionário e serviço — visão do próprio funcionário.
-    Não expõe employee_id: nesse contexto o funcionário já é o dono da
-    lista (endpoint filtra por request.auth), não precisa repetir quem ele é.
+    Não expõe employee_id/employee: nesse contexto o funcionário já é o
+    dono da lista (endpoint filtra por request.auth), não precisa
+    repetir quem ele é. Os demais atributos do model (id, service_id,
+    service, is_active, created_at) aparecem todos — o funcionário
+    precisa ver is_active pra saber quais vínculos estão ativos/inativos
+    na própria listagem, já que é ele quem ativa/desativa/exclui.
     """
     id: uuid.UUID
     service_id: uuid.UUID
     service: ServiceOut
+    is_active: bool
+    created_at: datetime
 
 
 class EmployeeServicePrivateOut(Schema):
