@@ -29,3 +29,20 @@ class WorkingHoursNotFound(Exception):
     def __init__(self, message=None):
         self.message = message or _("Horário de trabalho não encontrado.")
         super().__init__(self.message)
+
+
+class TimeOffConflict(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Horário de pausa não estão alinhados.")
+        super().__init__(self.message)
+
+class TimeOffNotFound(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Horário de pausa não encontrado.")
+        super().__init__(self.message)
+
+class InvalidTimeOffRequest(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Requisição de folga / pausa inválida.")
+        super().__init__(self.message)
+

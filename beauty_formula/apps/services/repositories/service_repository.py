@@ -67,7 +67,7 @@ def update_service(service: Service, **fields) -> Service:
     for field, value in fields.items():
         setattr(service, field, value)
 
-    service.save()  # Service.save() já roda full_clean() internamente
+    service.save() 
     return service
 
 
