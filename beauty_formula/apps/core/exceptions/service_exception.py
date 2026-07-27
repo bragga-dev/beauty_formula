@@ -23,3 +23,9 @@ class InvalidAvailabilityRequest(Exception):
     def __init__(self, message=None):
         self.message = message or _("Requisição de disponibilidade inválida.")
         super().__init__(self.message)
+
+
+class WorkingHoursNotFound(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Horário de trabalho não encontrado.")
+        super().__init__(self.message)
