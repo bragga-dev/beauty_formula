@@ -25,13 +25,15 @@ from beauty_formula.apps.services.schemas.employee_time_off_schema import (
     EmployeeTimeOffRecurringCreateIn,
     EmployeeTimeOffPunctualCreateIn,
     EmployeeTimeOffOut,
-    EmployeeTimeOffUpdateIn,
+    EmployeeTimeOffRecurringUpdateIn,
+    EmployeeTimeOffPunctualUpdateIn,
     EmployeeTimeOffList,
 )
 from beauty_formula.apps.services.services.employee_time_off_service import (
     create_recurring_time_off_for_employee,
     create_punctual_time_off_for_employee,
-    update_time_off_for_employee,
+    update_recurring_time_off_for_employee,
+    update_punctual_time_off_for_employee,
     delete_time_off_for_employee,
     delete_all_time_off_for_employee,
     delete_recurring_time_off_for_employee,
@@ -349,26 +351,62 @@ def create_punctual_time_off_router(request, payload: EmployeeTimeOffPunctualCre
 
 
 @router.patch(
-    "/{time_off_id}",
+    "/recurring/{time_off_id}",
     response={200: EmployeeTimeOffOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
     auth=EmployeeOnlyAuth(),
-    summary="Funcionário atualiza um bloqueio próprio",
+    summary="Funcionário atualiza um bloqueio RECORRENTE próprio",
 )
 @ratelimit(key="user", rate="30/m", block=True)
-def update_time_off_router(request, time_off_id: uuid.UUID, payload: EmployeeTimeOffUpdateIn):
+def update_recurring_time_off_router(request, time_off_id: uuid.UUID, payload: EmployeeTimeOffRecurringUpdateIn):
     """
-    Atualiza parcialmente um bloqueio próprio.
+    Atualiza parcialmente um bloqueio recorrente próprio. Só funciona
+    se o bloqueio apontado por `time_off_id` já for recorrente — não
+    troca a modalidade do registro.
     """
     user: User = request.auth
 
     try:
-        time_off = update_time_off_for_employee(
+        time_off = update_recurring_time_off_for_employee(
             user_id=user.id,
             time_off_id=time_off_id,
             block_type=payload.block_type.value if payload.block_type is not None else None,
             weekday=payload.weekday.value if payload.weekday is not None else None,
             start_time=payload.start_time,
             end_time=payload.end_time,
+        )
+        return 200, time_off
+    except EmployeeNotFoundError:
+        return 404, {"detail": "Funcionário não encontrado."}
+    except TimeOffNotFound as e:
+        return 404, {"detail": str(e)}
+    except InvalidTimeOffRequest as e:
+        return 400, {"detail": str(e)}
+    except ValidationError as e:
+        return 400, {"detail": "; ".join(e.messages)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+@router.patch(
+    "/punctual/{time_off_id}",
+    response={200: EmployeeTimeOffOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=EmployeeOnlyAuth(),
+    summary="Funcionário atualiza um bloqueio PONTUAL próprio",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def update_punctual_time_off_router(request, time_off_id: uuid.UUID, payload: EmployeeTimeOffPunctualUpdateIn):
+    """
+    Atualiza parcialmente um bloqueio pontual próprio. Só funciona se
+    o bloqueio apontado por `time_off_id` já for pontual — não troca
+    a modalidade do registro.
+    """
+    user: User = request.auth
+
+    try:
+        time_off = update_punctual_time_off_for_employee(
+            user_id=user.id,
+            time_off_id=time_off_id,
+            block_type=payload.block_type.value if payload.block_type is not None else None,
             start_datetime=payload.start_datetime,
             end_datetime=payload.end_datetime,
         )
@@ -378,6 +416,8 @@ def update_time_off_router(request, time_off_id: uuid.UUID, payload: EmployeeTim
     except TimeOffNotFound as e:
         return 404, {"detail": str(e)}
     except TimeOffConflict as e:
+        return 400, {"detail": str(e)}
+    except InvalidTimeOffRequest as e:
         return 400, {"detail": str(e)}
     except ValidationError as e:
         return 400, {"detail": "; ".join(e.messages)}

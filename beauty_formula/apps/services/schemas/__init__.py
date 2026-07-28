@@ -31,7 +31,8 @@ from beauty_formula.apps.services.schemas.employee_time_off_schema import (
     EmployeeTimeOffPunctualCreateIn,
     EmployeeTimeOffList,
     EmployeeTimeOffOut,
-    EmployeeTimeOffUpdateIn,
+    EmployeeTimeOffRecurringUpdateIn,
+    EmployeeTimeOffPunctualUpdateIn,
 )
 
 from beauty_formula.apps.services.schemas.employee_working_hours_schema import (
@@ -62,7 +63,8 @@ __all__ = [
     "EmployeeTimeOffPunctualCreateIn",
     "EmployeeTimeOffList",
     "EmployeeTimeOffOut",
-    "EmployeeTimeOffUpdateIn",
+    "EmployeeTimeOffRecurringUpdateIn",
+    "EmployeeTimeOffPunctualUpdateIn",
     
     # EmployeeWorkingHours
     "EmployeeWorkingHoursCreateIn",

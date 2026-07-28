@@ -87,14 +87,27 @@ class EmployeeTimeOffPunctualCreateIn(Schema):
     end_datetime: datetime
 
 
-class EmployeeTimeOffUpdateIn(Schema):
+class EmployeeTimeOffRecurringUpdateIn(Schema):
     """
-    Atualização de bloqueio - PATCH parcial, todos os campos opcionais.
+    Atualiza parcialmente um bloqueio RECORRENTE — PATCH, todos os
+    campos opcionais. Só se aplica a um bloqueio que já é recorrente;
+    não troca a modalidade do registro (mesmo espírito da separação
+    em duas rotas de criação: cada modalidade tem seu próprio schema,
+    sem campos da outra modalidade soltos aqui).
     """
     block_type: Optional[BlockTypeEnum] = None
     weekday: Optional[WeekdayEnum] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
+
+
+class EmployeeTimeOffPunctualUpdateIn(Schema):
+    """
+    Atualiza parcialmente um bloqueio PONTUAL — PATCH, todos os campos
+    opcionais. Só se aplica a um bloqueio que já é pontual; não troca
+    a modalidade do registro.
+    """
+    block_type: Optional[BlockTypeEnum] = None
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
 
@@ -111,7 +124,8 @@ __all__ = [
     "EmployeeTimeOffOut",
     "EmployeeTimeOffRecurringCreateIn",
     "EmployeeTimeOffPunctualCreateIn",
-    "EmployeeTimeOffUpdateIn",
+    "EmployeeTimeOffRecurringUpdateIn",
+    "EmployeeTimeOffPunctualUpdateIn",
     "EmployeeTimeOffList",
 
 ]

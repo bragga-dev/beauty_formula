@@ -235,26 +235,59 @@ def create_punctual_time_off_for_employee(
     return time_off
 
 
-def update_time_off_for_employee(
+def update_recurring_time_off_for_employee(
     user_id: uuid.UUID,
     time_off_id: uuid.UUID,
     block_type: Optional[str] = None,
-    block_modality: Optional[str] = None,
     weekday: Optional[int] = None,
     start_time: Optional[time] = None,
     end_time: Optional[time] = None,
+) -> EmployeeTimeOff:
+    """
+    Atualiza parcialmente um bloqueio RECORRENTE próprio (checa posse
+    e modalidade antes). None = mantém o valor atual.
+
+    Não troca a modalidade do registro — só serve pra editar um
+    bloqueio que já é recorrente, mesmo espírito de
+    create_recurring_time_off_for_employee: quem chama essa função já
+    sabe qual modalidade quer, o endpoint que a chama
+    (PATCH /employee-time-off/recurring/{id}) já é exclusivo pra isso.
+    """
+    time_off = _get_own_time_off(user_id, time_off_id)
+
+    if not time_off.is_recurring:
+        raise InvalidTimeOffRequest("Este bloqueio não é recorrente.")
+
+    time_off = update_time_off(
+        time_off=time_off,
+        block_type=block_type,
+        weekday=weekday,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    return time_off
+
+
+def update_punctual_time_off_for_employee(
+    user_id: uuid.UUID,
+    time_off_id: uuid.UUID,
+    block_type: Optional[str] = None,
     start_datetime: Optional[datetime] = None,
     end_datetime: Optional[datetime] = None,
 ) -> EmployeeTimeOff:
     """
-    Atualiza parcialmente um bloqueio próprio (checa posse antes).
+    Atualiza parcialmente um bloqueio PONTUAL próprio (checa posse e
+    modalidade antes). None = mantém o valor atual. Reagenda a
+    expiração automática (soft delete via Celery) se start/end mudou
+    — ver _schedule_expiration.
 
-    None = mantém o valor atual. `block_modality` só precisa ser
-    enviado se for realmente trocar de recorrente pra pontual (ou vice
-    versa) — nesse caso, envie também os campos do novo modo E zere os
-    do modo antigo explicitamente (a validação do model é estrita).
+    Não troca a modalidade do registro — só serve pra editar um
+    bloqueio que já é pontual.
     """
     time_off = _get_own_time_off(user_id, time_off_id)
+
+    if not time_off.is_punctual:
+        raise InvalidTimeOffRequest("Este bloqueio não é pontual.")
 
     # Verifica conflitos se estiver alterando datas/horários
     new_start_datetime = start_datetime if start_datetime is not None else time_off.start_datetime
@@ -274,10 +307,6 @@ def update_time_off_for_employee(
     time_off = update_time_off(
         time_off=time_off,
         block_type=block_type,
-        block_modality=block_modality,
-        weekday=weekday,
-        start_time=start_time,
-        end_time=end_time,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
     )

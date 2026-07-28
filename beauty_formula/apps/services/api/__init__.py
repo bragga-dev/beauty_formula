@@ -45,7 +45,8 @@ from beauty_formula.apps.services.api.employee_time_off import (
     list_my_time_off_on_date_router,
     list_my_time_off_router,
     list_my_upcoming_time_off_router,
-    update_time_off_router,
+    update_punctual_time_off_router,
+    update_recurring_time_off_for_employee,
 )
 
 from beauty_formula.apps.services.api.availability import (
@@ -94,7 +95,8 @@ __all__ = [
     "list_my_time_off_on_date_router",
     "list_my_time_off_router",
     "list_my_upcoming_time_off_router",
-    "update_time_off_router",
+    "update_punctual_time_off_router",
+    "update_recurring_time_off_for_employee",
     
     # Availability
     "employee_availability_router",

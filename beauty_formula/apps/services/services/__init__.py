@@ -38,7 +38,8 @@ from beauty_formula.apps.services.services.employee_time_off_service import (
 
     create_recurring_time_off_for_employee,
     create_punctual_time_off_for_employee,
-    update_time_off_for_employee,
+    update_recurring_time_off_for_employee,
+    update_punctual_time_off_for_employee,
     delete_time_off_for_employee,
     delete_all_time_off_for_employee,
     delete_recurring_time_off_for_employee,
@@ -87,7 +88,8 @@ __all__ = [
     # Employee Time Off
     "create_recurring_time_off_for_employee",
     "create_punctual_time_off_for_employee",
-    "update_time_off_for_employee",
+    "update_recurring_time_off_for_employee",
+    "update_punctual_time_off_for_employee",
     "delete_time_off_for_employee",
     "delete_all_time_off_for_employee",
     "delete_recurring_time_off_for_employee",
