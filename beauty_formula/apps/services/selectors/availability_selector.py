@@ -25,16 +25,13 @@ def _to_aware(target_date: date_type, t) -> datetime:
     return timezone.make_aware(datetime.combine(target_date, t))
 
 
-def get_available_slots(employee_id: UUID, target_date: date_type, slot_duration: timedelta) -> List[Interval]:
+def _get_free_intervals(employee_id: UUID, target_date: date_type) -> List[Interval]:
     """
-    Retorna os slots livres de um funcionário numa data, já fatiados no
-    tamanho de `slot_duration` (duração do serviço sendo agendado — o
-    slot é dinâmico, não um tamanho fixo tipo 15/30min).
-
-    Pipeline: janela de trabalho do dia da semana → subtrai bloqueios
-    (recorrentes + pontuais que tocam a data) → subtrai agendamentos já
-    ativos → fatia o que sobrou em slots do tamanho do serviço → se a
-    data for hoje, descarta slots que já ficaram no passado.
+    Janela livre "crua" de um funcionário numa data: expediente do dia
+    da semana, já com bloqueios (recorrentes + pontuais) e agendamentos
+    ativos subtraídos. Sem fatiar em slots — usado tanto por
+    `get_available_slots` (que fatia) quanto por `is_slot_available`
+    (que só testa se um intervalo específico cabe aqui dentro).
     """
     weekday = target_date.weekday()  # Monday=0 ... Sunday=6, mesmo enum do EmployeeWorkingHours.Weekday
 
@@ -59,7 +56,24 @@ def get_available_slots(employee_id: UUID, target_date: date_type, slot_duration
     for scheduling in get_active_schedulings_for_employee_on_date(employee_id, target_date):
         blocked.append(Interval(scheduling.scheduled_time, scheduling.scheduled_time + scheduling.duration_at_booking))
 
-    free = subtract_intervals(free, blocked)
+    return subtract_intervals(free, blocked)
+
+
+def get_available_slots(employee_id: UUID, target_date: date_type, slot_duration: timedelta) -> List[Interval]:
+    """
+    Retorna os slots livres de um funcionário numa data, já fatiados no
+    tamanho de `slot_duration` (duração do serviço sendo agendado — o
+    slot é dinâmico, não um tamanho fixo tipo 15/30min).
+
+    Pipeline: janela de trabalho do dia da semana → subtrai bloqueios
+    (recorrentes + pontuais que tocam a data) → subtrai agendamentos já
+    ativos → fatia o que sobrou em slots do tamanho do serviço → se a
+    data for hoje, descarta slots que já ficaram no passado.
+    """
+    free = _get_free_intervals(employee_id, target_date)
+    if not free:
+        return []
+
     slots = slice_into_slots(free, slot_duration)
 
     if target_date == timezone.localdate():
@@ -67,3 +81,20 @@ def get_available_slots(employee_id: UUID, target_date: date_type, slot_duration
         slots = [slot for slot in slots if slot.start > now]
 
     return slots
+
+
+def is_slot_available(employee_id: UUID, start: datetime, end: datetime) -> bool:
+    """
+    Verifica se o intervalo [start, end) cabe inteiro numa janela livre
+    do funcionário — dentro do expediente, fora de bloqueios/folgas e
+    sem sobrepor outro agendamento ativo.
+
+    Diferente de `get_available_slots`, não fatia nada: só testa o
+    intervalo exato que o cliente pediu. Usado pelo `scheduling_service`
+    antes de criar/reagendar, pra devolver um erro claro (SchedulingConflict)
+    em vez de depender só da validação de conflito do model (que não
+    conhece expediente nem folga — só sobreposição com outros agendamentos).
+    """
+    target_date = timezone.localdate(start)
+    free = _get_free_intervals(employee_id, target_date)
+    return any(f.start <= start and end <= f.end for f in free)

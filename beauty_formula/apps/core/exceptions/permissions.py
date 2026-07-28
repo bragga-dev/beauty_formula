@@ -12,6 +12,11 @@ class EmployeeNotFoundError(Exception):
     pass
 
 
+class ClientNotFoundError(Exception):
+    """Exceção lançada quando o cliente não é encontrado."""
+    pass
+
+
 class ClientNotActiveError(Exception):
     """Exceção lançada quando o client não está ativo na funcionário."""
     pass

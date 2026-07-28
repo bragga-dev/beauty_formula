@@ -46,3 +46,39 @@ class InvalidTimeOffRequest(Exception):
         self.message = message or _("Requisição de folga / pausa inválida.")
         super().__init__(self.message)
 
+
+class SchedulingNotFound(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Agendamento não encontrado.")
+        super().__init__(self.message)
+
+
+class SchedulingConflict(Exception):
+    """Horário indisponível: conflito de agenda, fora do expediente ou em bloqueio/folga."""
+    def __init__(self, message=None):
+        self.message = message or _("Esse horário não está disponível para o funcionário selecionado.")
+        super().__init__(self.message)
+
+
+class InvalidSchedulingRequest(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Requisição de agendamento inválida.")
+        super().__init__(self.message)
+
+
+class SchedulingCannotBeModified(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Este agendamento não pode mais ser alterado.")
+        super().__init__(self.message)
+
+
+class SchedulingCannotBeCanceled(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Este agendamento não pode ser cancelado.")
+        super().__init__(self.message)
+
+
+class InvalidSchedulingStatusTransition(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Transição de status inválida para este agendamento.")
+        super().__init__(self.message)

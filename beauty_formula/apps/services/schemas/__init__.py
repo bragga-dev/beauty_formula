@@ -42,13 +42,28 @@ from beauty_formula.apps.services.schemas.employee_working_hours_schema import (
     WeekdayEnum,
 )
 
+from beauty_formula.apps.services.schemas.scheduling_schema import (
+
+    SchedulingStatusEnum,
+    SchedulingOut,
+    SchedulingPrivateOut,
+    SchedulingCreateIn,
+    SchedulingUpdateIn,
+    SchedulingCancelIn,
+    SchedulingStatusUpdateIn,
+    SchedulingFilter,
+    SchedulingList,
+    SchedulingPrivateList,
+)
+
 from beauty_formula.apps.services.schemas.availability_schema import (
     AvailabilitySlotOut,
 )
 
 
 __all__ = [
-    # Service
+    
+    # Serviços
     "ServiceCreateIn",
     "ServiceFilter",
     "ServiceOut",
@@ -56,7 +71,7 @@ __all__ = [
     "ServiceUpdateIn",
     "ServiceUpdateStatusIn",
 
-    # EmployeeTimeOff
+    # Pausa e Bloqueios dos Funcíonários
     "BlockTypeEnum",
     "BlockModalityEnum",
     "EmployeeTimeOffRecurringCreateIn",
@@ -66,13 +81,25 @@ __all__ = [
     "EmployeeTimeOffRecurringUpdateIn",
     "EmployeeTimeOffPunctualUpdateIn",
     
-    # EmployeeWorkingHours
+    # Horas de Trabalho dos Funcionários
     "EmployeeWorkingHoursCreateIn",
     "EmployeeWorkingHoursOut",
     "EmployeeWorkingHoursUpdateIn",
     "WeekdayEnum",
+
+    # Agendamentos
+    "SchedulingStatusEnum",
+    "SchedulingOut",
+    "SchedulingPrivateOut",
+    "SchedulingCreateIn",
+    "SchedulingUpdateIn",
+    "SchedulingCancelIn",
+    "SchedulingStatusUpdateIn",
+    "SchedulingFilter",
+    "SchedulingList",
+    "SchedulingPrivateList",
     
-    # Availability
+    # Disponibilidade
     "AvailabilitySlotOut",
 
     # EmployeeService: importe direto de

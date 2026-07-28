@@ -25,9 +25,9 @@ class Scheduling(models.Model):
         NO_SHOW = "no_show", _("Não compareceu")  
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    service = models.ForeignKey(Service, on_delete=models.PROTECT, related_name="schedulings")
-    client = models.ForeignKey('accounts.Client', on_delete=models.PROTECT, related_name="schedulings")
-    employee = models.ForeignKey('accounts.Employee', on_delete=models.PROTECT, related_name="schedulings")
+    service = models.ForeignKey(Service, on_delete=models.PROTECT, related_name="service_schedulings")
+    client = models.ForeignKey('accounts.Client', on_delete=models.PROTECT, related_name="client_schedulings")
+    employee = models.ForeignKey('accounts.Employee', on_delete=models.PROTECT, related_name="employee_schedulings")
     scheduled_time = models.DateTimeField(_("Horário agendado"))
     status = models.CharField(_("Status"), max_length=20, choices=SchedulingStatus.choices, default=SchedulingStatus.PENDING, db_index=True)
     price_at_booking = models.DecimalField(_("Preço no momento do agendamento"), max_digits=10, decimal_places=2, editable=False)
@@ -64,7 +64,7 @@ class Scheduling(models.Model):
         ]
     
     def __str__(self):
-        return f"#{self.id[:8]} - {self.service.name} - {self.client} - {self.scheduled_time.strftime('%d/%m/%Y %H:%M')}"
+        return f"#{self.uuid.UUID} - {self.service.name} - {self.client} - {self.scheduled_time.strftime('%d/%m/%Y %H:%M')}"
     
     def clean(self):
         """Validações do agendamento"""

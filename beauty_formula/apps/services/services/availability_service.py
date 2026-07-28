@@ -15,7 +15,6 @@ from beauty_formula.apps.services.selectors.availability_selector import get_ava
 from beauty_formula.apps.services.selectors.employee_service_selector import get_employee_service
 from beauty_formula.apps.services.selectors.service_selector import get_service_by_id
 
-# Cliente só enxerga disponibilidade até esse tanto de dias no futuro.
 MAX_DAYS_AHEAD = 15
 
 
