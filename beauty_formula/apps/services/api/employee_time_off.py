@@ -22,13 +22,15 @@ from beauty_formula.apps.core.permissions.auth_classes import EmployeeOnlyAuth
 from beauty_formula.apps.core.utils.pagination import paginate_queryset, PageOut, PAGE_SIZE_DEFAULT
 from beauty_formula.apps.services.schemas.employee_time_off_schema import (
     BlockTypeEnum,
-    EmployeeTimeOffCreateIn,
+    EmployeeTimeOffRecurringCreateIn,
+    EmployeeTimeOffPunctualCreateIn,
     EmployeeTimeOffOut,
     EmployeeTimeOffUpdateIn,
     EmployeeTimeOffList,
 )
 from beauty_formula.apps.services.services.employee_time_off_service import (
-    create_time_off_for_employee,
+    create_recurring_time_off_for_employee,
+    create_punctual_time_off_for_employee,
     update_time_off_for_employee,
     delete_time_off_for_employee,
     delete_all_time_off_for_employee,
@@ -283,30 +285,55 @@ def list_my_upcoming_time_off_router(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
-    "/",
+    "/recurring/",
     response={201: EmployeeTimeOffOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
     auth=EmployeeOnlyAuth(),
-    summary="Funcionário cria um bloqueio de horário",
+    summary="Funcionário cria um bloqueio RECORRENTE",
 )
 @ratelimit(key="user", rate="30/m", block=True)
-def create_time_off_router(request, payload: EmployeeTimeOffCreateIn):
+def create_recurring_time_off_router(request, payload: EmployeeTimeOffRecurringCreateIn):
     """
-    Cria um bloqueio de horário.
-
-    Pode ser:
-    - Recorrente: weekday + start_time + end_time
-    - Pontual: start_datetime + end_datetime
+    Cria um bloqueio recorrente (ex: almoço toda terça, 12h-13h).
+    Repete toda semana até ser editado ou excluído.
     """
     user: User = request.auth
 
     try:
-        # Remove employee_id do payload (vem do request.auth)
-        time_off = create_time_off_for_employee(
+        time_off = create_recurring_time_off_for_employee(
             user_id=user.id,
             block_type=payload.block_type.value,
-            weekday=payload.weekday.value if payload.weekday is not None else None,
+            weekday=payload.weekday.value,
             start_time=payload.start_time,
             end_time=payload.end_time,
+        )
+        return 201, time_off
+    except EmployeeNotFoundError:
+        return 404, {"detail": "Funcionário não encontrado."}
+    except ValidationError as e:
+        return 400, {"detail": "; ".join(e.messages)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+@router.post(
+    "/punctual/",
+    response={201: EmployeeTimeOffOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=EmployeeOnlyAuth(),
+    summary="Funcionário cria um bloqueio PONTUAL",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def create_punctual_time_off_router(request, payload: EmployeeTimeOffPunctualCreateIn):
+    """
+    Cria um bloqueio pontual (ex: consulta médica dia 15/08, 14h-15h).
+    Expira sozinho (soft delete automático via Celery) 1 minuto depois
+    de end_datetime.
+    """
+    user: User = request.auth
+
+    try:
+        time_off = create_punctual_time_off_for_employee(
+            user_id=user.id,
+            block_type=payload.block_type.value,
             start_datetime=payload.start_datetime,
             end_datetime=payload.end_datetime,
         )

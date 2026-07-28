@@ -26,7 +26,9 @@ from beauty_formula.apps.services.schemas.service_schema import (
 
 from beauty_formula.apps.services.schemas.employee_time_off_schema import (
     BlockTypeEnum,
-    EmployeeTimeOffCreateIn,
+    BlockModalityEnum,
+    EmployeeTimeOffRecurringCreateIn,
+    EmployeeTimeOffPunctualCreateIn,
     EmployeeTimeOffList,
     EmployeeTimeOffOut,
     EmployeeTimeOffUpdateIn,
@@ -55,7 +57,9 @@ __all__ = [
 
     # EmployeeTimeOff
     "BlockTypeEnum",
-    "EmployeeTimeOffCreateIn",
+    "BlockModalityEnum",
+    "EmployeeTimeOffRecurringCreateIn",
+    "EmployeeTimeOffPunctualCreateIn",
     "EmployeeTimeOffList",
     "EmployeeTimeOffOut",
     "EmployeeTimeOffUpdateIn",
@@ -69,4 +73,9 @@ __all__ = [
     # Availability
     "AvailabilitySlotOut",
 
+    # EmployeeService: importe direto de
+    # beauty_formula.apps.services.schemas.employee_service_schema
+    # (EmployeeServiceCreateIn, EmployeeServiceOut,
+    # EmployeeServicePrivateOut, EmployeeServiceUpdateIn) — não
+    # reexportado aqui de propósito, ver docstring do módulo.
 ]

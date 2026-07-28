@@ -17,13 +17,16 @@ from beauty_formula.apps.services.models.employee_time_off import EmployeeTimeOf
 from beauty_formula.apps.accounts.models.employee import Employee
 
 
-UPDATABLE_EMPLOYEE_TIME_OFF_FIELDS = {"block_type", "weekday", "start_time", "end_time", "start_datetime", "end_datetime"}
+UPDATABLE_EMPLOYEE_TIME_OFF_FIELDS = {
+    "block_type", "block_modality", "weekday", "start_time", "end_time", "start_datetime", "end_datetime"
+}
 
 @transaction.atomic
 def create_time_off(
     *,
     employee: Employee,
     block_type: str,
+    block_modality: str,
     weekday: Optional[int] = None,
     start_time: Optional[time] = None,
     end_time: Optional[time] = None,
@@ -33,9 +36,11 @@ def create_time_off(
     """
     Cria um bloqueio de horário para um funcionário.
 
-    Pode ser:
-    - Recorrente: weekday + start_time + end_time
-    - Pontual: start_datetime + end_datetime
+    `block_modality` é quem decide a validação no model (não mais uma
+    inferência a partir de quais campos vieram preenchidos) — quem
+    chama essa função (services/employee_time_off_service.py) já sabe
+    qual modalidade quer, já que agora são duas rotas exclusivas de
+    criação (recorrente vs pontual), não uma genérica.
 
     O save() já roda full_clean() — validações de overlap e regras de
     negócio são feitas no model, não aqui.
@@ -43,6 +48,7 @@ def create_time_off(
     time_off = EmployeeTimeOff(
         employee=employee,
         block_type=block_type,
+        block_modality=block_modality,
         weekday=weekday,
         start_time=start_time,
         end_time=end_time,

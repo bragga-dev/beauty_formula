@@ -33,6 +33,12 @@ class BlockTypeEnum(str, Enum):
         return choices_dict.get(value, value)
 
 
+class BlockModalityEnum(str, Enum):
+    """Espelha EmployeeTimeOff.BlockModality."""
+    RECURRING = "recurring"
+    PUNCTUAL = "punctual"
+
+
 class EmployeeTimeOffOut(Schema):
     """
     Bloqueio de horário do funcionário - visão do próprio funcionário.
@@ -47,32 +53,38 @@ class EmployeeTimeOffOut(Schema):
     """
     id: uuid.UUID
     block_type: BlockTypeEnum
+    block_modality: BlockModalityEnum
     weekday: Optional[WeekdayEnum] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
+    is_active: bool
     
     class Config:
         from_attributes = True
 
 
-class EmployeeTimeOffCreateIn(Schema):
+class EmployeeTimeOffRecurringCreateIn(Schema):
     """
-    Criação de bloqueio de horário.
-    Funcionário pode ser recorrente (weekday + start_time + end_time)
-    ou pontual (start_datetime + end_datetime).
-
-    Sem `employee_id`: quem cria é sempre o próprio funcionário
-    autenticado (request.auth) — não faz sentido o client mandar um
-    employee_id que o endpoint vai ignorar de qualquer forma.
+    Cria um bloqueio RECORRENTE — ex: almoço toda terça, 12h-13h.
+    Repete toda semana até ser editado ou excluído.
     """
     block_type: BlockTypeEnum
-    weekday: Optional[WeekdayEnum] = None
-    start_time: Optional[time] = None
-    end_time: Optional[time] = None
-    start_datetime: Optional[datetime] = None
-    end_datetime: Optional[datetime] = None
+    weekday: WeekdayEnum
+    start_time: time
+    end_time: time
+
+
+class EmployeeTimeOffPunctualCreateIn(Schema):
+    """
+    Cria um bloqueio PONTUAL — uma janela específica de data/hora, ex:
+    consulta médica dia 15/08 das 14h às 15h. Expira sozinho (soft
+    delete automático) 1 minuto depois de end_datetime.
+    """
+    block_type: BlockTypeEnum
+    start_datetime: datetime
+    end_datetime: datetime
 
 
 class EmployeeTimeOffUpdateIn(Schema):
@@ -95,8 +107,10 @@ class EmployeeTimeOffList(Schema):
 __all__ = [
 
     "BlockTypeEnum",
+    "BlockModalityEnum",
     "EmployeeTimeOffOut",
-    "EmployeeTimeOffCreateIn",
+    "EmployeeTimeOffRecurringCreateIn",
+    "EmployeeTimeOffPunctualCreateIn",
     "EmployeeTimeOffUpdateIn",
     "EmployeeTimeOffList",
 

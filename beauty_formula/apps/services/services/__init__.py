@@ -36,7 +36,8 @@ from beauty_formula.apps.services.services.availability_service import (
 
 from beauty_formula.apps.services.services.employee_time_off_service import (
 
-    create_time_off_for_employee,
+    create_recurring_time_off_for_employee,
+    create_punctual_time_off_for_employee,
     update_time_off_for_employee,
     delete_time_off_for_employee,
     delete_all_time_off_for_employee,
@@ -84,7 +85,8 @@ __all__ = [
     "get_employee_availability",
 
     # Employee Time Off
-    "create_time_off_for_employee",
+    "create_recurring_time_off_for_employee",
+    "create_punctual_time_off_for_employee",
     "update_time_off_for_employee",
     "delete_time_off_for_employee",
     "delete_all_time_off_for_employee",

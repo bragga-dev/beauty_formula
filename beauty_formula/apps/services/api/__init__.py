@@ -30,7 +30,8 @@ from beauty_formula.apps.services.api.employee_working_hours import (
 )
 
 from beauty_formula.apps.services.api.employee_time_off import (
-    create_time_off_router,
+    create_recurring_time_off_router,
+    create_punctual_time_off_router,
     delete_all_time_off_router,
     delete_punctual_time_off_router,
     delete_recurring_time_off_router,
@@ -78,7 +79,8 @@ __all__ = [
     "update_working_hours_router",
     
     # EmployeeTimeOff
-    "create_time_off_router",
+    "create_recurring_time_off_router",
+    "create_punctual_time_off_router",
     "delete_all_time_off_router",
     "delete_punctual_time_off_router",
     "delete_recurring_time_off_router",

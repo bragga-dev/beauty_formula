@@ -3,10 +3,11 @@ Serviço de EmployeeTimeOff — orquestra as regras de negócio para
 bloqueios de horário (recorrentes ou pontuais) de um funcionário.
 """
 import uuid
-from datetime import time, datetime, date as date_type
+from datetime import time, datetime, date as date_type, timedelta
 from typing import Optional, List
 
 from django.db.models import QuerySet
+from django.utils import timezone
 
 from beauty_formula.apps.accounts.selectors.employee_selector import get_employee_by_user_id
 from beauty_formula.apps.core.exceptions.permissions import EmployeeNotFoundError
@@ -16,6 +17,7 @@ from beauty_formula.apps.core.exceptions.service_exception import (
     InvalidTimeOffRequest,
 )
 from beauty_formula.apps.services.models.employee_time_off import EmployeeTimeOff
+from beauty_formula.apps.services.tasks.expire_punctual_time_off import expire_punctual_time_off
 from beauty_formula.apps.services.repositories.employee_time_off_repository import (
     create_time_off,
     update_time_off,
@@ -39,6 +41,25 @@ from beauty_formula.apps.services.selectors.employee_time_off_selector import (
     has_time_off_conflict,
     validate_time_off_belongs_to_employee,
 )
+
+
+def _schedule_expiration(time_off: EmployeeTimeOff) -> None:
+    """
+    Agenda (ou reagenda) a expiração automática de um bloqueio pontual.
+
+    Chamado depois de toda criação/atualização bem-sucedida — se o
+    registro resultante não é (ou não é mais) pontual, não agenda nada.
+    Cada chamada agenda uma task NOVA pro end_datetime atual; tasks
+    antigas de agendamentos anteriores (de antes de uma edição) viram
+    no-op sozinhas — ver expire_punctual_time_off em services/tasks.py.
+    """
+    if not time_off.is_punctual:
+        return
+
+    expire_punctual_time_off.apply_async(
+        args=[str(time_off.id)],
+        eta=time_off.end_datetime + timedelta(minutes=1),
+    )
 
 
 def _get_own_time_off(user_id: uuid.UUID, time_off_id: uuid.UUID) -> EmployeeTimeOff:
@@ -158,54 +179,67 @@ def list_own_upcoming_time_off(user_id: uuid.UUID, days_ahead: int = 7) -> Query
     return get_upcoming_time_off_for_employee(employee_id=employee.id, days_ahead=days_ahead)
 
 
-def create_time_off_for_employee(
+def create_recurring_time_off_for_employee(
     user_id: uuid.UUID,
     block_type: str,
-    weekday: Optional[int] = None,
-    start_time: Optional[time] = None,
-    end_time: Optional[time] = None,
-    start_datetime: Optional[datetime] = None,
-    end_datetime: Optional[datetime] = None,
+    weekday: int,
+    start_time: time,
+    end_time: time,
 ) -> EmployeeTimeOff:
     """
-    Cria um bloqueio de horário para o próprio funcionário.
-
-    Pode ser:
-    - Recorrente: weekday + start_time + end_time
-    - Pontual: start_datetime + end_datetime
-
-    A validação de negócio (regras de preenchimento, overlap)
-    acontece no model via clean()/save() — aqui só resolve o
-    Employee e delega pro repository.
+    Cria um bloqueio RECORRENTE (ex: almoço toda terça, 12h-13h) pro
+    próprio funcionário. block_modality=RECURRING é fixado aqui — quem
+    chama essa função não escolhe a modalidade, o endpoint que a chama
+    (POST /employee-time-off/recurring/) já é exclusivo pra isso.
     """
     employee = get_employee_by_user_id(user_id=user_id)
     if employee is None:
         raise EmployeeNotFoundError()
 
-    # Verifica conflitos antes de criar
-    if start_datetime and end_datetime:
-        if has_time_off_conflict(
-            employee_id=employee.id,
-            start_datetime=start_datetime,
-            end_datetime=end_datetime
-        ):
-            raise TimeOffConflict("Já existe um bloqueio neste período.")
-
     return create_time_off(
         employee=employee,
         block_type=block_type,
+        block_modality=EmployeeTimeOff.BlockModality.RECURRING,
         weekday=weekday,
         start_time=start_time,
         end_time=end_time,
+    )
+
+
+def create_punctual_time_off_for_employee(
+    user_id: uuid.UUID,
+    block_type: str,
+    start_datetime: datetime,
+    end_datetime: datetime,
+) -> EmployeeTimeOff:
+    """
+    Cria um bloqueio PONTUAL (ex: consulta médica dia X) pro próprio
+    funcionário. Agenda a expiração automática (soft delete via Celery)
+    logo em seguida — ver _schedule_expiration.
+    """
+    employee = get_employee_by_user_id(user_id=user_id)
+    if employee is None:
+        raise EmployeeNotFoundError()
+
+    if has_time_off_conflict(employee_id=employee.id, start_datetime=start_datetime, end_datetime=end_datetime):
+        raise TimeOffConflict("Já existe um bloqueio neste período.")
+
+    time_off = create_time_off(
+        employee=employee,
+        block_type=block_type,
+        block_modality=EmployeeTimeOff.BlockModality.PUNCTUAL,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
     )
+    _schedule_expiration(time_off)
+    return time_off
 
 
 def update_time_off_for_employee(
     user_id: uuid.UUID,
     time_off_id: uuid.UUID,
     block_type: Optional[str] = None,
+    block_modality: Optional[str] = None,
     weekday: Optional[int] = None,
     start_time: Optional[time] = None,
     end_time: Optional[time] = None,
@@ -215,7 +249,10 @@ def update_time_off_for_employee(
     """
     Atualiza parcialmente um bloqueio próprio (checa posse antes).
 
-    None = mantém o valor atual.
+    None = mantém o valor atual. `block_modality` só precisa ser
+    enviado se for realmente trocar de recorrente pra pontual (ou vice
+    versa) — nesse caso, envie também os campos do novo modo E zere os
+    do modo antigo explicitamente (a validação do model é estrita).
     """
     time_off = _get_own_time_off(user_id, time_off_id)
 
@@ -234,15 +271,18 @@ def update_time_off_for_employee(
         if conflicts.exists():
             raise TimeOffConflict("Já existe um bloqueio neste período.")
 
-    return update_time_off(
+    time_off = update_time_off(
         time_off=time_off,
         block_type=block_type,
+        block_modality=block_modality,
         weekday=weekday,
         start_time=start_time,
         end_time=end_time,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
     )
+    _schedule_expiration(time_off)
+    return time_off
 
 
 def delete_time_off_for_employee(user_id: uuid.UUID, time_off_id: uuid.UUID) -> None:
@@ -295,5 +335,3 @@ def delete_time_off_by_block_type_for_employee(user_id: uuid.UUID, block_type: s
         raise EmployeeNotFoundError()
 
     delete_time_off_by_block_type(employee, block_type)
-
-
