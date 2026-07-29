@@ -142,8 +142,19 @@ class SchedulingCreateIn(Schema):
 
     @field_validator("scheduled_time")
     @classmethod
-    def validate_scheduled_time(cls, v: datetime) -> datetime:
-        """Valida se o horário agendado não está no passado."""
+    def validate_scheduled_time_create(cls, v: datetime) -> datetime:
+        """
+        Normaliza para aware (o cliente pode mandar um ISO sem offset) e
+        valida se o horário agendado não está no passado.
+
+        USE_TZ=True no projeto faz `timezone.now()` retornar aware — sem
+        essa normalização, comparar com um `v` naive (vindo direto do
+        parse do JSON) explode com TypeError, e o mesmo problema se
+        repetiria mais à frente, na validação de conflito de horário do
+        model.
+        """
+        if timezone.is_naive(v):
+            v = timezone.make_aware(v)
         if v < timezone.now():
             raise ValueError("O horário agendado não pode ser no passado.")
         return v
@@ -163,10 +174,12 @@ class SchedulingUpdateIn(Schema):
 
     @field_validator("scheduled_time")
     @classmethod
-    def validate_scheduled_time(cls, v: Optional[datetime]) -> Optional[datetime]:
-        """Valida se o horário agendado não está no passado."""
+    def validate_scheduled_time_update(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Normaliza para aware e valida se o horário agendado não está no passado."""
         if v is None:
             return v
+        if timezone.is_naive(v):
+            v = timezone.make_aware(v)
         if v < timezone.now():
             raise ValueError("O horário agendado não pode ser no passado.")
         return v

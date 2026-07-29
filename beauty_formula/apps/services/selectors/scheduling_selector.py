@@ -121,7 +121,11 @@ def filter_schedulings(
 # Disponibilidade — ocupação da agenda do funcionário
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def get_active_schedulings_for_employee_on_date(employee_id: uuid.UUID, target_date: date_type) -> QuerySet[Scheduling]:
+def get_active_schedulings_for_employee_on_date(
+    employee_id: uuid.UUID,
+    target_date: date_type,
+    exclude_scheduling_id: Optional[uuid.UUID] = None,
+) -> QuerySet[Scheduling]:
     """
     Retorna os agendamentos que podem ocupar a agenda do funcionário numa
     data específica.
@@ -131,10 +135,19 @@ def get_active_schedulings_for_employee_on_date(employee_id: uuid.UUID, target_d
     tarde da noite e termina depois da meia-noite. A subtração de
     intervalos feita depois (availability_selector) descarta qualquer
     coisa que não se sobreponha de verdade à data pedida.
+
+    `exclude_scheduling_id` deve ser informado ao recalcular disponibilidade
+    durante a EDIÇÃO de um agendamento existente — caso contrário o próprio
+    registro sendo editado aparece como "ocupando" o horário e qualquer
+    reagendamento (mesmo pra um horário livre) seria barrado por conflito
+    consigo mesmo.
     """
-    return Scheduling.objects.filter(
+    qs = Scheduling.objects.filter(
         employee_id=employee_id,
         is_active=True,
         status__in=BUSY_STATUSES,
         scheduled_time__date__in=[target_date - timedelta(days=1), target_date],
     )
+    if exclude_scheduling_id is not None:
+        qs = qs.exclude(pk=exclude_scheduling_id)
+    return qs

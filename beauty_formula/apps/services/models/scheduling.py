@@ -1,7 +1,3 @@
-
-
-
-
 import uuid
 
 
@@ -64,7 +60,7 @@ class Scheduling(models.Model):
         ]
     
     def __str__(self):
-        return f"#{self.uuid.UUID} - {self.service.name} - {self.client} - {self.scheduled_time.strftime('%d/%m/%Y %H:%M')}"
+        return f"#{self.id} - {self.service.name} - {self.client} - {self.scheduled_time.strftime('%d/%m/%Y %H:%M')}"
     
     def clean(self):
         """Validações do agendamento"""
@@ -96,10 +92,17 @@ class Scheduling(models.Model):
                     )
     
     def save(self, *args, **kwargs):
-        if not self.pk:     
+        # OBS: não usar `if not self.pk` — `id` é UUIDField com
+        # default=uuid.uuid4, então o Django já popula o pk no __init__,
+        # antes do primeiro save(). Isso faz `not self.pk` ser sempre
+        # False e price_at_booking/duration_at_booking nunca são
+        # preenchidos na criação (-> IntegrityError de NOT NULL).
+        # `_state.adding` reflete corretamente se o registro ainda não
+        # foi persistido no banco.
+        if self._state.adding:
             self.price_at_booking = self.service.price
             self.duration_at_booking = self.service.duration
-        
+
         self.full_clean()
         super().save(*args, **kwargs)
     

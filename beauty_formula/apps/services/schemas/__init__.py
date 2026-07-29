@@ -3,17 +3,19 @@ Schemas do módulo de serviços — validação e serialização para
 Service, EmployeeService, EmployeeTimeOff, EmployeeWorkingHours
 e Availability.
 
-IMPORTANTE sobre EmployeeService: `EmployeeServicePrivateOut`
-(em employee_service_schema.py) precisa de `EmployeeOut`
+IMPORTANTE sobre EmployeeService e Scheduling: `EmployeeServicePrivateOut`
+(em employee_service_schema.py) e `SchedulingOut`/`SchedulingPrivateOut`
+(em scheduling_schema.py) precisam de `EmployeeOut`
 (accounts.schemas.employee_schema), que por sua vez importa
 `ServiceOut` daqui (services.schemas.service_schema). Importar
-`employee_service_schema` aqui no agregador do pacote forçaria esse
-ciclo toda vez que QUALQUER coisa deste pacote fosse importada —
-já aconteceu isso em produção (ImportError: cannot import name
-'EmployeeOut' from partially initialized module). Como nada no
-projeto consome esse agregador (todo mundo importa direto do
-submódulo, ex: `from ...schemas.employee_service_schema import X`),
-a saída mais segura é não reexportar esse módulo específico aqui.
+`employee_service_schema` ou `scheduling_schema` aqui no agregador do
+pacote forçaria esse ciclo toda vez que QUALQUER coisa deste pacote
+fosse importada — já aconteceu isso em produção (ImportError: cannot
+import name 'EmployeeOut' from partially initialized module). Como
+nada no projeto consome esse agregador (todo mundo importa direto do
+submódulo, ex: `from ...schemas.employee_service_schema import X`,
+`from ...schemas.scheduling_schema import X`), a saída mais segura é
+não reexportar esses módulos específicos aqui.
 """
 from beauty_formula.apps.services.schemas.service_schema import (
     ServiceCreateIn,
@@ -40,20 +42,6 @@ from beauty_formula.apps.services.schemas.employee_working_hours_schema import (
     EmployeeWorkingHoursOut,
     EmployeeWorkingHoursUpdateIn,
     WeekdayEnum,
-)
-
-from beauty_formula.apps.services.schemas.scheduling_schema import (
-
-    SchedulingStatusEnum,
-    SchedulingOut,
-    SchedulingPrivateOut,
-    SchedulingCreateIn,
-    SchedulingUpdateIn,
-    SchedulingCancelIn,
-    SchedulingStatusUpdateIn,
-    SchedulingFilter,
-    SchedulingList,
-    SchedulingPrivateList,
 )
 
 from beauty_formula.apps.services.schemas.availability_schema import (
@@ -87,18 +75,11 @@ __all__ = [
     "EmployeeWorkingHoursUpdateIn",
     "WeekdayEnum",
 
-    # Agendamentos
-    "SchedulingStatusEnum",
-    "SchedulingOut",
-    "SchedulingPrivateOut",
-    "SchedulingCreateIn",
-    "SchedulingUpdateIn",
-    "SchedulingCancelIn",
-    "SchedulingStatusUpdateIn",
-    "SchedulingFilter",
-    "SchedulingList",
-    "SchedulingPrivateList",
-    
+    # Agendamentos: importe direto de
+    # beauty_formula.apps.services.schemas.scheduling_schema
+    # (SchedulingOut, SchedulingPrivateOut, SchedulingCreateIn, etc.) —
+    # não reexportado aqui de propósito, ver docstring do módulo.
+
     # Disponibilidade
     "AvailabilitySlotOut",
 

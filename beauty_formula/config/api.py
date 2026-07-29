@@ -10,6 +10,7 @@ from beauty_formula.apps.services.api.service import router as services_router
 from beauty_formula.apps.services.api.employee_service import router as employee_services_router
 from beauty_formula.apps.services.api.employee_working_hours import router as employee_working_hours_router
 from beauty_formula.apps.services.api.employee_time_off import router as employee_time_off_router
+from beauty_formula.apps.services.api.scheduling import router as scheduling_router
 from beauty_formula.apps.services.api.availability import router as availability_router
 
 
@@ -47,6 +48,7 @@ api.add_router("/services/", services_router, tags=["Services"])
 api.add_router("/employee-services/", employee_services_router, tags=["Employee Services"])
 api.add_router("/employee-working-hours/", employee_working_hours_router, tags=["Employee Working Hours"])
 api.add_router("/employee-time-off/", employee_time_off_router, tags=["Employee Time Off"])
+api.add_router("/scheduling/", scheduling_router, tags=["Scheduling"])
 api.add_router("/availability/", availability_router, tags=["Availability"])
 
 

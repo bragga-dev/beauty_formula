@@ -49,6 +49,26 @@ from beauty_formula.apps.services.api.employee_time_off import (
     update_recurring_time_off_for_employee,
 )
 
+from beauty_formula.apps.services.api.scheduling import (
+    cancel_employee_scheduling_router,
+    cancel_my_scheduling_router,
+    cancel_scheduling_router,
+    complete_scheduling_router,
+    confirm_scheduling_router,
+    create_scheduling_router,
+    delete_scheduling_router,
+    get_employee_scheduling_router,
+    get_my_scheduling_router,
+    get_scheduling_router,
+    list_all_schedulings_router,
+    list_employee_schedulings_router,
+    list_my_schedulings_router,
+    mark_no_show_router,
+    start_scheduling_router,
+    update_my_scheduling_router,
+    update_scheduling_router,
+)
+
 from beauty_formula.apps.services.api.availability import (
     employee_availability_router,
 )
@@ -97,6 +117,25 @@ __all__ = [
     "list_my_upcoming_time_off_router",
     "update_punctual_time_off_router",
     "update_recurring_time_off_for_employee",
+
+    # Scheduling
+    "create_scheduling_router",
+    "list_my_schedulings_router",
+    "get_my_scheduling_router",
+    "update_my_scheduling_router",
+    "cancel_my_scheduling_router",
+    "list_employee_schedulings_router",
+    "get_employee_scheduling_router",
+    "confirm_scheduling_router",
+    "start_scheduling_router",
+    "complete_scheduling_router",
+    "mark_no_show_router",
+    "cancel_employee_scheduling_router",
+    "list_all_schedulings_router",
+    "get_scheduling_router",
+    "update_scheduling_router",
+    "cancel_scheduling_router",
+    "delete_scheduling_router",
     
     # Availability
     "employee_availability_router",

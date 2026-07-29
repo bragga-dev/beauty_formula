@@ -2,10 +2,10 @@ import re
 from decimal import Decimal
 from typing import Optional
 import uuid
-
+from datetime import timedelta
 from ninja import Schema
 from pydantic import field_validator
-
+from pydantic import Field
 from beauty_formula.apps.services.models.service import Service
 
 NAME_PATTERN = re.compile(r"^[\w\sÀ-ÿ.,'-]+$")
@@ -39,23 +39,37 @@ def _validate_duration_minutes(v: Optional[int]) -> Optional[int]:
     return v
 
 
+from pydantic import computed_field
+
+# class ServiceOut(Schema):
+#     id: uuid.UUID
+#     name: str
+#     description: Optional[str] = None
+#     price: Decimal
+#     image_url: str
+
+#     # Campo interno, não será serializado
+#     duration: timedelta
+
+#     @computed_field
+#     @property
+#     def duration_minutes(self) -> int:
+#         return int(self.duration.total_seconds() // 60)
+
 class ServiceOut(Schema):
-    """
-    Representação pública de um serviço. Deliberadamente NÃO inclui
-    `commission_percentage` nem `total_bookings` — dado interno de
-    negócio, não deveria ser exposto numa página pública.
-    """
     id: uuid.UUID
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     price: Decimal
     image_url: str
-    duration_minutes: int
 
-    @staticmethod
-    def resolve_duration_minutes(service: Service) -> int:
-        return int(service.duration.total_seconds() // 60)
+    # campo interno
+    duration: timedelta = Field(exclude=True)
 
+    @computed_field
+    @property
+    def duration_minutes(self) -> int:
+        return int(self.duration.total_seconds() // 60)
 class ServicePrivateOut(Schema):
     """
     Representação pública de um serviço. Deliberadamente NÃO inclui

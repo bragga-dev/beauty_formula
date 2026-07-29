@@ -7,7 +7,7 @@ Não é dado persistido: é sempre calculado on-the-fly a partir do que já
 existe nos outros três models.
 """
 from datetime import date as date_type, datetime, timedelta
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from django.utils import timezone
@@ -25,13 +25,19 @@ def _to_aware(target_date: date_type, t) -> datetime:
     return timezone.make_aware(datetime.combine(target_date, t))
 
 
-def _get_free_intervals(employee_id: UUID, target_date: date_type) -> List[Interval]:
+def _get_free_intervals(
+    employee_id: UUID, target_date: date_type, exclude_scheduling_id: Optional[UUID] = None
+) -> List[Interval]:
     """
     Janela livre "crua" de um funcionário numa data: expediente do dia
     da semana, já com bloqueios (recorrentes + pontuais) e agendamentos
     ativos subtraídos. Sem fatiar em slots — usado tanto por
     `get_available_slots` (que fatia) quanto por `is_slot_available`
     (que só testa se um intervalo específico cabe aqui dentro).
+
+    `exclude_scheduling_id` repassa pra `get_active_schedulings_for_employee_on_date`
+    — necessário ao validar disponibilidade na EDIÇÃO de um agendamento
+    já existente, pra ele não aparecer ocupando o próprio horário.
     """
     weekday = target_date.weekday()  # Monday=0 ... Sunday=6, mesmo enum do EmployeeWorkingHours.Weekday
 
@@ -53,7 +59,9 @@ def _get_free_intervals(employee_id: UUID, target_date: date_type) -> List[Inter
             # Bloqueio pontual (ex: férias) — já são datetimes aware
             blocked.append(Interval(block.start_datetime, block.end_datetime))
 
-    for scheduling in get_active_schedulings_for_employee_on_date(employee_id, target_date):
+    for scheduling in get_active_schedulings_for_employee_on_date(
+        employee_id, target_date, exclude_scheduling_id=exclude_scheduling_id
+    ):
         blocked.append(Interval(scheduling.scheduled_time, scheduling.scheduled_time + scheduling.duration_at_booking))
 
     return subtract_intervals(free, blocked)
@@ -83,7 +91,9 @@ def get_available_slots(employee_id: UUID, target_date: date_type, slot_duration
     return slots
 
 
-def is_slot_available(employee_id: UUID, start: datetime, end: datetime) -> bool:
+def is_slot_available(
+    employee_id: UUID, start: datetime, end: datetime, exclude_scheduling_id: Optional[UUID] = None
+) -> bool:
     """
     Verifica se o intervalo [start, end) cabe inteiro numa janela livre
     do funcionário — dentro do expediente, fora de bloqueios/folgas e
@@ -94,7 +104,11 @@ def is_slot_available(employee_id: UUID, start: datetime, end: datetime) -> bool
     antes de criar/reagendar, pra devolver um erro claro (SchedulingConflict)
     em vez de depender só da validação de conflito do model (que não
     conhece expediente nem folga — só sobreposição com outros agendamentos).
+
+    Ao REAGENDAR um agendamento existente, passe `exclude_scheduling_id`
+    com o próprio ID — sem isso o registro sendo editado conta como
+    ocupando seu próprio horário atual e a checagem sempre falharia.
     """
     target_date = timezone.localdate(start)
-    free = _get_free_intervals(employee_id, target_date)
+    free = _get_free_intervals(employee_id, target_date, exclude_scheduling_id=exclude_scheduling_id)
     return any(f.start <= start and end <= f.end for f in free)
