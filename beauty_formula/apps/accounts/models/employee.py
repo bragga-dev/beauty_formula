@@ -1,4 +1,3 @@
-
 import uuid
 
 from django.conf import settings
@@ -69,7 +68,11 @@ class Employee(models.Model):
 
     
     def get_full_name(self):
-        full_name = f"{self.first_name} {self.last_name}".strip()
+        # OBS: usar `filter(None, ...)` em vez de f"{self.first_name} {self.last_name}"
+        # direto — quando os dois campos são None, o f-string vira o texto
+        # literal "None None" (truthy), e o fallback pra username/placeholder
+        # abaixo nunca era acionado.
+        full_name = " ".join(filter(None, [self.first_name, self.last_name])).strip()
         return full_name or self.username or f"Employee {self.id}"
 
     def save(self, *args, **kwargs):

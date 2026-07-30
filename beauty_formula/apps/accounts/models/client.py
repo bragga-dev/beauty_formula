@@ -63,7 +63,9 @@ class Client(models.Model):
     
 
     def get_full_name(self):
-        full_name = f"{self.first_name} {self.last_name}".strip()
+        # OBS: mesmo fix do Employee.get_full_name() — evita o f-string
+        # virar o texto literal "None None" quando os dois campos são None.
+        full_name = " ".join(filter(None, [self.first_name, self.last_name])).strip()
         return full_name or self.username or f"Client {self.id}"
     
     @staticmethod

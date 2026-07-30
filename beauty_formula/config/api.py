@@ -30,7 +30,7 @@ from beauty_formula.apps.core.permissions.auth_classes import (
 )
 
 api = NinjaAPI(
-    title="FÓRMULA DA BEZELA API",
+    title="FÓRMULA DA BELEZA API",
     version="1.0.0",
     description="API para agendamento de serviços de beleza.",
     auth=[JWTAuth(), AdminOnlyAuth(), EmployeeOnlyAuth(), ClientOnlyAuth(), VerifiedUserAuth(), ActiveUserAuth()],

@@ -3,6 +3,7 @@ Login endpoint — autenticação de usuários.
 """
 import uuid
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import HttpResponseRedirect
 from django_ratelimit.decorators import ratelimit
 from ninja import File, Router, UploadedFile
@@ -261,7 +262,6 @@ def register_router(request, payload: RegisterIn):
     
 
 
-
 @router.get("/verify-email/{uidb64}/{token}", summary="Confirmar e-mail",  description="Confirma o email e redireciona para o frontend.", auth=None,)
 @ratelimit( key="ip", rate="20/h", block=True,)
 def verify_email_endpoint_router(request, uidb64: str, token: str):
@@ -351,7 +351,6 @@ def export_my_data_router(request):
 
 
 
-
 @router.post("/register-employee", response={201: TokenOut, 409: MessageOut}, auth=AdminOnlyAuth(), summary="Cadastro de Funcionário",)
 @ratelimit(key="ip", rate="20/h", block=True,)
 def register_employee_router(request, payload: RegisterEmployeeIn):
@@ -373,8 +372,10 @@ def promote_to_employee_router(request, user_id: uuid.UUID):
         return 201, EmployeeOut.from_orm(employee=employee)
     except UserNotFound as e:
         return 404, {"detail": str(e)}
-    except Exception as e:
-        return 400, {"detail": f"Erro ao promover cliente: {str(e)}"}
+    # Sem `except Exception` genérico aqui: qualquer erro inesperado (fora
+    # de UserNotFound, que é a única exceção de domínio que este service
+    # levanta) deve virar 500 e ser logado pelo handler global — não 400
+    # com a mensagem crua da exceção exposta pro cliente.
     
 
 @router.post("/deactive-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Desativa Usuário.")
@@ -385,8 +386,6 @@ def deactivate_account_router(request, user_id: uuid.UUID):
         return 201, UserOut.from_orm(user=user)
     except UserNotFound as e:
         return 404, {"detail": str(e)}
-    except Exception as e:
-        return 400, {"detail": f"Erro ao desativar usuário: {str(e)}"}
 
 
 @router.post("/reactivate-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Reativa Usuário.")
@@ -397,8 +396,6 @@ def reactivate_user_router(request, user_id: uuid.UUID):
         return 201, UserOut.from_orm(user=user)
     except UserNotFound as e:
         return 404, {"detail": str(e)}
-    except Exception as e:
-        return 400, {"detail": f"Erro ao reativar usuário: {str(e)}"}
 
 
 @router.patch("/update-client-profile", response={200: ClientOut, 404: MessageOut, 400: MessageOut}, auth=ClientOnlyAuth(), summary="Atualiza perfil do Cliente logado.")
@@ -410,8 +407,8 @@ def update_profile_client_router(request, payload: ClientUpdateIn):
         return 200, client_updated 
     except UserNotFound as e:
         return 404, {"detail": str(e)}
-    except Exception as e:
-        return 400, {"detail": f"Erro ao atualizar perfil: {str(e)}"}
+    except DjangoValidationError as e:
+        return 400, {"detail": "; ".join(e.messages) if hasattr(e, "messages") else str(e)}
 
 
 
@@ -424,8 +421,8 @@ def update_profile_employee_router(request, payload: EmployeeUpdateIn):
         return 200, client_updated 
     except UserNotFound as e:
         return 404, {"detail": str(e)}
-    except Exception as e:
-        return 400, {"detail": f"Erro ao atualizar perfil: {str(e)}"}
+    except DjangoValidationError as e:
+        return 400, {"detail": "; ".join(e.messages) if hasattr(e, "messages") else str(e)}
 
 
 @router.post("/upload-client-photo", response={200: ClientOut, 400: MessageOut, 404: MessageOut}, auth=ClientOnlyAuth(), summary="Upload da foto do Cliente logado.")

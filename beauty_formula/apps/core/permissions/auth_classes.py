@@ -40,12 +40,18 @@ class EmployeeCompleteProfileAuth(JWTAuth):
         if not employee:
             raise PermissionDenied("Usuário não possui funcionário vinculado.")
 
+        # OBS: os campos abaixo precisam bater com os campos reais do model
+        # Employee (apps/accounts/models/employee.py). Antes checava
+        # `full_name`, `cnpj` e `banner`, que nunca existiram no model —
+        # essa classe quebrava com AttributeError sempre que fosse usada.
+        # Checa first_name/last_name direto (não `get_full_name()`, que
+        # sempre cai num fallback tipo "Employee {id}" e nunca acusaria
+        # nome faltando).
         required_fields = {
-            "Nome completo": employee.full_name,
-            "CNPJ": employee.cnpj,
+            "Nome": employee.first_name,
+            "Sobrenome": employee.last_name,
             "Telefone": employee.phone,
-            "Banner": employee.banner,
-            "Descrição": employee.about,
+            "Biografia": employee.bio,
             "Instagram": employee.instagram,
         }
 
@@ -63,7 +69,11 @@ class EmployeeCompleteProfileAuth(JWTAuth):
                 f"{missing_count} campo(s) obrigatório(s) faltando: {fields_list}"
             )
 
-        if not employee.is_verified:
+        # OBS: `employee.is_verified` também não existe no model — a
+        # verificação de "confiável" é sobre o User (is_trusty + is_active),
+        # não sobre o Employee. Usa o helper `is_verified(user)` já
+        # importado no topo do arquivo, igual as outras classes daqui.
+        if not is_verified(user):
             raise PermissionDenied("O funcionário precisa ser verificado para acessar.")
         return user
 
