@@ -1,0 +1,468 @@
+{% extends "core/emails/base.html" %}
+
+{% block title %}Agendamento Confirmado — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}Seu agendamento na Fórmula da Beleza foi confirmado com sucesso! Confira os detalhes do seu serviço.{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .section-label {
+        display: inline-block;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        color: #d81e2a;
+        background: #fdecec;
+        padding: 5px 12px;
+        border-radius: 20px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin: 0 0 16px;
+    }
+
+    .heading {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 26px;
+        font-weight: 900;
+        color: #0a0a0a;
+        margin: 0 0 22px;
+        line-height: 1.3;
+    }
+
+    .greeting {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        color: #1a1a1a;
+        margin: 0 0 10px;
+        line-height: 1.7;
+    }
+
+    .body-text {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        color: #5a5a5a;
+        margin: 0 0 28px;
+        line-height: 1.75;
+    }
+
+    .info-box {
+        background: #fafafa;
+        border-radius: 18px;
+        padding: 20px 24px;
+        margin-bottom: 28px;
+        border-left: 4px solid #d81e2a;
+    }
+
+    .info-box-title {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        color: #0a0a0a;
+        letter-spacing: 0.5px;
+        margin: 0 0 8px;
+        text-transform: uppercase;
+    }
+
+    .info-box-text {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 14px;
+        color: #6a6a6a;
+        margin: 0;
+        line-height: 1.75;
+    }
+
+    .info-box-text strong {
+        color: #0a0a0a;
+        font-weight: 600;
+    }
+
+    .highlight-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #d81e2a, #b0151f);
+        color: #ffffff !important;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 8px 20px;
+        border-radius: 50px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin: 8px 0 16px;
+    }
+
+    .cta-wrap {
+        text-align: center;
+        margin: 8px 0 26px;
+    }
+
+    .cta-btn {
+        display: inline-block;
+        background: #d81e2a;
+        color: #ffffff !important;
+        text-decoration: none !important;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        padding: 17px 56px;
+        border-radius: 100px;
+        box-shadow: 0 10px 24px rgba(216,30,42,0.3);
+    }
+
+    .cta-btn-secondary {
+        display: inline-block;
+        background: transparent;
+        color: #d81e2a !important;
+        text-decoration: none !important;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        padding: 15px 40px;
+        border-radius: 100px;
+        border: 2px solid #d81e2a;
+        margin-top: 12px;
+        transition: all 0.3s ease;
+    }
+
+    .service-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #f0f0f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .service-image {
+        width: 100%;
+        max-width: 200px;
+        height: auto;
+        border-radius: 12px;
+        display: block;
+        margin: 0 auto 16px;
+    }
+
+    .service-name {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: #0a0a0a;
+        margin: 0 0 8px;
+        text-align: center;
+    }
+
+    .service-description {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 14px;
+        color: #6a6a6a;
+        margin: 0 0 12px;
+        text-align: center;
+        line-height: 1.6;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin: 16px 0 8px;
+    }
+
+    .detail-item {
+        background: #f5f5f5;
+        border-radius: 12px;
+        padding: 14px 16px;
+        text-align: center;
+    }
+
+    .detail-item .label {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .detail-item .value {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        color: #0a0a0a;
+        display: block;
+    }
+
+    .detail-item .value.price {
+        color: #d81e2a;
+    }
+
+    .employee-info {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 0;
+    }
+
+    .employee-photo {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #fdecec;
+        flex-shrink: 0;
+    }
+
+    .employee-details {
+        flex: 1;
+    }
+
+    .employee-name {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        color: #0a0a0a;
+        margin: 0 0 4px;
+    }
+
+    .employee-bio {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        color: #6a6a6a;
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 16px;
+        border-radius: 50px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .notes-box {
+        background: #fafafa;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin: 12px 0 0;
+        border: 1px solid #f0f0f0;
+    }
+
+    .notes-box p {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 14px;
+        color: #6a6a6a;
+        margin: 0;
+        font-style: italic;
+    }
+
+    .link-fallback {
+        text-align: center;
+        margin-bottom: 28px;
+    }
+
+    .link-fallback p {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        color: #aaaaaa;
+        margin: 0 0 8px;
+    }
+
+    .link-fallback a {
+        display: inline-block;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        color: #a8121c;
+        background: #fafafa;
+        border-radius: 12px;
+        padding: 10px 16px;
+        word-break: break-all;
+        text-decoration: none;
+    }
+
+    .warning-box {
+        background: #fafafa;
+        border-radius: 18px;
+        padding: 18px 22px;
+        margin-top: 28px;
+    }
+
+    .warning-box p {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        color: #6a6a6a;
+        margin: 0;
+        line-height: 1.7;
+    }
+
+    @media only screen and (max-width: 600px) {
+        .heading { font-size: 22px !important; }
+        .cta-btn { display: block !important; padding: 17px 24px !important; }
+        .cta-btn-secondary { display: block !important; padding: 15px 24px !important; }
+        .detail-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+        .detail-item { padding: 12px 10px; }
+        .employee-info { flex-direction: column; text-align: center; }
+        .service-image { max-width: 150px; }
+        .info-box { padding: 16px; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .heading { color: #f2f2f2 !important; }
+        .greeting { color: #e8e8e8 !important; }
+        .body-text { color: #b0b0b0 !important; }
+        .info-box { background: #1e1e1e !important; border-left-color: #d81e2a !important; }
+        .info-box-text, .warning-box p { color: #b0b0b0 !important; }
+        .info-box-text strong { color: #f2f2f2 !important; }
+        .service-card { background: #1e1e1e !important; border-color: #2a2a2a !important; }
+        .service-name { color: #f2f2f2 !important; }
+        .service-description { color: #b0b0b0 !important; }
+        .detail-item { background: #2a2a2a !important; }
+        .detail-item .value { color: #f2f2f2 !important; }
+        .detail-item .value.price { color: #d81e2a !important; }
+        .employee-name { color: #f2f2f2 !important; }
+        .employee-bio { color: #b0b0b0 !important; }
+        .link-fallback a { background: #1e1e1e !important; }
+        .warning-box { background: #1e1e1e !important; }
+        .warning-box p strong { color: #f2f2f2 !important; }
+        .notes-box { background: #1e1e1e !important; border-color: #2a2a2a !important; }
+        .notes-box p { color: #b0b0b0 !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+    <span class="section-label">✅ Confirmação de agendamento</span>
+    <h1 class="heading">Seu agendamento foi confirmado!</h1>
+
+    <p class="greeting">
+        Olá, <strong style="color:#d81e2a;">{{ client_name }}</strong>!
+    </p>
+
+    <p class="body-text">
+        Temos o prazer de confirmar seu agendamento na <strong>Fórmula da Beleza</strong>. 
+        Sua reserva foi realizada com sucesso e já estamos ansiosos para recebê-lo(a)!
+    </p>
+
+    <!-- Service Card -->
+    <div class="info-box">
+        <p class="info-box-title">📋 Detalhes do serviço</p>
+        
+        {% if service_image %}
+        <img src="{{ service_image }}" alt="{{ service_name }}" class="service-image">
+        {% endif %}
+        
+        <div class="service-name">{{ service_name }}</div>
+        
+        {% if service_description %}
+        <p class="service-description">{{ service_description }}</p>
+        {% endif %}
+
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="label">Valor</span>
+                <span class="value price">R$ {{ scheduling_service_price|floatformat:2 }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Duração</span>
+                <span class="value">{{ scheduling_service_duration }} min</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Data e Hora</span>
+                <span class="value" style="font-size: 14px;">{{ scheduling_service_time }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Status</span>
+                <span class="status-badge">{{ scheduling_service_status }}</span>
+            </div>
+        </div>
+
+        {% if scheduling_service_notes %}
+        <div class="notes-box">
+            <p>📝 {{ scheduling_service_notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Employee Info -->
+    <div class="info-box">
+        <p class="info-box-title">💇 Profissional responsável</p>
+        <div class="employee-info">
+            {% if employee_photo %}
+            <img src="{{ employee_photo }}" alt="{{ employee_full_name }}" class="employee-photo">
+            {% endif %}
+            <div class="employee-details">
+                <p class="employee-name">{{ employee_full_name }}</p>
+                {% if employee_bio %}
+                <p class="employee-bio">{{ employee_bio }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações adicionais -->
+    <div class="info-box" style="background: #f5f0f0; border-left-color: #d81e2a;">
+        <p class="info-box-title">ℹ️ Informações importantes</p>
+        <p class="info-box-text">
+            <strong>Data do agendamento:</strong> {{ scheduling_service_created_at }}<br>
+            <strong>E-mail de contato:</strong> {{ user_email }}<br><br>
+            <span style="font-size: 13px; color: #999;">
+                💡 Recomendamos chegar com 10 minutos de antecedência para 
+                garantir o melhor atendimento.
+            </span>
+        </p>
+    </div>
+
+    <!-- Ações -->
+    <div class="cta-wrap">
+        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #6a6a6a; margin-bottom: 16px;">
+            Precisa visualizar ou gerenciar seus agendamentos?
+        </p>
+        
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ appointments_url }}" style="height:52px;v-text-anchor:middle;width:240px;" arcsize="50%" stroke="f" fillcolor="#d81e2a">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;letter-spacing:1px;">VER MEUS AGENDAMENTOS</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ appointments_url }}" class="cta-btn">
+            Ver meus agendamentos
+        </a>
+        <!--<![endif]-->
+    </div>
+
+    <!-- Segundo CTA -->
+    <div style="text-align: center; margin-bottom: 28px;">
+        <a href="{{ saloon_url }}" class="cta-btn-secondary">
+            Ver salão
+        </a>
+    </div>
+
+    <!-- Lembrete -->
+    <div class="info-box" style="background: #fafafa; border-left-color: #d81e2a;">
+        <p class="info-box-title">📌 Lembre-se</p>
+        <p class="info-box-text">
+            ✅ Confirme sua chegada com o profissional<br>
+            ✅ Leve os itens necessários para o serviço<br>
+            ✅ Se precisar cancelar, faça com até 24h de antecedência<br>
+            ✅ Avalie seu atendimento após o serviço
+        </p>
+    </div>
+
+    <!-- Mensagem final -->
+    <div style="text-align: center; margin-top: 32px; padding: 20px; border-top: 1px solid #f0f0f0;">
+        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #6a6a6a; font-style: italic; margin: 0;">
+            "Estamos ansiosos para recebê-lo(a) e proporcionar uma experiência incrível! 💆✨"
+        </p>
+        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #999; margin: 8px 0 0;">
+            Equipe Fórmula da Beleza
+        </p>
+    </div>
+
+{% endblock %}

@@ -61,7 +61,11 @@ from beauty_formula.apps.services.selectors.scheduling_selector import (
 )
 from beauty_formula.apps.services.selectors.service_selector import get_service_by_id
 from beauty_formula.apps.services.tasks.send_confirm_scheduling_to_client import send_confirm_scheduling_to_client
-from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
+from beauty_formula.apps.services.tasks.send_confirm_scheduling_to_employee import send_confirm_scheduling_to_employee
+from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_client import send_cancel_scheduling_to_client
+from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_employee import send_cancel_scheduling_to_employee
+from beauty_formula.apps.services.tasks.send_scheduling_completed_thanks import send_scheduling_completed_thanks
+
 
 
 
@@ -140,6 +144,18 @@ def _validate_slot_available(
         raise SchedulingConflict()
 
 
+def _dispatch_cancellation_emails(scheduling: Scheduling) -> None:
+    """
+    Dispara os dois e-mails de cancelamento (cliente e funcionário).
+
+    Extraído porque os três fluxos de cancelamento (cliente, funcionário,
+    admin) precisam notificar exatamente as mesmas duas pontas — só quem
+    tem permissão pra cancelar é que muda entre eles.
+    """
+    send_cancel_scheduling_to_client.delay(scheduling_id=scheduling.id)
+    send_cancel_scheduling_to_employee.delay(scheduling_id=scheduling.id)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Criação
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -169,6 +185,7 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
         notes=data.notes,
     )
     send_confirm_scheduling_to_client.delay(user_id=user_id, scheduling_id=scheduling.id)
+    send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 
@@ -319,8 +336,9 @@ def cancel_own_scheduling_as_client(user_id: UUID, scheduling_id: UUID, reason: 
     if not scheduling.can_be_canceled_by_client:
         raise SchedulingCannotBeCanceled(_("Cancelamentos só são permitidos até 2h antes do horário agendado."))
 
-    user = get_user_by_id(user_id=user_id)
+    user = User.objects.get(pk=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
+    _dispatch_cancellation_emails(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
 
@@ -331,8 +349,9 @@ def cancel_scheduling_as_employee(user_id: UUID, scheduling_id: UUID, reason: st
     if not scheduling.can_be_canceled_by_admin:
         raise SchedulingCannotBeCanceled()
 
-    user = get_user_by_id(user_id=user_id)
+    user = User.objects.get(pk=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
+    _dispatch_cancellation_emails(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
 
@@ -346,6 +365,7 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
         raise SchedulingCannotBeCanceled()
 
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
+    _dispatch_cancellation_emails(scheduling)
     return SchedulingPrivateOut.from_orm(scheduling)
 
 
@@ -366,6 +386,7 @@ def complete_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> Sche
     if not scheduling.can_transition_to(Scheduling.SchedulingStatus.COMPLETED):
         raise InvalidSchedulingStatusTransition(_("Só é possível concluir um agendamento confirmado."))
     scheduling = complete_scheduling_repo(scheduling)
+    send_scheduling_completed_thanks.delay(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 

@@ -118,5 +118,25 @@ docker compose -f docker-compose.dev.yml restart rabbitmq
 
 Use `docker-compose.prod.yml`, com as variáveis de produção configuradas no `.env` (`DEBUG=False`, `ALLOWED_HOSTS` restritivo, credenciais reais de banco/MinIO/Asaas).
 
-## Licença
+## Test
 
+# Dentro do container
+cd /app
+
+# Execute todos os testes dos models
+pytest beauty_formula/apps/accounts/tests/test_models/
+
+# Execute apenas test_client
+pytest beauty_formula/apps/accounts/tests/test_models/test_client.py -v
+
+# Execute apenas test_employee
+pytest beauty_formula/apps/accounts/tests/test_models/test_employee.py -v
+
+# Execute apenas test_user
+pytest beauty_formula/apps/accounts/tests/test_models/test_user.py -v
+
+# Execute apenas test_user_manage
+pytest beauty_formula/apps/accounts/tests/test_models/test_user_manage.py -v
+
+# Com cobertura
+pytest --cov=beauty_formula.apps.accounts.models beauty_formula/apps/accounts/tests/test_models/

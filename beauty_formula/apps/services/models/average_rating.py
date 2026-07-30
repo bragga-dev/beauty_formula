@@ -18,7 +18,7 @@ class AverageRating(models.Model):
     comments = models.TextField(_("Comentários"), blank=True, null=True, help_text=_("Comentários dos clientes sobre o serviço."), default="")
     created_at = models.DateTimeField(_("Criado em"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Atualizado em"), auto_now=True)
-
+    # is_authorized = models.BooleanField(_("Autorizado?"), default=False)
 
     def __str__(self):
         return f"Avaliação média do agendamento {self.scheduling.id}: {self.average_rating} ({self.total_reviews} avaliações)"  

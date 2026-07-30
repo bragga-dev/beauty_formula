@@ -1,4 +1,3 @@
-
 from django.conf import settings
 from beauty_formula.apps.core.tokens.signing import generate_uid_token
 
@@ -20,7 +19,7 @@ def build_verification_url(user) -> str:
 
 def build_password_reset_url(user) -> str:
     uid, token = generate_uid_token(user)
-    return f"{settings.FRONTEND_URL}/redefinir-senha/{uid}/{token}"
+    return f"{settings.FRONTEND_URL}/redefinir-senha?uid={uid}&token={token}"
 
 
 def verify_email(uidb64: str, token: str) -> User:

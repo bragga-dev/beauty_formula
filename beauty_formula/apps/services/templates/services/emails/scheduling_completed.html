@@ -1,8 +1,8 @@
 {% extends "core/emails/base.html" %}
 
-{% block title %}Agendamento Confirmado — Fórmula da Beleza{% endblock %}
+{% block title %}Obrigado pela Preferência! — Fórmula da Beleza{% endblock %}
 
-{% block preheader %}Seu agendamento na Fórmula da Beleza foi confirmado com sucesso! Confira os detalhes do seu serviço.{% endblock %}
+{% block preheader %}Seu atendimento foi concluído com sucesso! Avalie seu serviço e agende novamente.{% endblock %}
 
 {% block extra_styles %}
 <style>
@@ -53,6 +53,11 @@
         border-left: 4px solid #d81e2a;
     }
 
+    .info-box.success {
+        border-left-color: #2e7d32;
+        background: #f0f8f0;
+    }
+
     .info-box-title {
         font-family: Arial, Helvetica, sans-serif;
         font-size: 12px;
@@ -74,20 +79,6 @@
     .info-box-text strong {
         color: #0a0a0a;
         font-weight: 600;
-    }
-
-    .highlight-badge {
-        display: inline-block;
-        background: linear-gradient(135deg, #d81e2a, #b0151f);
-        color: #ffffff !important;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 13px;
-        font-weight: 700;
-        padding: 8px 20px;
-        border-radius: 50px;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        margin: 8px 0 16px;
     }
 
     .cta-wrap {
@@ -123,15 +114,6 @@
         border: 2px solid #d81e2a;
         margin-top: 12px;
         transition: all 0.3s ease;
-    }
-
-    .service-card {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 20px;
-        border: 1px solid #f0f0f0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
 
     .service-image {
@@ -234,75 +216,12 @@
         line-height: 1.5;
     }
 
-    .status-badge {
-        display: inline-block;
-        padding: 4px 16px;
-        border-radius: 50px;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 13px;
-        font-weight: 600;
-        background: #e8f5e9;
-        color: #2e7d32;
-    }
-
-    .status-badge.confirmed {
-        background: #e8f5e9;
-        color: #2e7d32;
-    }
-
-    .notes-box {
-        background: #fafafa;
-        border-radius: 12px;
-        padding: 16px 20px;
-        margin: 12px 0 0;
-        border: 1px solid #f0f0f0;
-    }
-
-    .notes-box p {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 14px;
-        color: #6a6a6a;
-        margin: 0;
-        font-style: italic;
-    }
-
-    .link-fallback {
+    .stars {
         text-align: center;
-        margin-bottom: 28px;
-    }
-
-    .link-fallback p {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 12px;
-        color: #aaaaaa;
-        margin: 0 0 8px;
-    }
-
-    .link-fallback a {
-        display: inline-block;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 12px;
-        color: #a8121c;
-        background: #fafafa;
-        border-radius: 12px;
-        padding: 10px 16px;
-        word-break: break-all;
-        text-decoration: none;
-    }
-
-    .warning-box {
-        background: #fafafa;
-        border-radius: 18px;
-        padding: 18px 22px;
-        margin-top: 28px;
-    }
-
-    .warning-box p {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 13px;
-        color: #6a6a6a;
-        margin: 0;
-        line-height: 1.7;
+        font-size: 32px;
+        letter-spacing: 4px;
+        color: #f5a623;
+        margin: 8px 0 16px;
     }
 
     @media only screen and (max-width: 600px) {
@@ -321,9 +240,9 @@
         .greeting { color: #e8e8e8 !important; }
         .body-text { color: #b0b0b0 !important; }
         .info-box { background: #1e1e1e !important; border-left-color: #d81e2a !important; }
-        .info-box-text, .warning-box p { color: #b0b0b0 !important; }
+        .info-box.success { background: #1a2a1a !important; border-left-color: #2e7d32 !important; }
+        .info-box-text { color: #b0b0b0 !important; }
         .info-box-text strong { color: #f2f2f2 !important; }
-        .service-card { background: #1e1e1e !important; border-color: #2a2a2a !important; }
         .service-name { color: #f2f2f2 !important; }
         .service-description { color: #b0b0b0 !important; }
         .detail-item { background: #2a2a2a !important; }
@@ -331,32 +250,27 @@
         .detail-item .value.price { color: #d81e2a !important; }
         .employee-name { color: #f2f2f2 !important; }
         .employee-bio { color: #b0b0b0 !important; }
-        .link-fallback a { background: #1e1e1e !important; }
-        .warning-box { background: #1e1e1e !important; }
-        .warning-box p strong { color: #f2f2f2 !important; }
-        .notes-box { background: #1e1e1e !important; border-color: #2a2a2a !important; }
-        .notes-box p { color: #b0b0b0 !important; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 
-    <span class="section-label">✅ Confirmação de agendamento</span>
-    <h1 class="heading">Seu agendamento foi confirmado!</h1>
+    <span class="section-label">🎉 Atendimento concluído</span>
+    <h1 class="heading">Obrigado pela preferência!</h1>
 
     <p class="greeting">
         Olá, <strong style="color:#d81e2a;">{{ client_name }}</strong>!
     </p>
 
     <p class="body-text">
-        Temos o prazer de confirmar seu agendamento na <strong>Fórmula da Beleza</strong>. 
-        Sua reserva foi realizada com sucesso e já estamos ansiosos para recebê-lo(a)!
+        Seu atendimento na <strong>Fórmula da Beleza</strong> foi <strong>concluído com sucesso</strong>! 🎊
+        Foi um prazer atender você. Esperamos que tenha tido uma experiência incrível!
     </p>
 
     <!-- Service Card -->
-    <div class="info-box">
-        <p class="info-box-title">📋 Detalhes do serviço</p>
+    <div class="info-box success">
+        <p class="info-box-title">📋 Detalhes do atendimento</p>
         
         {% if service_image %}
         <img src="{{ service_image }}" alt="{{ service_name }}" class="service-image">
@@ -378,25 +292,15 @@
                 <span class="value">{{ scheduling_service_duration }} min</span>
             </div>
             <div class="detail-item">
-                <span class="label">Data e Hora</span>
-                <span class="value" style="font-size: 14px;">{{ scheduling_service_time }}</span>
-            </div>
-            <div class="detail-item">
-                <span class="label">Status</span>
-                <span class="status-badge confirmed">{{ scheduling_service_status }}</span>
+                <span class="label">Concluído em</span>
+                <span class="value" style="font-size: 14px;">{{ completed_at }}</span>
             </div>
         </div>
-
-        {% if scheduling_service_notes %}
-        <div class="notes-box">
-            <p>📝 {{ scheduling_service_notes }}</p>
-        </div>
-        {% endif %}
     </div>
 
     <!-- Employee Info -->
     <div class="info-box">
-        <p class="info-box-title">💇 Profissional responsável</p>
+        <p class="info-box-title">💇 Quem te atendeu</p>
         <div class="employee-info">
             {% if employee_photo %}
             <img src="{{ employee_photo }}" alt="{{ employee_full_name }}" class="employee-photo">
@@ -410,60 +314,62 @@
         </div>
     </div>
 
-    <!-- Informações adicionais -->
-    <div class="info-box" style="background: #f5f0f0; border-left-color: #d81e2a;">
-        <p class="info-box-title">ℹ️ Informações importantes</p>
-        <p class="info-box-text">
-            <strong>Data do agendamento:</strong> {{ scheduling_service_created_at }}<br>
-            <strong>E-mail de contato:</strong> {{ user_email }}<br><br>
-            <span style="font-size: 13px; color: #999;">
-                💡 Recomendamos chegar com 10 minutos de antecedência para 
-                garantir o melhor atendimento.
-            </span>
+    <!-- Avaliação -->
+    <div class="info-box" style="text-align: center; background: #fafafa; border-left-color: #f5a623;">
+        <p class="info-box-title">⭐ Avalie seu atendimento</p>
+        <div class="stars">★★★★★</div>
+        <p class="info-box-text" style="margin-bottom: 16px;">
+            Sua opinião é muito importante para nós! <br>
+            Avalie o serviço e nos ajude a melhorar ainda mais.
         </p>
+        
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ rate_url }}" style="height:48px;v-text-anchor:middle;width:200px;" arcsize="50%" stroke="f" fillcolor="#f5a623">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">AVALIAR SERVIÇO</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ rate_url }}" style="display: inline-block; background: #f5a623; color: #ffffff !important; text-decoration: none !important; font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; padding: 14px 40px; border-radius: 100px; box-shadow: 0 8px 20px rgba(245,166,35,0.3);">
+            Avaliar serviço
+        </a>
+        <!--<![endif]-->
     </div>
 
     <!-- Ações -->
     <div class="cta-wrap">
         <p style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #6a6a6a; margin-bottom: 16px;">
-            Precisa visualizar ou gerenciar seus agendamentos?
+            Deseja agendar novamente? Estamos te esperando!
         </p>
         
         <!--[if mso]>
-        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ appointments_url }}" style="height:52px;v-text-anchor:middle;width:240px;" arcsize="50%" stroke="f" fillcolor="#d81e2a">
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ new_scheduling_url }}" style="height:52px;v-text-anchor:middle;width:240px;" arcsize="50%" stroke="f" fillcolor="#d81e2a">
             <w:anchorlock/>
-            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;letter-spacing:1px;">VER MEUS AGENDAMENTOS</center>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;letter-spacing:1px;">AGENDAR NOVAMENTE</center>
         </v:roundrect>
         <![endif]-->
         <!--[if !mso]><!-->
-        <a href="{{ appointments_url }}" class="cta-btn">
-            Ver meus agendamentos
+        <a href="{{ new_scheduling_url }}" class="cta-btn">
+            Agendar novamente
         </a>
         <!--<![endif]-->
     </div>
 
-    <!-- Segundo CTA -->
-    <div style="text-align: center; margin-bottom: 28px;">
-        <a href="{{ saloon_url }}" class="cta-btn-secondary">
-            Ver salão
-        </a>
-    </div>
-
-    <!-- Lembrete -->
+    <!-- Conteúdo motivacional -->
     <div class="info-box" style="background: #fafafa; border-left-color: #d81e2a;">
-        <p class="info-box-title">📌 Lembre-se</p>
+        <p class="info-box-title">💡 Por que avaliar?</p>
         <p class="info-box-text">
-            ✅ Confirme sua chegada com o profissional<br>
-            ✅ Leve os itens necessários para o serviço<br>
-            ✅ Se precisar cancelar, faça com até 24h de antecedência<br>
-            ✅ Avalie seu atendimento após o serviço
+            ✅ Ajuda outros clientes a escolherem o melhor serviço<br>
+            ✅ Reconhece o trabalho do profissional que te atendeu<br>
+            ✅ Nos ajuda a melhorar a qualidade dos nossos serviços<br>
+            ✅ Você pode ganhar descontos em futuros agendamentos!
         </p>
     </div>
 
     <!-- Mensagem final -->
     <div style="text-align: center; margin-top: 32px; padding: 20px; border-top: 1px solid #f0f0f0;">
         <p style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #6a6a6a; font-style: italic; margin: 0;">
-            "Estamos ansiosos para recebê-lo(a) e proporcionar uma experiência incrível! 💆✨"
+            "Sua satisfação é a nossa maior recompensa! Até a próxima! 💆✨"
         </p>
         <p style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #999; margin: 8px 0 0;">
             Equipe Fórmula da Beleza
