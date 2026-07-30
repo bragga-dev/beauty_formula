@@ -104,22 +104,8 @@ def cancel_scheduling(scheduling: Scheduling, *, reason: str, canceled_by: User)
 
 
 @transaction.atomic
-def confirm_scheduling(scheduling: Scheduling) -> Scheduling:
-    """Confirma um agendamento pendente."""
-    scheduling.confirm()
-    return scheduling
-
-
-@transaction.atomic
-def start_scheduling(scheduling: Scheduling) -> Scheduling:
-    """Inicia o atendimento de um agendamento confirmado."""
-    scheduling.start()
-    return scheduling
-
-
-@transaction.atomic
 def complete_scheduling(scheduling: Scheduling) -> Scheduling:
-    """Conclui um atendimento em andamento."""
+    """Conclui um atendimento (agendamento confirmado)."""
     scheduling.complete()
     return scheduling
 
@@ -129,6 +115,36 @@ def mark_scheduling_as_no_show(scheduling: Scheduling) -> Scheduling:
     """Marca um agendamento como não comparecido."""
     scheduling.mark_as_no_show()
     return scheduling
+
+
+@transaction.atomic
+def reschedule_scheduling(
+    scheduling: Scheduling,
+    *,
+    service: Service,
+    employee: Employee,
+    scheduled_time: datetime,
+    notes: Optional[str] = None,
+) -> Scheduling:
+    """
+    Reagenda um atendimento: cria um novo agendamento (já CONFIRMED, via
+    `create_scheduling`) e marca o atual como RESCHEDULED, vinculando os
+    dois registros. Não reaproveita/edita o registro atual — o histórico
+    original é preservado intacto.
+    """
+    new_scheduling = create_scheduling(
+        service=service,
+        client=scheduling.client,
+        employee=employee,
+        scheduled_time=scheduled_time,
+        notes=notes if notes is not None else scheduling.notes,
+    )
+    # `mark_as_rescheduled` valida a transição de status internamente e
+    # levanta `InvalidSchedulingStatusTransition` se o agendamento não
+    # estiver mais CONFIRMED — deixamos propagar como está, a camada de
+    # service é quem decide como traduzir isso pra resposta HTTP.
+    scheduling.mark_as_rescheduled(new_scheduling)
+    return new_scheduling
 
 
 @transaction.atomic

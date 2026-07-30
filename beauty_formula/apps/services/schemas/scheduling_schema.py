@@ -17,12 +17,11 @@ from beauty_formula.apps.services.schemas.service_schema import ServiceOut
 
 class SchedulingStatusEnum(str, Enum):
     """Enum para status do agendamento - espelha o modelo Scheduling.SchedulingStatus"""
-    PENDING = "pending"
     CONFIRMED = "confirmed"
-    IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELED = "canceled"
     NO_SHOW = "no_show"
+    RESCHEDULED = "rescheduled"
 
     @classmethod
     def get_display_name(cls, value: str) -> str:
@@ -60,6 +59,7 @@ class SchedulingOut(Schema):
     canceled_reason: Optional[str] = None
     canceled_by: Optional[UserOut] = None
     rated_at: Optional[datetime] = None
+    rescheduled_to_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
 
@@ -79,6 +79,7 @@ class SchedulingOut(Schema):
             canceled_reason=scheduling.canceled_reason,
             canceled_by=UserOut.from_orm(scheduling.canceled_by) if scheduling.canceled_by_id else None,
             rated_at=scheduling.rated_at,
+            rescheduled_to_id=scheduling.rescheduled_to_id,
             created_at=scheduling.created_at,
             updated_at=scheduling.updated_at,
         )
@@ -102,6 +103,7 @@ class SchedulingPrivateOut(Schema):
     canceled_at: Optional[datetime] = None
     canceled_reason: Optional[str] = None
     rated_at: Optional[datetime] = None
+    rescheduled_to_id: Optional[uuid.UUID] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -122,6 +124,7 @@ class SchedulingPrivateOut(Schema):
             canceled_at=scheduling.canceled_at,
             canceled_reason=scheduling.canceled_reason,
             rated_at=scheduling.rated_at,
+            rescheduled_to_id=scheduling.rescheduled_to_id,
             is_active=scheduling.is_active,
             created_at=scheduling.created_at,
             updated_at=scheduling.updated_at,
@@ -195,6 +198,31 @@ class SchedulingCancelIn(Schema):
         v = v.strip()
         if not v:
             raise ValueError("Motivo do cancelamento é obrigatório.")
+        return v
+
+
+class SchedulingRescheduleIn(Schema):
+    """
+    Reagendamento de um atendimento confirmado.
+
+    Não altera o registro atual — ele é marcado como RESCHEDULED e um
+    novo agendamento é criado (já CONFIRMED) com o novo horário e,
+    opcionalmente, novo serviço/funcionário. Isso preserva o histórico
+    do agendamento original para auditoria e relatórios.
+    """
+    scheduled_time: datetime
+    service_id: Optional[uuid.UUID] = None
+    employee_id: Optional[uuid.UUID] = None
+    notes: Optional[str] = None
+
+    @field_validator("scheduled_time")
+    @classmethod
+    def validate_scheduled_time_reschedule(cls, v: datetime) -> datetime:
+        """Normaliza para aware e valida se o novo horário não está no passado."""
+        if timezone.is_naive(v):
+            v = timezone.make_aware(v)
+        if v < timezone.now():
+            raise ValueError("O horário agendado não pode ser no passado.")
         return v
 
 

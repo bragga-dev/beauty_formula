@@ -25,9 +25,7 @@ def _to_aware(target_date: date_type, t) -> datetime:
     return timezone.make_aware(datetime.combine(target_date, t))
 
 
-def _get_free_intervals(
-    employee_id: UUID, target_date: date_type, exclude_scheduling_id: Optional[UUID] = None
-) -> List[Interval]:
+def _get_free_intervals(employee_id: UUID, target_date: date_type, exclude_scheduling_id: Optional[UUID] = None) -> List[Interval]:
     """
     Janela livre "crua" de um funcionário numa data: expediente do dia
     da semana, já com bloqueios (recorrentes + pontuais) e agendamentos
@@ -91,9 +89,7 @@ def get_available_slots(employee_id: UUID, target_date: date_type, slot_duration
     return slots
 
 
-def is_slot_available(
-    employee_id: UUID, start: datetime, end: datetime, exclude_scheduling_id: Optional[UUID] = None
-) -> bool:
+def is_slot_available(employee_id: UUID, start: datetime, end: datetime, exclude_scheduling_id: Optional[UUID] = None) -> bool:
     """
     Verifica se o intervalo [start, end) cabe inteiro numa janela livre
     do funcionário — dentro do expediente, fora de bloqueios/folgas e

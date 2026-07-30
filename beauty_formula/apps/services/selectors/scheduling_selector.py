@@ -11,11 +11,10 @@ from django.db.models import Q, QuerySet
 from beauty_formula.apps.services.models.scheduling import Scheduling
 
 # Status que efetivamente ocupam a agenda do funcionário. Concluído/
-# cancelado/no-show não bloqueiam novos horários.
+# cancelado/no-show/reagendado não bloqueiam novos horários — só um
+# agendamento CONFIRMED está ativo no fluxo.
 BUSY_STATUSES = [
-    Scheduling.SchedulingStatus.PENDING,
     Scheduling.SchedulingStatus.CONFIRMED,
-    Scheduling.SchedulingStatus.IN_PROGRESS,
 ]
 
 # select_related padrão pra qualquer listagem/detalhe que vá virar

@@ -1,12 +1,15 @@
 """
 Rotas de Scheduling (Agendamentos).
 
-- Cliente: cria, lista, vê detalhe, edita (enquanto pendente) e cancela
+- Cliente: cria, lista, vê detalhe, edita observações, reagenda e cancela
   os próprios agendamentos.
-- Funcionário: lista/vê os próprios agendamentos e avança o status
-  (confirmar, iniciar, concluir, não comparecimento) ou cancela.
+- Funcionário: lista/vê os próprios agendamentos e conclui, marca não
+  comparecimento ou cancela os que atende.
 - Admin: visão total — lista com filtros, vê qualquer detalhe, edita,
   cancela e exclui permanentemente.
+
+Sem confirmação manual nem status "em andamento": todo agendamento já
+nasce CONFIRMED (a disponibilidade já foi validada na criação).
 """
 from datetime import datetime
 from typing import Optional
@@ -38,6 +41,7 @@ from beauty_formula.apps.services.schemas.scheduling_schema import (
     SchedulingCreateIn,
     SchedulingOut,
     SchedulingPrivateOut,
+    SchedulingRescheduleIn,
     SchedulingStatusEnum,
     SchedulingUpdateIn,
 )
@@ -46,7 +50,6 @@ from beauty_formula.apps.services.services.scheduling_service import (
     cancel_scheduling_as_admin,
     cancel_scheduling_as_employee,
     complete_scheduling_for_employee,
-    confirm_scheduling_for_employee,
     create_scheduling_for_client,
     delete_scheduling_by_admin,
     get_own_scheduling_detail_for_client,
@@ -56,7 +59,7 @@ from beauty_formula.apps.services.services.scheduling_service import (
     list_own_schedulings_for_client,
     list_own_schedulings_for_employee,
     mark_scheduling_as_no_show_for_employee,
-    start_scheduling_for_employee,
+    reschedule_own_scheduling_for_client,
     update_own_scheduling_for_client,
     update_scheduling_by_admin,
 )
@@ -137,13 +140,35 @@ def get_my_scheduling_router(request, scheduling_id: UUID):
     "/update-my-scheduling/{scheduling_id}",
     response={200: SchedulingOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
     auth=ClientOnlyAuth(),
-    summary="Cliente edita um agendamento próprio (só enquanto pendente)",
+    summary="Cliente edita observações de um agendamento confirmado",
 )
 @ratelimit(key="user", rate="20/m", block=True)
 def update_my_scheduling_router(request, scheduling_id: UUID, payload: SchedulingUpdateIn):
     user: User = request.auth
     try:
         scheduling = update_own_scheduling_for_client(user_id=user.id, scheduling_id=scheduling_id, data=payload)
+        return 200, scheduling
+    except ClientNotFoundError:
+        return 404, {"detail": "Cliente não encontrado."}
+    except SchedulingNotFound as e:
+        return 404, {"detail": str(e)}
+    except SchedulingCannotBeModified as e:
+        return 400, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+@router.patch(
+    "/reschedule-my-scheduling/{scheduling_id}",
+    response={200: SchedulingOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=ClientOnlyAuth(),
+    summary="Cliente reagenda um agendamento confirmado (cria um novo registro)",
+)
+@ratelimit(key="user", rate="20/m", block=True)
+def reschedule_my_scheduling_router(request, scheduling_id: UUID, payload: SchedulingRescheduleIn):
+    user: User = request.auth
+    try:
+        scheduling = reschedule_own_scheduling_for_client(user_id=user.id, scheduling_id=scheduling_id, data=payload)
         return 200, scheduling
     except ClientNotFoundError:
         return 404, {"detail": "Cliente não encontrado."}
@@ -231,54 +256,10 @@ def get_employee_scheduling_router(request, scheduling_id: UUID):
 
 
 @router.patch(
-    "/confirm/{scheduling_id}",
-    response={200: SchedulingOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=EmployeeOnlyAuth(),
-    summary="Funcionário confirma um agendamento pendente",
-)
-@ratelimit(key="user", rate="30/m", block=True)
-def confirm_scheduling_router(request, scheduling_id: UUID):
-    user: User = request.auth
-    try:
-        scheduling = confirm_scheduling_for_employee(user_id=user.id, scheduling_id=scheduling_id)
-        return 200, scheduling
-    except EmployeeNotFoundError:
-        return 404, {"detail": "Funcionário não encontrado."}
-    except SchedulingNotFound as e:
-        return 404, {"detail": str(e)}
-    except InvalidSchedulingStatusTransition as e:
-        return 400, {"detail": str(e)}
-    except Exception as e:
-        return 400, {"detail": str(e)}
-
-
-@router.patch(
-    "/start/{scheduling_id}",
-    response={200: SchedulingOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=EmployeeOnlyAuth(),
-    summary="Funcionário inicia o atendimento de um agendamento confirmado",
-)
-@ratelimit(key="user", rate="30/m", block=True)
-def start_scheduling_router(request, scheduling_id: UUID):
-    user: User = request.auth
-    try:
-        scheduling = start_scheduling_for_employee(user_id=user.id, scheduling_id=scheduling_id)
-        return 200, scheduling
-    except EmployeeNotFoundError:
-        return 404, {"detail": "Funcionário não encontrado."}
-    except SchedulingNotFound as e:
-        return 404, {"detail": str(e)}
-    except InvalidSchedulingStatusTransition as e:
-        return 400, {"detail": str(e)}
-    except Exception as e:
-        return 400, {"detail": str(e)}
-
-
-@router.patch(
     "/complete/{scheduling_id}",
     response={200: SchedulingOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
     auth=EmployeeOnlyAuth(),
-    summary="Funcionário conclui um atendimento em andamento",
+    summary="Funcionário conclui um atendimento confirmado",
 )
 @ratelimit(key="user", rate="30/m", block=True)
 def complete_scheduling_router(request, scheduling_id: UUID):

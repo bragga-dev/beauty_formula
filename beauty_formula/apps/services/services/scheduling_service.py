@@ -1,12 +1,19 @@
 """
 Regras de negócio de Scheduling (agendamentos).
 
-Fluxo geral:
-- Cliente cria/edita/cancela os PRÓPRIOS agendamentos.
-- Funcionário avança o status dos agendamentos que atende (confirmar,
-  iniciar, concluir, marcar não comparecimento) e também pode cancelar.
+Fluxo geral (simplificado — sem confirmação manual nem status "em
+andamento"):
+- Todo agendamento já nasce CONFIRMED: a disponibilidade e os conflitos
+  já são validados na criação, então não existe um estado pendente
+  aguardando aprovação.
+- Cliente cria/edita/cancela/reagenda os PRÓPRIOS agendamentos.
+- Funcionário conclui o atendimento, marca não comparecimento ou cancela
+  os agendamentos que atende.
 - Admin tem visão total: lista qualquer agendamento, cancela, e é o
   único que pode excluir (hard delete) um registro.
+- Reagendar NÃO altera o registro atual: ele é marcado como RESCHEDULED
+  e um novo agendamento (já CONFIRMED) é criado em seu lugar, preservando
+  o histórico para auditoria e relatórios.
 """
 from datetime import datetime, timedelta
 from typing import Optional
@@ -31,17 +38,17 @@ from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.repositories.scheduling_repository import (
     cancel_scheduling as cancel_scheduling_repo,
     complete_scheduling as complete_scheduling_repo,
-    confirm_scheduling as confirm_scheduling_repo,
     create_scheduling as create_scheduling_repo,
     delete_scheduling as delete_scheduling_repo,
     mark_scheduling_as_no_show as mark_no_show_repo,
-    start_scheduling as start_scheduling_repo,
+    reschedule_scheduling as reschedule_scheduling_repo,
     update_scheduling as update_scheduling_repo,
 )
 from beauty_formula.apps.services.schemas.scheduling_schema import (
     SchedulingCreateIn,
     SchedulingOut,
     SchedulingPrivateOut,
+    SchedulingRescheduleIn,
     SchedulingUpdateIn,
 )
 from beauty_formula.apps.services.selectors.availability_selector import is_slot_available
@@ -53,13 +60,16 @@ from beauty_formula.apps.services.selectors.scheduling_selector import (
     get_schedulings_by_employee,
 )
 from beauty_formula.apps.services.selectors.service_selector import get_service_by_id
+from beauty_formula.apps.services.tasks.send_confirm_scheduling_to_client import send_confirm_scheduling_to_client
+from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
 
-# Status finais — um agendamento nesses estados não pode mais ser editado,
-# reagendado ou cancelado, só consultado.
+
+
 FINAL_STATUSES = [
     Scheduling.SchedulingStatus.COMPLETED,
     Scheduling.SchedulingStatus.CANCELED,
     Scheduling.SchedulingStatus.NO_SHOW,
+    Scheduling.SchedulingStatus.RESCHEDULED,
 ]
 
 
@@ -158,6 +168,7 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
         scheduled_time=data.scheduled_time,
         notes=data.notes,
     )
+    send_confirm_scheduling_to_client.delay(user_id=user_id, scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 
@@ -230,50 +241,28 @@ def get_own_scheduling_detail_for_employee(user_id: UUID, scheduling_id: UUID) -
 
 def update_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, data: SchedulingUpdateIn) -> SchedulingOut:
     """
-    Cliente edita um agendamento próprio — só permitido enquanto o
-    agendamento ainda estiver pendente (depois de confirmado, a alteração
-    já impacta a agenda do funcionário e deve passar por cancelamento).
+    Cliente edita um agendamento próprio.
+
+    Como todo agendamento já nasce CONFIRMED e ocupa a agenda do
+    funcionário desde a criação, mudar serviço/funcionário/horário aqui
+    passaria por trás da máquina de estados — esse tipo de alteração deve
+    usar o endpoint de reagendamento (`reschedule_own_scheduling_for_client`),
+    que preserva o histórico do agendamento original. Este endpoint só
+    permite editar campos que não afetam a agenda, como `notes`.
     """
     scheduling = _get_own_client_scheduling(user_id, scheduling_id)
 
-    if scheduling.status != Scheduling.SchedulingStatus.PENDING:
+    if scheduling.status != Scheduling.SchedulingStatus.CONFIRMED:
         raise SchedulingCannotBeModified(
-            _("Só é possível editar um agendamento enquanto ele estiver pendente.")
+            _("Só é possível editar um agendamento enquanto ele estiver confirmado.")
         )
 
-    service = scheduling.service
-    if data.service_id is not None and data.service_id != scheduling.service_id:
-        service = get_service_by_id(service_id=data.service_id)
-        if service is None or not service.is_active:
-            raise ServiceNotFound()
-
-    employee = scheduling.employee
-    if data.employee_id is not None and data.employee_id != scheduling.employee_id:
-        employee = get_employee_by_id(employee_id=data.employee_id)
-        if employee is None:
-            raise EmployeeNotFoundError()
-
-    if data.service_id is not None or data.employee_id is not None:
-        _validate_employee_offers_service(employee_id=employee.id, service_id=service.id)
-
-    # Reavalia disponibilidade se algo que afeta a agenda mudou: serviço
-    # (duração), funcionário ou o próprio horário. `exclude_scheduling_id`
-    # evita que o agendamento conte como ocupando seu próprio horário atual.
     if data.service_id is not None or data.employee_id is not None or data.scheduled_time is not None:
-        _validate_slot_available(
-            employee_id=employee.id,
-            scheduled_time=data.scheduled_time or scheduling.scheduled_time,
-            duration=service.duration,
-            exclude_scheduling_id=scheduling.id,
+        raise SchedulingCannotBeModified(
+            _("Para trocar serviço, funcionário ou horário, use o reagendamento.")
         )
 
-    scheduling = update_scheduling_repo(
-        scheduling,
-        service=service if data.service_id is not None else None,
-        employee=employee if data.employee_id is not None else None,
-        scheduled_time=data.scheduled_time,
-        notes=data.notes,
-    )
+    scheduling = update_scheduling_repo(scheduling, notes=data.notes)
     return SchedulingOut.from_orm(scheduling)
 
 
@@ -328,11 +317,9 @@ def cancel_own_scheduling_as_client(user_id: UUID, scheduling_id: UUID, reason: 
     scheduling = _get_own_client_scheduling(user_id, scheduling_id)
 
     if not scheduling.can_be_canceled_by_client:
-        raise SchedulingCannotBeCanceled(
-            _("Cancelamentos só são permitidos até 2h antes do horário agendado.")
-        )
+        raise SchedulingCannotBeCanceled(_("Cancelamentos só são permitidos até 2h antes do horário agendado."))
 
-    user = User.objects.get(pk=user_id)
+    user = get_user_by_id(user_id=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
     return SchedulingOut.from_orm(scheduling)
 
@@ -344,7 +331,7 @@ def cancel_scheduling_as_employee(user_id: UUID, scheduling_id: UUID, reason: st
     if not scheduling.can_be_canceled_by_admin:
         raise SchedulingCannotBeCanceled()
 
-    user = User.objects.get(pk=user_id)
+    user = get_user_by_id(user_id=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
     return SchedulingOut.from_orm(scheduling)
 
@@ -364,44 +351,84 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Transições de status (funcionário/admin)
+#
+# Sem confirmação manual nem "em andamento": todo agendamento já nasce
+# CONFIRMED. Daqui só se sai por COMPLETED, CANCELED, NO_SHOW ou
+# RESCHEDULED — a checagem em si é feita pela máquina de estados do
+# model (`Scheduling.can_transition_to`), essas funções só resolvem o
+# agendamento do funcionário e traduzem a falha de transição pra
+# exceção de domínio esperada pelo router.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def confirm_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
-    """Funcionário confirma um agendamento pendente."""
-    scheduling = _get_own_employee_scheduling(user_id, scheduling_id)
-    if scheduling.status != Scheduling.SchedulingStatus.PENDING:
-        raise InvalidSchedulingStatusTransition(_("Só é possível confirmar um agendamento pendente."))
-    scheduling = confirm_scheduling_repo(scheduling)
-    return SchedulingOut.from_orm(scheduling)
-
-
-def start_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
-    """Funcionário inicia o atendimento de um agendamento confirmado."""
-    scheduling = _get_own_employee_scheduling(user_id, scheduling_id)
-    if scheduling.status != Scheduling.SchedulingStatus.CONFIRMED:
-        raise InvalidSchedulingStatusTransition(_("Só é possível iniciar um agendamento confirmado."))
-    scheduling = start_scheduling_repo(scheduling)
-    return SchedulingOut.from_orm(scheduling)
-
-
 def complete_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
-    """Funcionário conclui um atendimento em andamento."""
+    """Funcionário conclui um atendimento confirmado."""
     scheduling = _get_own_employee_scheduling(user_id, scheduling_id)
-    if scheduling.status != Scheduling.SchedulingStatus.IN_PROGRESS:
-        raise InvalidSchedulingStatusTransition(_("Só é possível concluir um agendamento em andamento."))
+    if not scheduling.can_transition_to(Scheduling.SchedulingStatus.COMPLETED):
+        raise InvalidSchedulingStatusTransition(_("Só é possível concluir um agendamento confirmado."))
     scheduling = complete_scheduling_repo(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
 
 def mark_scheduling_as_no_show_for_employee(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
-    """Funcionário marca um agendamento pendente/confirmado como não comparecido."""
+    """Funcionário marca um agendamento confirmado como não comparecido."""
     scheduling = _get_own_employee_scheduling(user_id, scheduling_id)
-    if scheduling.status not in (Scheduling.SchedulingStatus.PENDING, Scheduling.SchedulingStatus.CONFIRMED):
-        raise InvalidSchedulingStatusTransition(
-            _("Só é possível marcar não comparecimento em agendamentos pendentes ou confirmados.")
-        )
+    if not scheduling.can_transition_to(Scheduling.SchedulingStatus.NO_SHOW):
+        raise InvalidSchedulingStatusTransition(_("Só é possível marcar não comparecimento em agendamentos confirmados."))
     scheduling = mark_no_show_repo(scheduling)
     return SchedulingOut.from_orm(scheduling)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Reagendamento (cliente)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, data: SchedulingRescheduleIn) -> SchedulingOut:
+    """
+    Cliente reagenda um atendimento confirmado.
+
+    O agendamento atual é marcado como RESCHEDULED (preservando data,
+    serviço, funcionário e histórico originais) e um novo agendamento,
+    já CONFIRMED, é criado com o novo horário e, opcionalmente, novo
+    serviço/funcionário.
+    """
+    scheduling = _get_own_client_scheduling(user_id, scheduling_id)
+
+    if not scheduling.can_be_rescheduled:
+        raise SchedulingCannotBeModified(_("Só é possível reagendar um agendamento confirmado."))
+
+    service = scheduling.service
+    if data.service_id is not None and data.service_id != scheduling.service_id:
+        service = get_service_by_id(service_id=data.service_id)
+        if service is None or not service.is_active:
+            raise ServiceNotFound()
+
+    employee = scheduling.employee
+    if data.employee_id is not None and data.employee_id != scheduling.employee_id:
+        employee = get_employee_by_id(employee_id=data.employee_id)
+        if employee is None:
+            raise EmployeeNotFoundError()
+
+    if data.service_id is not None or data.employee_id is not None:
+        _validate_employee_offers_service(employee_id=employee.id, service_id=service.id)
+
+    # `exclude_scheduling_id` evita que o próprio agendamento (ainda
+    # CONFIRMED nesse ponto) conte como ocupando o horário que ele
+    # mesmo está liberando ao ser reagendado.
+    _validate_slot_available(
+        employee_id=employee.id,
+        scheduled_time=data.scheduled_time,
+        duration=service.duration,
+        exclude_scheduling_id=scheduling.id,
+    )
+
+    new_scheduling = reschedule_scheduling_repo(
+        scheduling,
+        service=service,
+        employee=employee,
+        scheduled_time=data.scheduled_time,
+        notes=data.notes,
+    )
+    return SchedulingOut.from_orm(new_scheduling)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
