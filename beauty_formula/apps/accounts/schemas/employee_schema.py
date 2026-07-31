@@ -118,7 +118,7 @@ class EmployeeUpdateIn(Schema):
                     raise ValueError("Número de telefone inválido.")
             except NumberParseException:
                 raise ValueError("Número de telefone inválido.")
-        return 
+        return v
 
 class EmployeeTeamOut(Schema):
     """
@@ -215,17 +215,6 @@ class PromoteToEmployeeIn(Schema):
     """
     reason: Optional[str] = None
  
-
-
-
-
-
-class PromoteToEmployeeIn(Schema):
-    """
-    Não utilizado no path atual (user_id vem da URL), mantido apenas
-    caso queira adicionar um campo `reason` opcional no futuro.
-    """
-    reason: Optional[str] = None
 
 
 __all__ = [

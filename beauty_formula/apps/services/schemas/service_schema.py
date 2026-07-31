@@ -7,6 +7,8 @@ from ninja import Schema
 from pydantic import field_validator
 from pydantic import Field
 from beauty_formula.apps.services.models.service import Service
+from pydantic import computed_field
+
 
 NAME_PATTERN = re.compile(r"^[\w\sÀ-ÿ.,'-]+$")
 MIN_DURATION_MINUTES = 1
@@ -39,22 +41,6 @@ def _validate_duration_minutes(v: Optional[int]) -> Optional[int]:
     return v
 
 
-from pydantic import computed_field
-
-# class ServiceOut(Schema):
-#     id: uuid.UUID
-#     name: str
-#     description: Optional[str] = None
-#     price: Decimal
-#     image_url: str
-
-#     # Campo interno, não será serializado
-#     duration: timedelta
-
-#     @computed_field
-#     @property
-#     def duration_minutes(self) -> int:
-#         return int(self.duration.total_seconds() // 60)
 
 class ServiceOut(Schema):
     id: uuid.UUID
@@ -63,7 +49,6 @@ class ServiceOut(Schema):
     price: Decimal
     image_url: str
 
-    # campo interno
     duration: timedelta = Field(exclude=True)
 
     @computed_field
@@ -122,12 +107,3 @@ class ServiceFilter(Schema):
     search: Optional[str] = None
 
 
-__all__ = [
-
-    "ServiceOut", 
-    "ServiceCreateIn", 
-    "ServiceUpdateIn", 
-    "ServiceFilter",
-    "ServiceActivateIn",
-
-    ]

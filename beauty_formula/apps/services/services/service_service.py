@@ -25,13 +25,12 @@ from  beauty_formula.apps.services.repositories.service_repository import(
     delete_service,
     activate_service,
     set_service_image,
-    remove_service_image,
+
 
 )
 from beauty_formula.apps.services.selectors.service_selector import (
     get_service_by_id,
     get_active_services,
-    get_inactive_services,
     get_service_by_id_inactivate,
     get_all_services,
     

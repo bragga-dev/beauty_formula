@@ -2,12 +2,10 @@
 Login endpoint — autenticação de usuários.
 """
 import uuid
-from typing import Optional, List
-from django.conf import settings
-from django.http import HttpResponseRedirect
+from typing import Optional
 from django_ratelimit.decorators import ratelimit
 from ninja import File, Router, UploadedFile
-from ninja_jwt.authentication import JWTAuth
+
 
 from beauty_formula.apps.services.services.service_service import (
     create_service_for_admin,

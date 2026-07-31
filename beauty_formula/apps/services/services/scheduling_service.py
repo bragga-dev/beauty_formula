@@ -18,7 +18,7 @@ andamento"):
 from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
-
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from beauty_formula.apps.accounts.models.user import User
@@ -66,6 +66,7 @@ from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_client import 
 from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_employee import send_cancel_scheduling_to_employee
 from beauty_formula.apps.services.tasks.send_scheduling_completed_thanks import send_scheduling_completed_thanks
 
+from beauty_formula.apps.services.models.service import Service
 
 
 
@@ -160,6 +161,7 @@ def _dispatch_cancellation_emails(scheduling: Scheduling) -> None:
 # Criação
 # ═══════════════════════════════════════════════════════════════════════════════
 
+@transaction.atomic
 def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> SchedulingOut:
     """Cliente cria um novo agendamento."""
     client = get_client_by_user_id(user_id=user_id)
@@ -186,6 +188,7 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
     )
     send_confirm_scheduling_to_client.delay(user_id=user_id, scheduling_id=scheduling.id)
     send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling.id)
+    Service.increment_bookings()
     return SchedulingOut.from_orm(scheduling)
 
 
@@ -329,6 +332,8 @@ def update_scheduling_by_admin(scheduling_id: UUID, data: SchedulingUpdateIn) ->
 # Cancelamento
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
+@transaction.atomic
 def cancel_own_scheduling_as_client(user_id: UUID, scheduling_id: UUID, reason: str) -> SchedulingOut:
     """Cliente cancela um agendamento próprio, respeitando a janela mínima de 2h."""
     scheduling = _get_own_client_scheduling(user_id, scheduling_id)
@@ -341,7 +346,7 @@ def cancel_own_scheduling_as_client(user_id: UUID, scheduling_id: UUID, reason: 
     _dispatch_cancellation_emails(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
-
+@transaction.atomic
 def cancel_scheduling_as_employee(user_id: UUID, scheduling_id: UUID, reason: str) -> SchedulingOut:
     """Funcionário cancela um agendamento próprio."""
     scheduling = _get_own_employee_scheduling(user_id, scheduling_id)
@@ -354,7 +359,7 @@ def cancel_scheduling_as_employee(user_id: UUID, scheduling_id: UUID, reason: st
     _dispatch_cancellation_emails(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
-
+@transaction.atomic
 def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> SchedulingPrivateOut:
     """Admin cancela qualquer agendamento."""
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
@@ -380,6 +385,8 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
 # exceção de domínio esperada pelo router.
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
+@transaction.atomic
 def complete_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
     """Funcionário conclui um atendimento confirmado."""
     scheduling = _get_own_employee_scheduling(user_id, scheduling_id)
@@ -455,7 +462,7 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exclusão (somente admin)
 # ═══════════════════════════════════════════════════════════════════════════════
-
+@transaction.atomic
 def delete_scheduling_by_admin(scheduling_id: UUID) -> None:
     """
     Admin exclui um agendamento permanentemente.
@@ -466,3 +473,4 @@ def delete_scheduling_by_admin(scheduling_id: UUID) -> None:
     if scheduling is None:
         raise SchedulingNotFound()
     delete_scheduling_repo(scheduling)
+    Service.decrement_bookings()

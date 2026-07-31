@@ -124,16 +124,16 @@ def search_users(query: str):
     return User.objects.filter(
         Q(email__icontains=query) |
 
-        Q(client__first_name__icontains=query) |
-        Q(client__last_name__icontains=query) |
-        Q(client__username__icontains=query) |
-        Q(client__gender__icontains=query) |
+        Q(client_profile__first_name__icontains=query) |
+        Q(client_profile__last_name__icontains=query) |
+        Q(client_profile__username__icontains=query) |
+        Q(client_profile__gender__icontains=query) |
 
-        Q(employee__first_name__icontains=query) |
-        Q(employee__last_name__icontains=query) |
-        Q(employee__username__icontains=query) |
-        Q(employee__gender__icontains=query) |
-        Q(employee__bio__icontains=query) 
+        Q(employee_profile__first_name__icontains=query) |
+        Q(employee_profile__last_name__icontains=query) |
+        Q(employee_profile__username__icontains=query) |
+        Q(employee_profile__gender__icontains=query) |
+        Q(employee_profile__bio__icontains=query) 
     ).distinct()
 
 def search_users_by_role_and_status(role: str, is_active: bool) -> QuerySet[User]:
