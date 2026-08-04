@@ -12,7 +12,7 @@ from beauty_formula.apps.core.validators.image_validator import validate_image_f
 
 def service_image_path(instance, filename):
     ext = filename.rsplit(".", 1)[-1].lower()
-    return f"photos/{instance.id}/photo.{ext}"
+    return f"photos/{instance.id}/{uuid.uuid4().hex}.{ext}"
 
 
 DEFAULT_SERVICE_PHOTO = "default/service_img.png"

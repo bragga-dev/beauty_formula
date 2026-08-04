@@ -11,7 +11,7 @@ from beauty_formula.apps.core.constants.gender import Gender
 
 def employee_photo_path(instance, filename):
     ext = filename.rsplit(".", 1)[-1].lower()
-    return f"photos/{instance.id}/photo.{ext}"
+    return f"photos/{instance.id}/{uuid.uuid4().hex}.{ext}"
 
 DEFAULT_EMPLOYEE_PHOTO = "default/employee_img.jpeg"
 
