@@ -9,6 +9,7 @@ from uuid import UUID
 from django_ratelimit.decorators import ratelimit
 from ninja import Router
 
+from beauty_formula.apps.accounts.schemas.employee_schema import EmployeeTeamOut
 from beauty_formula.apps.accounts.schemas.user_schema import MessageOut
 from beauty_formula.apps.core.exceptions.service_exception import (
     AssociationNotFound,
@@ -16,9 +17,36 @@ from beauty_formula.apps.core.exceptions.service_exception import (
     ServiceNotFound,
 )
 from beauty_formula.apps.services.schemas.availability_schema import AvailabilitySlotOut
-from beauty_formula.apps.services.services.availability_service import get_employee_availability
+from beauty_formula.apps.services.services.availability_service import (
+    get_employee_availability,
+    list_eligible_employees_for_service,
+)
 
 router = Router()
+
+
+@router.get(
+    "/eligible-employees/{service_id}",
+    response={200: List[EmployeeTeamOut], 400: MessageOut, 404: MessageOut},
+    auth=None,
+    summary="Profissionais aptos e com disponibilidade real pra um serviço",
+    description=(
+        "Etapa 'Profissional' do fluxo de agendamento: devolve só quem "
+        "realmente atende esse serviço (EmployeeService ativo) E tem "
+        "pelo menos um horário livre na janela de agendamento — não só "
+        "quem está vinculado. Lista vazia = nenhum profissional disponível "
+        "agora pra esse serviço."
+    ),
+)
+@ratelimit(key="ip", rate="60/m", block=True)
+def eligible_employees_router(request, service_id: UUID):
+    try:
+        employees = list_eligible_employees_for_service(service_id=service_id)
+        return 200, [EmployeeTeamOut.from_orm(employee) for employee in employees]
+    except ServiceNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
 
 
 @router.get(

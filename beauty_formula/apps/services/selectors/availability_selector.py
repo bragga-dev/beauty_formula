@@ -89,6 +89,24 @@ def get_available_slots(employee_id: UUID, target_date: date_type, slot_duration
     return slots
 
 
+def has_availability_in_window(employee_id: UUID, slot_duration: timedelta, start_date: date_type, days_ahead: int) -> bool:
+    """
+    Verifica se o funcionário tem pelo menos um slot livre do tamanho
+    `slot_duration` em algum dia entre `start_date` e `start_date + days_ahead`
+    (inclusive nas duas pontas). Pára no primeiro dia com vaga — não varre
+    a janela inteira à toa.
+
+    Usado pra filtrar a etapa "Profissional" do fluxo de agendamento: só
+    listar quem realmente tem horário livre pra aquele serviço, não só
+    quem está vinculado a ele.
+    """
+    for offset in range(days_ahead + 1):
+        day = start_date + timedelta(days=offset)
+        if get_available_slots(employee_id, day, slot_duration):
+            return True
+    return False
+
+
 def is_slot_available(employee_id: UUID, start: datetime, end: datetime, exclude_scheduling_id: Optional[UUID] = None) -> bool:
     """
     Verifica se o intervalo [start, end) cabe inteiro numa janela livre

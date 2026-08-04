@@ -188,7 +188,7 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
     )
     send_confirm_scheduling_to_client.delay(user_id=user_id, scheduling_id=scheduling.id)
     send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling.id)
-    Service.increment_bookings()
+    Service.increment_bookings(self=service)
     return SchedulingOut.from_orm(scheduling)
 
 
