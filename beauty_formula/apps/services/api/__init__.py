@@ -71,6 +71,23 @@ from beauty_formula.apps.services.api.availability import (
     employee_availability_router,
 )
 
+from beauty_formula.apps.services.api.average_rating import (
+    create_average_rating_router,
+    list_my_average_ratings_router,
+    get_my_average_rating_router,
+    update_my_average_rating_router,
+    delete_my_average_rating_router,
+    list_service_ratings_router,
+    get_service_rating_summary_router,
+    list_employee_ratings_router,
+    get_employee_rating_summary_router,
+    list_all_average_ratings_router,
+    get_average_rating_detail_router,
+    authorize_average_rating_router,
+    revoke_average_rating_router,
+    delete_average_rating_router,
+)
+
 
 __all__ = [
     # Service
@@ -135,4 +152,20 @@ __all__ = [
     
     # Availability
     "employee_availability_router",
+
+    # Average Rating
+    "create_average_rating_router",
+    "list_my_average_ratings_router",
+    "get_my_average_rating_router",
+    "update_my_average_rating_router",
+    "delete_my_average_rating_router",
+    "list_service_ratings_router",
+    "get_service_rating_summary_router",
+    "list_employee_ratings_router",
+    "get_employee_rating_summary_router",
+    "list_all_average_ratings_router",
+    "get_average_rating_detail_router",
+    "authorize_average_rating_router",
+    "revoke_average_rating_router",
+    "delete_average_rating_router",
 ]

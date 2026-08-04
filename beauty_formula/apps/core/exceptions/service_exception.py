@@ -82,3 +82,15 @@ class InvalidSchedulingStatusTransition(Exception):
     def __init__(self, message=None):
         self.message = message or _("Transição de status inválida para este agendamento.")
         super().__init__(self.message)
+
+
+class AverageRatingNotFound(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Avaliação não encontrada.")
+        super().__init__(self.message)
+
+
+class AverageRatingAlreadyExists(Exception):
+    def __init__(self, message=None):
+        self.message = message or _("Este agendamento já foi avaliado.")
+        super().__init__(self.message)
