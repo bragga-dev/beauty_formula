@@ -15,6 +15,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
 from beauty_formula.apps.services.models.service import DEFAULT_SERVICE_PHOTO, Service
+from beauty_formula.apps.core.tasks.media import delete_old_media_file
 
 
 UPDATABLE_SERVICE_FIELDS = {"name", "description", "price", "commission_percentage", "duration"}
@@ -73,22 +74,28 @@ def update_service(service: Service, **fields) -> Service:
 
 @transaction.atomic
 def set_service_image(service: Service, image: UploadedFile) -> Service:
-    """Substitui a imagem de um serviço existente."""
-    if service.image and service.image.name != DEFAULT_SERVICE_PHOTO:
-        service.image.delete(save=False)
+    """Substitui a imagem de um serviço existente.
+
+    A imagem antiga é removida do MinIO em background (Celery) em vez de
+    bloquear a request com um DELETE síncrono antes do upload da nova.
+    """
+    old_name = service.image.name if service.image and service.image.name != DEFAULT_SERVICE_PHOTO else None
     service.image = image
     service.full_clean()
     service.save()
+    if old_name:
+        delete_old_media_file.delay(old_name)
     return service
 
 
 @transaction.atomic
 def remove_service_image(service: Service) -> Service:
     """Remove a imagem de um serviço, voltando para a imagem padrão."""
-    if service.image and service.image.name != DEFAULT_SERVICE_PHOTO:
-        service.image.delete(save=False)
+    old_name = service.image.name if service.image and service.image.name != DEFAULT_SERVICE_PHOTO else None
     service.image = DEFAULT_SERVICE_PHOTO
     service.save(update_fields=["image"])
+    if old_name:
+        delete_old_media_file.delay(old_name)
     return service
 
 

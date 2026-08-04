@@ -7,6 +7,7 @@ from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.schemas.client_schema import GenderEnum
 from django.core.files import File
+from beauty_formula.apps.core.tasks.media import delete_old_media_file
 
 from typing import Optional
 
@@ -53,16 +54,18 @@ def delete_employee(employee: Employee) -> None:
 
 
 def set_employee_photo(employee: Employee, photo: InMemoryUploadedFile) -> Employee:
-    if employee.photo and employee.photo.name != "default/employee_img.jpeg":
-        employee.photo.delete(save=False)
+    old_name = employee.photo.name if employee.photo and employee.photo.name != "default/employee_img.jpeg" else None
     employee.photo = photo
     employee.save(update_fields=["photo"])
+    if old_name:
+        delete_old_media_file.delay(old_name)
     return employee
 
 
 def remove_employee_photo(employee: Employee) -> Employee:
-    if employee.photo and employee.photo.name != "default/employee_img.jpeg":
-        employee.photo.delete(save=False)
+    old_name = employee.photo.name if employee.photo and employee.photo.name != "default/employee_img.jpeg" else None
     employee.photo = "default/employee_img.jpeg"
     employee.save(update_fields=["photo"])
+    if old_name:
+        delete_old_media_file.delay(old_name)
     return employee
