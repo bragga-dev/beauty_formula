@@ -18,12 +18,6 @@ class Scheduling(models.Model):
         NO_SHOW = "no_show", _("Não compareceu")
         RESCHEDULED = "rescheduled", _("Reagendado")
 
-    # Máquina de estados: todo agendamento nasce CONFIRMED (a checagem de
-    # disponibilidade já acontece na criação, então não existe mais um
-    # status pendente aguardando confirmação manual). A partir daí, só os
-    # estados abaixo são alcançáveis — qualquer outra transição é inválida
-    # e bloqueada por `_ensure_transition_allowed`. Os quatro estados de
-    # destino são todos terminais (não têm saída).
     ALLOWED_TRANSITIONS = {
         SchedulingStatus.CONFIRMED: {
             SchedulingStatus.COMPLETED,
@@ -91,9 +85,6 @@ class Scheduling(models.Model):
     def clean(self):
         """Validações do agendamento"""
 
-        # 1. Validação de conflito — só agendamentos CONFIRMED ocupam a
-        # agenda do funcionário. Concluído/cancelado/no-show/reagendado
-        # já saíram do fluxo ativo e não bloqueiam novos horários.
         if self.duration_at_booking:
             end_time = self.scheduled_time + self.duration_at_booking
 
@@ -116,13 +107,6 @@ class Scheduling(models.Model):
                     )
 
     def save(self, *args, **kwargs):
-        # OBS: não usar `if not self.pk` — `id` é UUIDField com
-        # default=uuid.uuid4, então o Django já popula o pk no __init__,
-        # antes do primeiro save(). Isso faz `not self.pk` ser sempre
-        # False e price_at_booking/duration_at_booking nunca são
-        # preenchidos na criação (-> IntegrityError de NOT NULL).
-        # `_state.adding` reflete corretamente se o registro ainda não
-        # foi persistido no banco.
         if self._state.adding:
             self.price_at_booking = self.service.price
             self.duration_at_booking = self.service.duration
@@ -157,7 +141,6 @@ class Scheduling(models.Model):
         if self.status != self.SchedulingStatus.CONFIRMED:
             return False
 
-        # Permite cancelar até 2h antes
         hours_diff = (self.scheduled_time - timezone.now()).total_seconds() / 3600
         return hours_diff >= 2
 
@@ -202,12 +185,17 @@ class Scheduling(models.Model):
         self.status = self.SchedulingStatus.COMPLETED
         self.save()
 
-    def mark_as_no_show(self):
-        """Marca como não compareceu"""
+    def mark_as_no_show(self, reason: str = "Cliente não compareceu"):
+        """
+        Marca como não compareceu. `reason` tem um padrão pro caso comum
+        (funcionário marcando manualmente), mas pode ser sobrescrito —
+        usado, por exemplo, pela task `close_overdue_schedulings`, que
+        fecha agendamentos vencidos automaticamente com um motivo próprio.
+        """
         self._ensure_transition_allowed(self.SchedulingStatus.NO_SHOW)
         self.status = self.SchedulingStatus.NO_SHOW
         self.canceled_at = timezone.now()
-        self.canceled_reason = "Cliente não compareceu"
+        self.canceled_reason = reason
         self.is_active = False
         self.save()
 
