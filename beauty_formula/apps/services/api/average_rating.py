@@ -16,7 +16,7 @@ from ninja import Router
 
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.schemas.user_schema import MessageOut
-from beauty_formula.apps.core.exceptions.permissions import ClientNotFoundError, EmployeeNotFoundError
+from beauty_formula.apps.core.exceptions.permissions import ClientNotFoundError, EmployeeNotFoundError, PermissionDenied
 from beauty_formula.apps.core.exceptions.service_exception import (
     AverageRatingAlreadyExists,
     AverageRatingNotFound,
@@ -290,18 +290,20 @@ def get_average_rating_detail_router(request, rating_id: UUID):
     "/admin/{rating_id}/authorize",
     response={200: AverageRatingPrivateOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
     auth=AdminOrEmployeeAuth(),
-    summary="Admin ou Funcionário autorizam a avaliação a aparecer publicamente",
+    summary="Admin ou o próprio funcionário autorizam a avaliação a aparecer publicamente",
 )
 @ratelimit(key="user", rate="30/m", block=True)
 def authorize_average_rating_router(request, rating_id: UUID):
+    user: User = request.auth
     try:
-        rating = authorize_average_rating_admin(rating_id=rating_id)
+        rating = authorize_average_rating_admin(user=user, rating_id=rating_id)
         return 200, rating
     except AverageRatingNotFound as e:
         return 404, {"detail": str(e)}
+    except PermissionDenied as e:
+        return 403, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": str(e)}
-
 
 @router.patch(
     "/admin/{rating_id}/revoke",

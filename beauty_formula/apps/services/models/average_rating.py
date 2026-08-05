@@ -66,7 +66,7 @@ class AverageRating(models.Model):
 
     created_at = models.DateTimeField(_("Criado em"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Atualizado em"), auto_now=True)
-    is_authorized = models.BooleanField(_("Altorizado"), default=False)
+    is_authorized = models.BooleanField(_("Autorizado"), default=False)
 
     class Meta:
         verbose_name = _("Avaliação de serviço")

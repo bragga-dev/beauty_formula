@@ -188,9 +188,8 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
     )
     send_confirm_scheduling_to_client.delay(user_id=user_id, scheduling_id=scheduling.id)
     send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling.id)
-    Service.increment_bookings(self=service)
+    service.increment_bookings()
     return SchedulingOut.from_orm(scheduling)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Listagem
@@ -439,9 +438,6 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
     if data.service_id is not None or data.employee_id is not None:
         _validate_employee_offers_service(employee_id=employee.id, service_id=service.id)
 
-    # `exclude_scheduling_id` evita que o próprio agendamento (ainda
-    # CONFIRMED nesse ponto) conte como ocupando o horário que ele
-    # mesmo está liberando ao ser reagendado.
     _validate_slot_available(
         employee_id=employee.id,
         scheduled_time=data.scheduled_time,
@@ -456,8 +452,8 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
         scheduled_time=data.scheduled_time,
         notes=data.notes,
     )
+    service.increment_bookings()
     return SchedulingOut.from_orm(new_scheduling)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exclusão (somente admin)
@@ -472,5 +468,7 @@ def delete_scheduling_by_admin(scheduling_id: UUID) -> None:
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
         raise SchedulingNotFound()
+
+    service = scheduling.service  
     delete_scheduling_repo(scheduling)
-    Service.decrement_bookings()
+    service.decrement_bookings()

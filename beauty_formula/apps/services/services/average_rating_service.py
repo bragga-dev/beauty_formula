@@ -15,6 +15,7 @@ Fluxo:
 from uuid import UUID
 
 from django.db import transaction
+from django.utils import timezone
 
 from beauty_formula.apps.accounts.selectors.client_selector import get_client_by_user_id
 from beauty_formula.apps.accounts.selectors.employee_selector import (
@@ -65,6 +66,11 @@ from beauty_formula.apps.services.selectors.service_average_rating_selector impo
 from beauty_formula.apps.services.selectors.service_selector import validate_service_exists
 
 
+
+from beauty_formula.apps.accounts.models.user import User
+from beauty_formula.apps.accounts.selectors.employee_selector import get_employee_by_user_id
+from beauty_formula.apps.core.exceptions import PermissionDenied
+from beauty_formula.apps.core.permissions.roles import is_admin
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers internos
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -109,9 +115,11 @@ def create_average_rating_for_client(user_id: UUID, data: AverageRatingCreateIn)
         comment=data.comment,
     )
 
+    scheduling.rated_at = timezone.now()
+    scheduling.save(update_fields=["rated_at", "updated_at"])
+
     _refresh_aggregates(rating)
     return AverageRatingPrivateOut.from_orm(rating)
-
 
 def list_my_average_ratings(user_id: UUID):
     """Lista todas as avaliações do cliente autenticado (autorizadas ou não)."""
@@ -128,17 +136,28 @@ def get_own_average_rating_detail(user_id: UUID, rating_id: UUID) -> AverageRati
 
 @transaction.atomic
 def update_own_average_rating(user_id: UUID, rating_id: UUID, data: AverageRatingUpdateIn) -> AverageRatingPrivateOut:
-    """Cliente edita a própria nota/comentário."""
+    """
+    Cliente edita a própria nota/comentário.
+
+    Se a avaliação já estava autorizada (pública) e o cliente muda nota
+    ou comentário, ela volta para moderação (`is_authorized=False`) —
+    o novo conteúdo precisa passar pelo admin de novo antes de voltar
+    a aparecer publicamente.
+    """
     rating = _get_own_average_rating(user_id=user_id, rating_id=rating_id)
 
     fields = data.model_dump(exclude_unset=True)
+    content_changed = "rating" in fields or "comment" in fields
+
     rating = update_rating(rating, **fields)
+
+    if content_changed and rating.is_authorized:
+        rating = revoke_rating_authorization(rating)
 
     if "rating" in fields:
         _refresh_aggregates(rating)
 
     return AverageRatingPrivateOut.from_orm(rating)
-
 
 @transaction.atomic
 def delete_own_average_rating(user_id: UUID, rating_id: UUID) -> None:
@@ -212,18 +231,24 @@ def get_average_rating_detail_admin(rating_id: UUID) -> AverageRatingPrivateOut:
         raise AverageRatingNotFound()
     return AverageRatingPrivateOut.from_orm(rating)
 
-
 @transaction.atomic
-def authorize_average_rating_admin(rating_id: UUID) -> AverageRatingPrivateOut:
-    """Admin autoriza a avaliação a aparecer publicamente."""
+def authorize_average_rating_admin(user: User, rating_id: UUID) -> AverageRatingPrivateOut:
+    """
+    Admin autoriza qualquer avaliação. Funcionário só pode autorizar
+    avaliações sobre ELE MESMO — nunca sobre outro funcionário.
+    """
     rating = get_average_rating_by_id(rating_id=rating_id)
     if rating is None:
         raise AverageRatingNotFound()
 
+    if not is_admin(user):
+        employee = get_employee_by_user_id(user_id=user.id)
+        if employee is None or rating.employee_id != employee.id:
+            raise PermissionDenied("Você só pode autorizar avaliações sobre você mesmo.")
+
     rating = authorize_rating(rating)
     _refresh_aggregates(rating)
     return AverageRatingPrivateOut.from_orm(rating)
-
 
 @transaction.atomic
 def revoke_average_rating_admin(rating_id: UUID) -> AverageRatingPrivateOut:
