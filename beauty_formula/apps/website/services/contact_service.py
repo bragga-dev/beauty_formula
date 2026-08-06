@@ -24,6 +24,8 @@ from beauty_formula.apps.core.exceptions.contact_exception import (
     ContactNotFound,
     ContactNameAlreadyExists,
 )
+from beauty_formula.apps.website.tasks.send_email_confirm_contact import send_email_confirm_contact
+from beauty_formula.apps.website.tasks.send_email_notify_admins import send_email_notify_admins
 
 
 def create_contact_public(data: ContactCreateIn) -> ContactOut:
@@ -39,6 +41,22 @@ def create_contact_public(data: ContactCreateIn) -> ContactOut:
         phone=data.phone,
         message=data.message,
         subject=data.subject,
+    )
+    send_email_confirm_contact.delay(
+        full_name=data.full_name,
+        email=data.email,
+        subject=data.subject,
+        message=data.message,
+        created_at=contact.created_at,
+        phone=data.phone,
+    )
+    send_email_notify_admins.delay(
+        full_name=data.full_name,
+        email=data.email,
+        subject=data.subject,
+        message=data.message,
+        created_at=contact.created_at,
+        phone=data.phone,
     )
     return ContactOut.from_orm(contact)
 
