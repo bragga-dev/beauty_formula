@@ -20,11 +20,10 @@ class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(_("Nome do produto"), max_length=255, unique=True, blank=False, null=False)
     description = models.TextField(_("Descrição do produto"), blank=True, null=True)
-    price = models.DecimalField(_("Preço do produto"), max_digits=10, decimal_places=2, validators=[MinValueValidator(0, message=_("O preço não pode ser negativo"))])
+    price = models.DecimalField(_("Preço do produto"), max_digits=10, decimal_places=2, validators=[MinValueValidator(0, message="O preço não pode ser negativo")])
     image = models.ImageField(_("Imagem do produto"), upload_to=product_image_path, validators=[validate_image_file], default=DEFAULT_PRODUCT_PHOTO, blank=True,  null=True, help_text=_("Formatos aceitos: jpg, jpeg ou png. Máx: 5MB."),)
-    stock = models.PositiveIntegerField(_("Estoque do produto"), default=0, validators=[MinValueValidator(0, message=_("O estoque não pode ser negativo"))])
     is_active = models.BooleanField(_("Ativo?"), default=True)
-
+    stock = models.PositiveIntegerField(_("Estoque do produto"), default=0, validators=[MinValueValidator(0, message="O estoque não pode ser negativo")])
     def __str__(self):
         return self.name
 

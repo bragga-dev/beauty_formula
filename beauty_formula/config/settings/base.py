@@ -65,10 +65,12 @@ THIRD_PARTY_APPS = [
 # =========================================================
 
 LOCAL_APPS = [
+    
     "beauty_formula.apps.core",
     "beauty_formula.apps.accounts",
     "beauty_formula.apps.services",
     "beauty_formula.apps.payment",
+    "beauty_formula.apps.website",
    
 ]
 
