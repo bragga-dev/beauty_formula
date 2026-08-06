@@ -7,6 +7,9 @@ Rotas de AverageRating — avaliações de atendimento e seus agregados
   consulta a média (summary) de cada um.
 - Admin: visão total — lista com filtros, vê qualquer detalhe, autoriza,
   revoga e exclui permanentemente.
+- Funcionário: lista e vê o detalhe apenas das avaliações sobre ele
+  mesmo, e autoriza/publica essas avaliações (nunca as de outro
+  funcionário).
 """
 from typing import Optional
 from uuid import UUID
@@ -240,8 +243,8 @@ def get_employee_rating_summary_router(request, employee_id: UUID):
 @router.get(
     "/admin/list",
     response={200: PageOut[AverageRatingPrivateOut], 400: MessageOut, 403: MessageOut},
-    auth=AdminOnlyAuth(),
-    summary="Admin lista todas as avaliações, com filtros combináveis",
+    auth=AdminOrEmployeeAuth(),
+    summary="Admin lista todas as avaliações; funcionário lista só as que são sobre ele",
 )
 @ratelimit(key="user", rate="30/m", block=True)
 def list_all_average_ratings_router(
@@ -254,6 +257,7 @@ def list_all_average_ratings_router(
     rating: Optional[RatingEnum] = None,
     is_authorized: Optional[bool] = None,
 ):
+    user: User = request.auth
     try:
         filters = AverageRatingFilter(
             service_id=service_id,
@@ -262,9 +266,11 @@ def list_all_average_ratings_router(
             rating=rating,
             is_authorized=is_authorized,
         )
-        ratings_qs = list_all_average_ratings_admin(filters=filters)
+        ratings_qs = list_all_average_ratings_admin(filters=filters, user_id=user.id)
         result = paginate_queryset(ratings_qs, page, page_size, AverageRatingPrivateOut.from_orm)
         return 200, result
+    except PermissionDenied as e:
+        return 403, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": str(e)}
 
@@ -272,16 +278,19 @@ def list_all_average_ratings_router(
 @router.get(
     "/admin/{rating_id}",
     response={200: AverageRatingPrivateOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
-    summary="Admin vê o detalhe completo de qualquer avaliação",
+    auth=AdminOrEmployeeAuth(),
+    summary="Admin vê o detalhe de qualquer avaliação; funcionário só das suas",
 )
 @ratelimit(key="user", rate="30/m", block=True)
 def get_average_rating_detail_router(request, rating_id: UUID):
+    user: User = request.auth
     try:
-        rating = get_average_rating_detail_admin(rating_id=rating_id)
+        rating = get_average_rating_detail_admin(rating_id=rating_id, user_id=user.id)
         return 200, rating
     except AverageRatingNotFound as e:
         return 404, {"detail": str(e)}
+    except PermissionDenied as e:
+        return 403, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": str(e)}
 
@@ -296,7 +305,7 @@ def get_average_rating_detail_router(request, rating_id: UUID):
 def authorize_average_rating_router(request, rating_id: UUID):
     user: User = request.auth
     try:
-        rating = authorize_average_rating_admin(user=user, rating_id=rating_id)
+        rating = authorize_average_rating_admin(user_id=user.id, rating_id=rating_id)
         return 200, rating
     except AverageRatingNotFound as e:
         return 404, {"detail": str(e)}
@@ -304,6 +313,7 @@ def authorize_average_rating_router(request, rating_id: UUID):
         return 403, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": str(e)}
+
 
 @router.patch(
     "/admin/{rating_id}/revoke",

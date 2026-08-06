@@ -66,10 +66,6 @@ from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_client import 
 from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_employee import send_cancel_scheduling_to_employee
 from beauty_formula.apps.services.tasks.send_scheduling_completed_thanks import send_scheduling_completed_thanks
 
-from beauty_formula.apps.services.models.service import Service
-
-
-
 FINAL_STATUSES = [
     Scheduling.SchedulingStatus.COMPLETED,
     Scheduling.SchedulingStatus.CANCELED,

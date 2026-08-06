@@ -71,6 +71,7 @@ from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.selectors.employee_selector import get_employee_by_user_id
 from beauty_formula.apps.core.exceptions import PermissionDenied
 from beauty_formula.apps.core.permissions.roles import is_admin
+from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers internos
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -215,24 +216,45 @@ def get_employee_rating_summary(employee_id: UUID) -> EmployeeAverageRatingOut:
 # Admin
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def list_all_average_ratings_admin(filters: AverageRatingFilter):
+def list_all_average_ratings_admin(filters: AverageRatingFilter, user_id: UUID):
+    """
+    Admin lista com os filtros informados livremente. Funcionário só pode
+    listar as próprias avaliações — o employee_id é sempre forçado para o
+    dele, ignorando qualquer valor vindo do filtro (evita que um
+    funcionário veja avaliações de outro trocando o parâmetro).
+    """
+    user = get_user_by_id(user_id=user_id)
+    employee_id = filters.employee_id
+    if not is_admin(user):
+        employee = get_employee_by_user_id(user_id=user_id)
+        if employee is None:
+            raise PermissionDenied("Apenas administradores ou funcionários podem acessar este recurso.")
+        employee_id = employee.id
+
     return filter_average_ratings(
         service_id=filters.service_id,
-        employee_id=filters.employee_id,
+        employee_id=employee_id,
         client_id=filters.client_id,
         rating=filters.rating,
         is_authorized=filters.is_authorized,
     )
 
 
-def get_average_rating_detail_admin(rating_id: UUID) -> AverageRatingPrivateOut:
+def get_average_rating_detail_admin(rating_id: UUID, user_id: UUID) -> AverageRatingPrivateOut:
+    """Admin vê qualquer detalhe; funcionário só o detalhe de avaliações sobre ele mesmo."""
     rating = get_average_rating_by_id(rating_id=rating_id)
     if rating is None:
         raise AverageRatingNotFound()
+    user = get_user_by_id(user_id=user_id)
+    if not is_admin(user):
+        employee = get_employee_by_user_id(user_id=user_id)
+        if employee is None or rating.employee_id != employee.id:
+            raise PermissionDenied("Você só pode ver avaliações sobre você mesmo.")
+
     return AverageRatingPrivateOut.from_orm(rating)
 
 @transaction.atomic
-def authorize_average_rating_admin(user: User, rating_id: UUID) -> AverageRatingPrivateOut:
+def authorize_average_rating_admin(user_id:UUID, rating_id: UUID) -> AverageRatingPrivateOut:
     """
     Admin autoriza qualquer avaliação. Funcionário só pode autorizar
     avaliações sobre ELE MESMO — nunca sobre outro funcionário.
@@ -240,9 +262,10 @@ def authorize_average_rating_admin(user: User, rating_id: UUID) -> AverageRating
     rating = get_average_rating_by_id(rating_id=rating_id)
     if rating is None:
         raise AverageRatingNotFound()
-
+    
+    user = get_user_by_id(user_id=user_id)
     if not is_admin(user):
-        employee = get_employee_by_user_id(user_id=user.id)
+        employee = get_employee_by_user_id(user_id=user_id)
         if employee is None or rating.employee_id != employee.id:
             raise PermissionDenied("Você só pode autorizar avaliações sobre você mesmo.")
 
