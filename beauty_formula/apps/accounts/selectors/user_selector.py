@@ -113,7 +113,37 @@ def get_user_with_related(user_id: uuid.UUID) -> Optional[User]:
     )
 
 
-# ── Search ────────────────────────────────────────────────────────────────────
+# ── Admin: listagem combinada ────────────────────────────────────────────────
+
+def filter_users_admin(
+    search: Optional[str] = None,
+    role: Optional[str] = None,
+    is_active: Optional[bool] = None,
+) -> QuerySet[User]:
+    """
+    Listagem admin com filtros combináveis (busca + role + status) e
+    select_related para evitar N+1 ao acessar client_profile/employee_profile
+    na serialização.
+    """
+    qs = User.objects.select_related("client_profile", "employee_profile")
+
+    if search:
+        search = search.strip()
+        qs = qs.filter(
+            Q(email__icontains=search)
+            | Q(client_profile__first_name__icontains=search)
+            | Q(client_profile__last_name__icontains=search)
+            | Q(employee_profile__first_name__icontains=search)
+            | Q(employee_profile__last_name__icontains=search)
+        )
+
+    if role:
+        qs = qs.filter(role=role)
+
+    if is_active is not None:
+        qs = qs.filter(is_active=is_active)
+
+    return qs.distinct().order_by("-date_joined")
 
 def search_users(query: str):
     query = query.strip()

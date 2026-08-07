@@ -53,6 +53,7 @@ from beauty_formula.apps.services.services.average_rating_service import (
     get_own_average_rating_detail,
     get_service_rating_summary,
     list_all_average_ratings_admin,
+    list_all_public_ratings,
     list_my_average_ratings,
     list_public_ratings_for_employee,
     list_public_ratings_for_service,
@@ -171,6 +172,28 @@ def delete_my_average_rating_router(request, rating_id: UUID):
 # ═══════════════════════════════════════════════════════════════════════════════
 # Público
 # ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/all",
+    response={200: PageOut[AverageRatingOut], 400: MessageOut},
+    summary="Lista todas as avaliações autorizadas (públicas), com filtros e paginação",
+)
+@ratelimit(key="ip", rate="60/m", block=True)
+def list_all_public_ratings_router(
+    request,
+    page: int = 1,
+    page_size: int = PAGE_SIZE_DEFAULT,
+    service_id: Optional[UUID] = None,
+    employee_id: Optional[UUID] = None,
+    rating: Optional[RatingEnum] = None,
+):
+    try:
+        ratings_qs = list_all_public_ratings(service_id=service_id, employee_id=employee_id, rating=rating)
+        result = paginate_queryset(ratings_qs, page, page_size, AverageRatingOut.from_orm)
+        return 200, result
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
 
 @router.get(
     "/service/{service_id}",

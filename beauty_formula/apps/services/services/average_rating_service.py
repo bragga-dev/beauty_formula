@@ -12,6 +12,7 @@ Fluxo:
 - Qualquer criação/edição/exclusão/autorização/revogação de uma avaliação
   recalcula os agregados do serviço e do funcionário envolvidos.
 """
+from typing import Optional
 from uuid import UUID
 
 from django.db import transaction
@@ -188,6 +189,24 @@ def list_public_ratings_for_employee(employee_id: UUID):
     if not validate_employee_exists(employee_id):
         raise EmployeeNotFoundError()
     return get_ratings_by_employee(employee_id=employee_id, authorized_only=True)
+
+
+def list_all_public_ratings(
+    service_id: Optional[UUID] = None,
+    employee_id: Optional[UUID] = None,
+    rating: Optional[int] = None,
+):
+    """
+    Listagem pública paginável de avaliações autorizadas, com filtros
+    combináveis — alimenta a página "Todas as Avaliações". Sempre restrita
+    a `is_authorized=True`, independente do que for passado.
+    """
+    return filter_average_ratings(
+        service_id=service_id,
+        employee_id=employee_id,
+        rating=rating,
+        is_authorized=True,
+    )
 
 
 def get_service_rating_summary(service_id: UUID) -> ServiceAverageRatingOut:
