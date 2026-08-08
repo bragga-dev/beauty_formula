@@ -22,7 +22,7 @@ from beauty_formula.apps.services.selectors.employee_service_selector import (
 )
 from beauty_formula.apps.services.selectors.service_selector import get_service_by_id
 
-MAX_DAYS_AHEAD = 15
+MAX_DAYS_AHEAD = 30
 
 
 def get_employee_availability(employee_id: UUID, service_id: UUID, target_date: date_type) -> List[Interval]:
