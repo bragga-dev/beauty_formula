@@ -1,22 +1,18 @@
 from django.conf import settings
 from django.utils import timezone
+
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.payment.models.payment_model import Payment
 from beauty_formula.apps.payment.integrations.asaas_client import AsaasClient
+from beauty_formula.apps.payment.repositories import payment_repository
+from beauty_formula.apps.payment.selectors import payment_selector
 from beauty_formula.apps.core.exceptions.payment_exception import SchedulingAlreadyPaid
-
-# Status que significam "essa cobrança ainda conta" — bloqueia criar outra pro mesmo agendamento.
-_BLOCKING_STATUSES = {
-    Payment.PaymentStatus.PENDING,
-    Payment.PaymentStatus.RECEIVED,
-    Payment.PaymentStatus.CONFIRMED,
-}
 
 
 def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> Payment:
     """
     Cria a cobrança na Asaas pro valor do agendamento (price_at_booking) e
-    persiste o Payment local.
+    persiste o Payment local via payment_repository.
 
     Não existe customer por cliente: toda cobrança do sistema usa o mesmo
     ASAAS_CUSTOMER_ID (o customer único, criado uma vez pelo dono da
@@ -25,11 +21,7 @@ def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> P
 
     Se billing_type for PIX, já busca o QR Code na sequência.
     """
-    already_charged = Payment.objects.filter(
-        scheduling=scheduling,
-        status__in=_BLOCKING_STATUSES,
-    ).exists()
-    if already_charged:
+    if payment_selector.get_active_payment_for_scheduling(scheduling.id) is not None:
         raise SchedulingAlreadyPaid()
 
     asaas = AsaasClient()
@@ -45,32 +37,28 @@ def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> P
         external_reference=str(scheduling.id),
     )
 
-    payment = Payment.objects.create(
+    payment = payment_repository.create_payment(
         scheduling=scheduling,
         client=scheduling.client,
-        asaas_payment_id=response["id"],
-        asaas_customer_id=settings.ASAAS_CUSTOMER_ID,
-        value=response["value"],
         billing_type=response["billingType"],
-        status=response["status"],
+        value=response["value"],
         due_date=due_date,
         description=description,
+        asaas_payment_id=response["id"],
+        asaas_customer_id=settings.ASAAS_CUSTOMER_ID,
+        status=response["status"],
         external_reference=str(scheduling.id),
         invoice_url=response.get("invoiceUrl"),
         bank_slip_url=response.get("bankSlipUrl"),
         net_value=response.get("netValue"),
-        synced_with_asaas=True,
     )
 
     if billing_type == Payment.PaymentMode.PIX:
-        _attach_pix_qrcode(payment, asaas)
+        qrcode = asaas.get_pix_qrcode(payment.asaas_payment_id)
+        payment = payment_repository.attach_pix_data(
+            payment,
+            pix_qr_code=qrcode.get("encodedImage"),
+            pix_copy_paste=qrcode.get("payload"),
+        )
 
-    return payment
-
-
-def _attach_pix_qrcode(payment: Payment, asaas: AsaasClient) -> Payment:
-    qrcode = asaas.get_pix_qrcode(payment.asaas_payment_id)
-    payment.pix_qr_code = qrcode.get("encodedImage")
-    payment.pix_copy_paste = qrcode.get("payload")
-    payment.save(update_fields=["pix_qr_code", "pix_copy_paste", "updated_at"])
     return payment
