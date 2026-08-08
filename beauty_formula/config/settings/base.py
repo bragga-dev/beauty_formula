@@ -306,6 +306,7 @@ LOGGING = {
 # =========================================================
 ASAAS_API_KEY = env("ASAAS_API_KEY")
 ASAAS_BASE_URL = env("ASAAS_BASE_URL", default="https://api-sandbox.asaas.com/v3")
+ASAAS_CUSTOMER_ID = env("ASAAS_CUSTOMER_ID")
 
 
 # =========================================================
