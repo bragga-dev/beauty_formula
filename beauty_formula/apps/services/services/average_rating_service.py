@@ -17,6 +17,7 @@ from uuid import UUID
 
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from beauty_formula.apps.accounts.selectors.client_selector import get_client_by_user_id
 from beauty_formula.apps.accounts.selectors.employee_selector import (
@@ -53,6 +54,7 @@ from beauty_formula.apps.services.schemas.service_average_rating_schema import S
 from beauty_formula.apps.services.selectors.average_rating_selector import (
     filter_average_ratings,
     get_average_rating_by_id,
+    get_rating_for_client_service_employee,
     get_ratings_by_client,
     get_ratings_by_employee,
     get_ratings_by_service,
@@ -102,11 +104,26 @@ def _refresh_aggregates(rating) -> None:
 
 @transaction.atomic
 def create_average_rating_for_client(user_id: UUID, data: AverageRatingCreateIn) -> AverageRatingPrivateOut:
-    """Cliente avalia um agendamento concluído próprio (uma vez só)."""
+    """
+    Cliente avalia um agendamento concluído próprio.
+
+    Regra de unicidade: 1 avaliação por combinação (cliente, serviço,
+    funcionário) — não por agendamento. Se o cliente já avaliou esse
+    serviço com esse profissional antes (em qualquer agendamento), a
+    criação é bloqueada; ele deve editar a avaliação já existente em
+    vez de acumular uma nova linha a cada atendimento repetido.
+    """
     scheduling = get_own_client_scheduling(user_id=user_id, scheduling_id=data.scheduling_id)
 
     if validate_scheduling_already_rated(scheduling_id=scheduling.id):
         raise AverageRatingAlreadyExists()
+
+    if get_rating_for_client_service_employee(
+        client_id=scheduling.client_id, service_id=scheduling.service_id, employee_id=scheduling.employee_id
+    ):
+        raise AverageRatingAlreadyExists(
+            _("Você já avaliou este serviço com este profissional. Edite sua avaliação existente em vez de criar uma nova.")
+        )
 
     rating = create_average_rating(
         scheduling=scheduling,

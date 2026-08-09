@@ -72,6 +72,12 @@ class AverageRating(models.Model):
         verbose_name = _("Avaliação de serviço")
         verbose_name_plural = _("Avaliações de serviços")
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["client", "service", "employee"],
+                name="unique_rating_per_client_service_employee",
+            ),
+        ]
         indexes = [
             models.Index(fields=["employee"]),
             models.Index(fields=["service"]),

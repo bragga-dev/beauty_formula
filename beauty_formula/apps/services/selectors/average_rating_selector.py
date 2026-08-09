@@ -144,3 +144,16 @@ def validate_average_rating_exists(rating_id: UUID) -> bool:
 def validate_scheduling_already_rated(scheduling_id: UUID) -> bool:
     """Verifica se um agendamento já possui avaliação (respeita a relação OneToOne)."""
     return AverageRating.objects.filter(scheduling_id=scheduling_id).exists()
+
+
+def get_rating_for_client_service_employee(client_id: UUID, service_id: UUID, employee_id: UUID) -> Optional[AverageRating]:
+    """
+    Retorna a avaliação existente (se houver) pra essa combinação de
+    cliente/serviço/funcionário. Base da regra de unicidade: cada
+    cliente avalia UMA vez cada serviço com cada profissional — mesmo
+    que repita o atendimento em outro agendamento, avalia de novo
+    editando essa avaliação, não criando outra linha na tabela.
+    """
+    return AverageRating.objects.filter(
+        client_id=client_id, service_id=service_id, employee_id=employee_id
+    ).first()
