@@ -1,12 +1,18 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.utils import timezone
 
-from beauty_formula.apps.services.models.scheduling import Scheduling
+from beauty_formula.apps.accounts.selectors.client_selector import get_client_by_user_id
+from beauty_formula.apps.core.exceptions.permissions import ClientNotFoundError
 from beauty_formula.apps.payment.models.payment_model import Payment
 from beauty_formula.apps.payment.integrations.asaas_client import AsaasClient
 from beauty_formula.apps.payment.repositories import payment_repository
 from beauty_formula.apps.payment.selectors import payment_selector
-from beauty_formula.apps.core.exceptions.payment_exception import SchedulingAlreadyPaid
+from beauty_formula.apps.core.exceptions.payment_exception import SchedulingAlreadyPaid, PaymentNotFound
+from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
+from beauty_formula.apps.services.models.scheduling import Scheduling
+from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
 
 
 def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> Payment:
@@ -25,7 +31,10 @@ def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> P
         raise SchedulingAlreadyPaid()
 
     asaas = AsaasClient()
-    due_date = timezone.now().date()
+
+    due_days = getattr(settings, "ASAAS_PAYMENT_DUE_DAYS", 1)
+    due_date = timezone.now().date() + timedelta(days=due_days)
+
     description = f"{scheduling.service.name} - {scheduling.client.get_full_name()} - {scheduling.scheduled_time.strftime('%d/%m/%Y %H:%M')}"
 
     response = asaas.create_payment(
@@ -62,3 +71,48 @@ def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> P
         )
 
     return payment
+
+
+def create_charge_for_client(*, user_id, scheduling_id, billing_type: str) -> Payment:
+    """Wrapper com checagem de posse: cliente só cobra o próprio agendamento."""
+    client = get_client_by_user_id(user_id)
+    if client is None:
+        raise ClientNotFoundError()
+
+    scheduling = get_scheduling_by_id(scheduling_id)
+    if scheduling is None or scheduling.client_id != client.id:
+        raise SchedulingNotFound()
+
+    return create_charge_for_scheduling(scheduling, billing_type)
+
+
+def get_own_payment_detail(*, user_id, payment_id) -> Payment:
+    client = get_client_by_user_id(user_id)
+    if client is None:
+        raise ClientNotFoundError()
+
+    payment = payment_selector.get_payment_by_id(payment_id)
+    if payment is None or payment.client_id != client.id:
+        raise PaymentNotFound()
+
+    return payment
+
+
+def process_asaas_webhook(payload: dict) -> Payment:
+    """
+    Aplica o status vindo do webhook do Asaas. O payload já traz o objeto
+    `payment` completo com `status` atualizado — não precisamos reconstruir
+    o status a partir do nome do evento (`event`), só usar o que já veio.
+    """
+    payment_data = payload.get("payment") or {}
+    asaas_payment_id = payment_data.get("id")
+    status = payment_data.get("status")
+
+    if not asaas_payment_id or not status:
+        raise PaymentNotFound("Payload de webhook sem id ou status de pagamento.")
+
+    payment = payment_selector.get_payment_by_asaas_id(asaas_payment_id)
+    if payment is None:
+        raise PaymentNotFound()
+
+    return payment_repository.update_payment_status(payment, status=status)

@@ -2,7 +2,7 @@
 
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 from ninja import Schema
 
 class AsaasCustomerCreateSchema(Schema):

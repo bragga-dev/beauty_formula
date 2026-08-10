@@ -14,21 +14,35 @@ class Payment(models.Model):
         CREDIT_CARD = "CREDIT_CARD", _("Cartão de Crédito")
 
     class PaymentStatus(models.TextChoices):
+        """
+        Espelha os status reais que o Asaas manda via webhook/resposta da API
+        (payment.status), não um enum próprio inventado — senão status
+        desconhecido vindo do webhook corrompe silenciosamente o registro.
+        """
         PENDING = "PENDING", _("Pendente")
         RECEIVED = "RECEIVED", _("Recebido")
         CONFIRMED = "CONFIRMED", _("Confirmado")
         OVERDUE = "OVERDUE", _("Vencido")
         REFUNDED = "REFUNDED", _("Reembolsado")
+        RECEIVED_IN_CASH = "RECEIVED_IN_CASH", _("Recebido em dinheiro")
+        REFUND_REQUESTED = "REFUND_REQUESTED", _("Reembolso solicitado")
+        REFUND_IN_PROGRESS = "REFUND_IN_PROGRESS", _("Reembolso em andamento")
+        CHARGEBACK_REQUESTED = "CHARGEBACK_REQUESTED", _("Chargeback solicitado")
+        CHARGEBACK_DISPUTE = "CHARGEBACK_DISPUTE", _("Disputa de chargeback")
+        AWAITING_CHARGEBACK_REVERSAL = "AWAITING_CHARGEBACK_REVERSAL", _("Aguardando reversão de chargeback")
+        DUNNING_REQUESTED = "DUNNING_REQUESTED", _("Negativação solicitada")
+        DUNNING_RECEIVED = "DUNNING_RECEIVED", _("Negativação recebida")
+        AWAITING_RISK_ANALYSIS = "AWAITING_RISK_ANALYSIS", _("Em análise antifraude")
         CANCELLED = "CANCELLED", _("Cancelado")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    scheduling = models.ForeignKey('service.Scheduling', on_delete=models.PROTECT, related_name="payments_scheduling")
+    scheduling = models.ForeignKey('services.Scheduling', on_delete=models.PROTECT, related_name="payments_scheduling")
     client = models.ForeignKey('accounts.Client', on_delete=models.PROTECT, related_name="payments_client")
     asaas_payment_id = models.CharField(_("ID da cobrança no Asaas"), max_length=50, blank=True, null=True, db_index=True)
     asaas_customer_id = models.CharField(_("ID do cliente no Asaas"), max_length=50, blank=True, null=True, db_index=True)
     value = models.DecimalField(_("Valor do Serviço"), max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
     billing_type = models.CharField(_("Forma de Pagamento"), max_length=20, choices=PaymentMode.choices, default=PaymentMode.PIX, db_index=True)
-    status = models.CharField(_("Status do Pagamento"), max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.PENDING, db_index=True)
+    status = models.CharField(_("Status do Pagamento"), max_length=30, choices=PaymentStatus.choices, default=PaymentStatus.PENDING, db_index=True)
     due_date = models.DateField(_("Data limite para efetuar pagamento"))
     description = models.TextField(_("Descrição da cobrança"), max_length=500)
     external_reference = models.CharField(_("Referência externa"), max_length=100, blank=True, null=True, db_index=True)
@@ -52,4 +66,4 @@ class Payment(models.Model):
         ]
 
     def __str__(self):
-        return f"Pagamento {self.id[:8]} - {self.client}"
+        return f"Pagamento {str(self.id)[:8]} - {self.client}"

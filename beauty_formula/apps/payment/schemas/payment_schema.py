@@ -40,15 +40,11 @@ class PaymentStatusEnum(str, Enum):
 
 class PaymentCreateSchema(Schema):
     """
-    Criação de cobrança — só pede o essencial. `value`, `due_date` e
-    `description` NÃO vêm do client: são resolvidos a partir do
-    `scheduling` no payment_service (preço já é o `price_at_booking`,
-    due_date é o dia da cobrança, description é montada no service).
-    Deixar o client mandar `value` seria abrir brecha pra pagar um
-    valor diferente do agendado.
+    Criação de cobrança — só pede o essencial.
+    scheduling_id é string para evitar problemas de validação com UUID.
     """
-    scheduling_id: uuid.UUID
-    billing_type: PaymentBillingTypeEnum
+    scheduling_id: str  # Mudado para string
+    billing_type: str   # Mudado para string para simplificar
 
 
 class PaymentResponseSchema(Schema):

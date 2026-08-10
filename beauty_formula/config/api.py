@@ -16,6 +16,8 @@ from beauty_formula.apps.services.api.availability import router as availability
 from beauty_formula.apps.services.api.average_rating import router as average_rating_router
 from beauty_formula.apps.website.api.product import router as product_router
 from beauty_formula.apps.website.api.contact import router as contact_router
+from beauty_formula.apps.payment.api.payment import router as payment_router
+
 
 from django_ratelimit.exceptions import Ratelimited
 import logging
@@ -56,6 +58,7 @@ api.add_router("/availability/", availability_router, tags=["Availability"])
 api.add_router("/average-ratings/", average_rating_router, tags=["Average Ratings"])
 api.add_router("/products/", product_router, tags=["Products"])
 api.add_router("/contacts/", contact_router, tags=["Contacts"])
+api.add_router("/payments/", payment_router, tags=["Payments"])
 
 # ── Handlers de erro globais ──────────────────────────────────────────────────
 
