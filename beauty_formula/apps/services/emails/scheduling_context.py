@@ -35,11 +35,11 @@ from beauty_formula.apps.services.models.scheduling import Scheduling
 # Único lugar que precisa mudar se as rotas reais do app front-end forem
 # diferentes dessas.
 # ─────────────────────────────────────────────────────────────────────────
-_CLIENT_APPOINTMENTS_PATH = "/meus-agendamentos"
-_EMPLOYEE_APPOINTMENTS_PATH = "/painel/agendamentos"
+_CLIENT_APPOINTMENTS_PATH = "/painel/meus-agendamentos"
+_EMPLOYEE_APPOINTMENTS_PATH = "/painel/meus-atendimentos"
 _SALOON_PATH = "/"
 _NEW_SCHEDULING_PATH = "/agendar"
-_RATE_SCHEDULING_PATH_TEMPLATE = "/agendamentos/{scheduling_id}/avaliar"
+_RATE_SCHEDULING_PATH_TEMPLATE = "/painel/meus-agendamentos/{scheduling_id}"
 
 
 def build_frontend_url(path: str) -> str:

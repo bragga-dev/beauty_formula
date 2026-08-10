@@ -67,7 +67,7 @@ from beauty_formula.apps.services.selectors.service_average_rating_selector impo
     get_average_rating_for_service,
 )
 from beauty_formula.apps.services.selectors.service_selector import validate_service_exists
-
+from beauty_formula.apps.services.tasks.send_new_rating_admin_notification import send_new_rating_admin_notification
 
 
 from beauty_formula.apps.accounts.models.user import User
@@ -118,12 +118,9 @@ def create_average_rating_for_client(user_id: UUID, data: AverageRatingCreateIn)
     if validate_scheduling_already_rated(scheduling_id=scheduling.id):
         raise AverageRatingAlreadyExists()
 
-    if get_rating_for_client_service_employee(
-        client_id=scheduling.client_id, service_id=scheduling.service_id, employee_id=scheduling.employee_id
-    ):
-        raise AverageRatingAlreadyExists(
-            _("Você já avaliou este serviço com este profissional. Edite sua avaliação existente em vez de criar uma nova.")
-        )
+    rating_exist =  get_rating_for_client_service_employee(client_id=scheduling.client_id, service_id=scheduling.service_id, employee_id=scheduling.employee_id)
+    if rating_exist:
+        raise AverageRatingAlreadyExists(_("Você já avaliou este serviço com este profissional. Edite sua avaliação existente em vez de criar uma nova."))
 
     rating = create_average_rating(
         scheduling=scheduling,
@@ -138,6 +135,8 @@ def create_average_rating_for_client(user_id: UUID, data: AverageRatingCreateIn)
     scheduling.save(update_fields=["rated_at", "updated_at"])
 
     _refresh_aggregates(rating)
+    if not rating_exist:
+        send_new_rating_admin_notification.delay(rating_id=rating.id)
     return AverageRatingPrivateOut.from_orm(rating)
 
 def list_my_average_ratings(user_id: UUID):

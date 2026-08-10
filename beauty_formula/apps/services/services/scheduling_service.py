@@ -66,6 +66,9 @@ from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_client import 
 from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_employee import send_cancel_scheduling_to_employee
 from beauty_formula.apps.services.tasks.send_scheduling_completed_thanks import send_scheduling_completed_thanks
 
+
+from beauty_formula.apps.services.selectors.average_rating_selector import get_rating_for_client_service_employee
+
 FINAL_STATUSES = [
     Scheduling.SchedulingStatus.COMPLETED,
     Scheduling.SchedulingStatus.CANCELED,
@@ -388,7 +391,9 @@ def complete_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> Sche
     if not scheduling.can_transition_to(Scheduling.SchedulingStatus.COMPLETED):
         raise InvalidSchedulingStatusTransition(_("Só é possível concluir um agendamento confirmado."))
     scheduling = complete_scheduling_repo(scheduling)
-    send_scheduling_completed_thanks.delay(scheduling_id=scheduling.id)
+    rating_exist =  get_rating_for_client_service_employee(client_id=scheduling.client.id, service_id=scheduling.service.id, employee_id=scheduling.employee.id)
+    if not rating_exist:
+        send_scheduling_completed_thanks.delay(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 
