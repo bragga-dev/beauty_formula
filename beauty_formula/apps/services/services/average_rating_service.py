@@ -118,8 +118,12 @@ def create_average_rating_for_client(user_id: UUID, data: AverageRatingCreateIn)
     if validate_scheduling_already_rated(scheduling_id=scheduling.id):
         raise AverageRatingAlreadyExists()
 
-    rating_exist =  get_rating_for_client_service_employee(client_id=scheduling.client_id, service_id=scheduling.service_id, employee_id=scheduling.employee_id)
-    if rating_exist:
+    already_rated = get_rating_for_client_service_employee(
+        client_id=scheduling.client_id,
+        service_id=scheduling.service_id,
+        employee_id=scheduling.employee_id,
+    )
+    if already_rated:
         raise AverageRatingAlreadyExists(_("Você já avaliou este serviço com este profissional. Edite sua avaliação existente em vez de criar uma nova."))
 
     rating = create_average_rating(
@@ -135,8 +139,7 @@ def create_average_rating_for_client(user_id: UUID, data: AverageRatingCreateIn)
     scheduling.save(update_fields=["rated_at", "updated_at"])
 
     _refresh_aggregates(rating)
-    if not rating_exist:
-        send_new_rating_admin_notification.delay(rating_id=rating.id)
+    send_new_rating_admin_notification.delay(rating_id=rating.id)
     return AverageRatingPrivateOut.from_orm(rating)
 
 def list_my_average_ratings(user_id: UUID):
