@@ -55,6 +55,7 @@ class Payment(models.Model):
     created_at = models.DateTimeField(_("Criado em"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Atualizado em"), auto_now=True)
     synced_with_asaas = models.BooleanField(_("Sincronizado com Asaas"), default=False)
+    
 
     class Meta:
         ordering = ['-created_at']

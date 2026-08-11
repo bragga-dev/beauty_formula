@@ -1,6 +1,10 @@
+import logging
+
 import requests
 from django.conf import settings
 from beauty_formula.apps.core.exceptions.payment_exception import AsaasAPIError
+
+logger = logging.getLogger(__name__)
 
 
 class AsaasClient:
@@ -23,18 +27,39 @@ class AsaasClient:
 
     def _request(self, method: str, path: str, **kwargs) -> dict:
         url = f"{self.base_url}{path}"
+
+        # Log da request ANTES de disparar — se dar 401/erro de novo, isso
+        # mostra a URL final e o corpo exatos que saíram, em vez de a gente
+        # ficar adivinhando. A chave só aparece mascarada (8 primeiros +
+        # 6 últimos caracteres) — nunca loga o token inteiro.
+        masked_key = settings.ASAAS_API_KEY
+        if masked_key and len(masked_key) > 14:
+            masked_key = f"{masked_key[:8]}...{masked_key[-6:]}"
+        logger.info("Asaas request: %s %s | access_token=%s | body=%s", method, url, masked_key, kwargs.get("json"),)
+
         try:
             response = self.session.request(method, url, timeout=15, **kwargs)
         except requests.RequestException as e:
             raise AsaasAPIError(f"Falha de conexão com a Asaas: {e}")
 
+        logger.info("Asaas response: %s %s -> %s | headers=%s | body=%r", method, url, response.status_code, dict(response.headers), response.text[:500],)
+
         if not response.ok:
+            payload = {}
+            message = response.text
             try:
                 payload = response.json()
                 message = payload.get("errors", [{}])[0].get("description", response.text)
             except (ValueError, IndexError, KeyError):
-                payload = {}
-                message = response.text
+                pass
+
+            if not message:
+                message = (
+                    f"Asaas retornou {response.status_code} sem corpo de resposta "
+                    f"para {method} {path}. Veja o log 'Asaas request/response' "
+                    "logo acima pra conferir URL, corpo e headers de resposta."
+                )
+
             raise AsaasAPIError(message, status_code=response.status_code, payload=payload)
 
         if response.status_code == 204 or not response.content:
@@ -56,11 +81,19 @@ class AsaasClient:
         payload = {
             "customer": customer_id,
             "billingType": billing_type,
-            "value": float(value),
+            # round explícito: Decimal -> float pode gerar erro de ponto
+            # flutuante (ex: 19.9 -> 19.899999999999998) e a Asaas rejeita
+            # valor com mais de 2 casas decimais.
+            "value": round(float(value), 2),
             "dueDate": due_date,
             "description": description,
             "externalReference": external_reference,
         }
+        # Não manda chave com valor None: a Asaas trata alguns campos nulos
+        # como "resetar" a config (ex: os objetos interest/fine sobrescrevem
+        # a config global da conta se enviados vazios/nulos — mesmo padrão
+        # vale aqui, então é mais seguro só omitir o que não foi passado).
+        payload = {k: v for k, v in payload.items() if v is not None}
         return self._request("POST", "/payments", json=payload)
 
     def get_payment(self, payment_id: str) -> dict:

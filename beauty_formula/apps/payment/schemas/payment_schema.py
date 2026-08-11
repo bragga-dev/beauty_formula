@@ -1,3 +1,5 @@
+
+
 from __future__ import annotations
 import uuid
 from datetime import date, datetime
@@ -30,6 +32,15 @@ class PaymentStatusEnum(str, Enum):
     CONFIRMED = "CONFIRMED"
     OVERDUE = "OVERDUE"
     REFUNDED = "REFUNDED"
+    RECEIVED_IN_CASH = "RECEIVED_IN_CASH"
+    REFUND_REQUESTED = "REFUND_REQUESTED"
+    REFUND_IN_PROGRESS = "REFUND_IN_PROGRESS"
+    CHARGEBACK_REQUESTED = "CHARGEBACK_REQUESTED"
+    CHARGEBACK_DISPUTE = "CHARGEBACK_DISPUTE"
+    AWAITING_CHARGEBACK_REVERSAL = "AWAITING_CHARGEBACK_REVERSAL"
+    DUNNING_REQUESTED = "DUNNING_REQUESTED"
+    DUNNING_RECEIVED = "DUNNING_RECEIVED"
+    AWAITING_RISK_ANALYSIS = "AWAITING_RISK_ANALYSIS"
     CANCELLED = "CANCELLED"
 
     @classmethod
@@ -43,8 +54,8 @@ class PaymentCreateSchema(Schema):
     Criação de cobrança — só pede o essencial.
     scheduling_id é string para evitar problemas de validação com UUID.
     """
-    scheduling_id: str  # Mudado para string
-    billing_type: str   # Mudado para string para simplificar
+    scheduling_id: str  
+    billing_type: PaymentBillingTypeEnum
 
 
 class PaymentResponseSchema(Schema):
@@ -112,3 +123,4 @@ class PaymentFilterSchema(Schema):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     synced: Optional[bool] = None
+
