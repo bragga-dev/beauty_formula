@@ -20,6 +20,7 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
     AsaasAPIError,
     PaymentNotFound,
     SchedulingAlreadyPaid,
+    CpfOrCnpjRequired,
 )
 from beauty_formula.apps.core.exceptions.permissions import ClientNotFoundError
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
@@ -58,6 +59,7 @@ def create_charge_router(request, payload: PaymentCreateSchema):
             user_id=user.id,
             scheduling_id=payload.scheduling_id,
             billing_type=payload.billing_type.value,
+            cpf_cnpj=payload.cpf_cnpj,
         )
         return 201, PaymentResponseSchema.from_orm(payment)
     except ClientNotFoundError:
@@ -66,9 +68,10 @@ def create_charge_router(request, payload: PaymentCreateSchema):
         return 404, {"detail": "Agendamento não encontrado."}
     except SchedulingAlreadyPaid as e:
         return 400, {"detail": str(e)}
+    except CpfOrCnpjRequired as e:
+        return 400, {"detail": str(e)}
     except AsaasAPIError as e:
         return 400, {"detail": e.message}
-
 
 @router.get(
     "/my-payments",

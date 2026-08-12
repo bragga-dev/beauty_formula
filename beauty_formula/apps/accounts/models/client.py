@@ -33,7 +33,7 @@ class Client(models.Model):
     birth_date = models.DateField(_("Data de nascimento"), blank=True, null=True)
     instagram = models.URLField(_("Instagram"), max_length=255, blank=True, null=True, help_text=_("URL do perfil do Instagram do cliente."))
     photo = models.ImageField(upload_to=client_photo_path, default=DEFAULT_CLIENT_PHOTO, blank=True, null=True, validators=[validate_image_file], help_text=_('Formatos aceitos: jpg, jpeg ou png. Máx: 5MB.'))
-
+    asaas_customer_id = models.CharField(_("ID do cliente na Asaas"), max_length=50, blank=True, null=True, db_index=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.user.email})"

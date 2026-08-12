@@ -25,6 +25,15 @@ class AsaasClient:
             "User-Agent": "beauty-formula",
         })
 
+    @staticmethod
+    def _redact_body(body):
+        """Mascara CPF/CNPJ antes de logar — nunca em texto puro no log."""
+        if not isinstance(body, dict) or "cpfCnpj" not in body:
+            return body
+        redacted = dict(body)
+        redacted["cpfCnpj"] = "***"
+        return redacted
+
     def _request(self, method: str, path: str, **kwargs) -> dict:
         url = f"{self.base_url}{path}"
 
@@ -35,7 +44,7 @@ class AsaasClient:
         masked_key = settings.ASAAS_API_KEY
         if masked_key and len(masked_key) > 14:
             masked_key = f"{masked_key[:8]}...{masked_key[-6:]}"
-        logger.info("Asaas request: %s %s | access_token=%s | body=%s", method, url, masked_key, kwargs.get("json"),)
+        logger.info("Asaas request: %s %s | access_token=%s | body=%s", method, url, masked_key, self._redact_body(kwargs.get("json")),)
 
         try:
             response = self.session.request(method, url, timeout=15, **kwargs)
@@ -105,3 +114,28 @@ class AsaasClient:
 
     def cancel_payment(self, payment_id: str) -> dict:
         return self._request("DELETE", f"/payments/{payment_id}")
+
+    # ── Customers (Clientes) ─────────────────────────────────────────────
+
+    def create_customer(
+        self,
+        *,
+        name: str,
+        cpf_cnpj: str,
+        email: str = None,
+        external_reference: str = None,
+    ) -> dict:
+        """
+        Cria um customer na Asaas — só usado na 1ª cobrança via cartão de
+        cada cliente (a Asaas exige cpfCnpj pra criar customer via API,
+        não tem como pular esse campo). PIX/Boleto continuam usando o
+        customer único do dono do salão, não passam por aqui.
+        """
+        payload = {
+            "name": name,
+            "cpfCnpj": cpf_cnpj,
+            "email": email,
+            "externalReference": external_reference,
+        }
+        payload = {k: v for k, v in payload.items() if v is not None}
+        return self._request("POST", "/customers", json=payload)

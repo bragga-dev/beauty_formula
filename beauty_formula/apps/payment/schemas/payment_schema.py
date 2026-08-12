@@ -56,6 +56,8 @@ class PaymentCreateSchema(Schema):
     """
     scheduling_id: str  
     billing_type: PaymentBillingTypeEnum
+    cpf_cnpj: Optional[str] = Field(default=None, min_length=11, max_length=14)
+    
 
 
 class PaymentResponseSchema(Schema):

@@ -28,3 +28,15 @@ class SchedulingAlreadyPaid(Exception):
             "Já existe uma cobrança em aberto ou paga para este agendamento."
         )
         super().__init__(self.message)
+
+class CpfOrCnpjRequired(Exception):
+    """
+    Só é levantada na 1ª cobrança via cartão de um cliente: a Asaas exige
+    CPF/CNPJ pra criar o customer dele. Nas cobranças seguintes o
+    customer_id já fica salvo no Client e isso não é mais pedido.
+    """
+    def __init__(self, message: str | None = None):
+        self.message = message or _(
+            "Informe o CPF ou CNPJ para pagar com cartão de crédito."
+        )
+        super().__init__(self.message)

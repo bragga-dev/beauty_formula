@@ -31,30 +31,62 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
     AsaasAPIError,
     SchedulingAlreadyPaid,
     PaymentNotFound,
+    CpfOrCnpjRequired,
 )
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+from beauty_formula.apps.accounts.repositories.client_repository import (
+    set_client_asaas_customer_id,
+)
+from beauty_formula.apps.core.validators.validate_cpf_cnpj import validate_cnpj, validate_cpf
+
 
 logger = logging.getLogger(__name__)
 
-
-def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> Payment:
+def _resolve_asaas_customer_id(scheduling: Scheduling, billing_type: str, cpf_cnpj: str | None, asaas: AsaasClient) -> str:
     """
-    Cria a cobrança na Asaas pro valor do agendamento (price_at_booking) e
-    persiste o Payment local via payment_repository.
+    PIX/Boleto: sempre o customer único do dono do salão (settings.ASAAS_CUSTOMER_ID)
+    — nenhum dado do cliente vai pra Asaas além do externalReference.
 
-    Não existe customer por cliente: toda cobrança do sistema usa o mesmo
-    ASAAS_CUSTOMER_ID (o customer único, criado uma vez pelo dono da
-    barbearia). O agendamento/cliente real fica só no seu banco — a Asaas
-    recebe apenas `externalReference` (id do agendamento) e a descrição.
-
-    Se billing_type for PIX, já busca o QR Code na sequência.
+    Cartão de crédito: customer PRÓPRIO do cliente, porque a fatura da Asaas
+    mostra os dados do customer vinculado como "Dados do comprador" — usando
+    o customer do salão, o pagador via os dados do salão em vez dos dele.
+    Criado uma vez (exige CPF/CNPJ, obrigatório na API da Asaas) e salvo em
+    client.asaas_customer_id pra não pedir de novo nas próximas cobranças.
     """
+    if billing_type != Payment.PaymentMode.CREDIT_CARD:
+        return settings.ASAAS_CUSTOMER_ID
+
+    client = scheduling.client
+    if client.asaas_customer_id:
+        return client.asaas_customer_id
+
+    if not cpf_cnpj:
+        raise CpfOrCnpjRequired()
+    
+    if not validate_cpf(value=cpf_cnpj) or not validate_cnpj(value=cpf_cnpj):
+        raise  CpfOrCnpjRequired("CPF ou CNPJ inválido!")
+
+
+    response = asaas.create_customer(
+        name=client.get_full_name(),
+        cpf_cnpj=cpf_cnpj,
+        email=client.user.email,
+        external_reference=str(client.id),
+    )
+    set_client_asaas_customer_id(client=client, asaas_customer_id=response["id"])
+    return response["id"]
+
+
+
+def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str, cpf_cnpj: str | None = None) -> Payment:
     if get_active_payment_for_scheduling(scheduling.id) is not None:
         raise SchedulingAlreadyPaid()
 
     asaas = AsaasClient()
+
+    customer_id = _resolve_asaas_customer_id(scheduling=scheduling, billing_type=billing_type, cpf_cnpj=cpf_cnpj, asaas=asaas)
 
     due_days = getattr(settings, "ASAAS_PAYMENT_DUE_DAYS", 1)
     due_date = timezone.now().date() + timedelta(days=due_days)
@@ -62,7 +94,7 @@ def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> P
     description = f"{scheduling.service.name} - {scheduling.client.get_full_name()} - {scheduling.scheduled_time.strftime('%d/%m/%Y %H:%M')}"
 
     response = asaas.create_payment(
-        customer_id=settings.ASAAS_CUSTOMER_ID,
+        customer_id=customer_id,
         billing_type=billing_type,
         value=scheduling.price_at_booking,
         due_date=due_date.isoformat(),
@@ -123,8 +155,7 @@ def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str) -> P
     return payment
 
 
-def create_charge_for_client(*, user_id, scheduling_id, billing_type: str) -> Payment:
-    """Wrapper com checagem de posse: cliente só cobra o próprio agendamento."""
+def create_charge_for_client(*, user_id, scheduling_id, billing_type: str, cpf_cnpj: str | None = None) -> Payment:
     client = get_client_by_user_id(user_id=user_id)
     if client is None:
         raise ClientNotFoundError()
@@ -133,7 +164,7 @@ def create_charge_for_client(*, user_id, scheduling_id, billing_type: str) -> Pa
     if scheduling is None or scheduling.client_id != client.id:
         raise SchedulingNotFound()
 
-    return create_charge_for_scheduling(scheduling=scheduling, billing_type=billing_type)
+    return create_charge_for_scheduling(scheduling=scheduling, billing_type=billing_type, cpf_cnpj=cpf_cnpj)
 
 
 def get_own_payment_detail(*, user_id, payment_id) -> Payment:
