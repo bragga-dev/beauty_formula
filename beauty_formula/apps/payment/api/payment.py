@@ -21,6 +21,7 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
     PaymentNotFound,
     SchedulingAlreadyPaid,
     CpfOrCnpjRequired,
+    PaymentNotRefundable,
 )
 from beauty_formula.apps.core.exceptions.permissions import ClientNotFoundError
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
@@ -29,6 +30,7 @@ from beauty_formula.apps.core.utils.pagination import PAGE_SIZE_DEFAULT, PageOut
 from beauty_formula.apps.payment.schemas.payment_schema import (
     PaymentCreateSchema,
     PaymentFilterSchema,
+    PaymentRefundSchema,
     PaymentResponseSchema,
 )
 from beauty_formula.apps.payment.selectors.payment_selector import filter_payments, get_payments_by_client
@@ -36,8 +38,9 @@ from beauty_formula.apps.payment.services.payment_service import (
     create_charge_for_client,
     get_own_payment_detail,
     process_asaas_webhook,
+    refund_payment,
+    sync_payment_with_asaas,
 )
-
 router = Router()
 
 
@@ -153,3 +156,37 @@ def asaas_webhook_router(request: HttpRequest):
         pass
 
     return 200, {"received": True}
+
+
+@router.post(
+    "/{payment_id}/sync",
+    response={200: PaymentResponseSchema, 404: MessageOut, 400: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Admin força a sincronização do status com a Asaas (fallback se o webhook atrasar/falhar)",
+)
+def sync_payment_router(request, payment_id: UUID):
+    try:
+        payment = sync_payment_with_asaas(payment_id)
+        return 200, PaymentResponseSchema.from_orm(payment)
+    except PaymentNotFound:
+        return 404, {"detail": "Cobrança não encontrada."}
+    except AsaasAPIError as e:
+        return 400, {"detail": e.message}
+
+
+@router.post(
+    "/{payment_id}/refund",
+    response={200: PaymentResponseSchema, 404: MessageOut, 400: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Admin estorna uma cobrança paga (total ou parcial) — nunca automático",
+)
+def refund_payment_router(request, payment_id: UUID, payload: PaymentRefundSchema):
+    try:
+        payment = refund_payment(payment_id=payment_id, value=payload.value, description=payload.description)
+        return 200, PaymentResponseSchema.from_orm(payment)
+    except PaymentNotFound:
+        return 404, {"detail": "Cobrança não encontrada."}
+    except PaymentNotRefundable as e:
+        return 400, {"detail": str(e)}
+    except AsaasAPIError as e:
+        return 400, {"detail": e.message}

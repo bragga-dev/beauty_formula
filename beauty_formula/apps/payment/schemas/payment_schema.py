@@ -126,3 +126,11 @@ class PaymentFilterSchema(Schema):
     end_date: Optional[date] = None
     synced: Optional[bool] = None
 
+class PaymentRefundSchema(Schema):
+    """
+    Estorno acionado manualmente pelo admin. value ausente = estorno
+    integral. value informado = estorno parcial (ex: reter taxa de
+    cancelamento) — a Asaas valida se cabe no saldo disponível.
+    """
+    value: Optional[Decimal] = Field(default=None, gt=0)
+    description: Optional[str] = Field(default=None, max_length=500)

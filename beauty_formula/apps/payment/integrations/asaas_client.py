@@ -139,3 +139,19 @@ class AsaasClient:
         }
         payload = {k: v for k, v in payload.items() if v is not None}
         return self._request("POST", "/customers", json=payload)
+
+
+
+    def refund_payment(self, payment_id: str, *, value: float = None, description: str = None) -> dict:
+        """
+        Estorna uma cobrança PIX ou cartão já RECEIVED/CONFIRMED. Sem
+        `value`, estorna o valor integral; com `value`, estorno parcial
+        (ex: reter taxa de cancelamento) — a Asaas valida se cabe no saldo
+        disponível da cobrança.
+
+        Boleto tem fluxo próprio (POST /payments/{id}/bankSlip/refund),
+        que exige o pagador informar dados bancários — não coberto aqui.
+        """
+        payload = {"value": value, "description": description}
+        payload = {k: v for k, v in payload.items() if v is not None}
+        return self._request("POST", f"/payments/{payment_id}/refund", json=payload)

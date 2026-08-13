@@ -32,6 +32,8 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
     SchedulingAlreadyPaid,
     PaymentNotFound,
     CpfOrCnpjRequired,
+    PaymentNotRefundable,
+    
 )
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
 from beauty_formula.apps.services.models.scheduling import Scheduling
@@ -41,6 +43,7 @@ from beauty_formula.apps.accounts.repositories.client_repository import (
 )
 from beauty_formula.apps.core.validators.validate_cpf_cnpj import validate_cnpj, validate_cpf
 
+_REFUNDABLE_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +168,59 @@ def create_charge_for_client(*, user_id, scheduling_id, billing_type: str, cpf_c
         raise SchedulingNotFound()
 
     return create_charge_for_scheduling(scheduling=scheduling, billing_type=billing_type, cpf_cnpj=cpf_cnpj)
+
+
+
+def sync_payment_with_asaas(payment_id) -> Payment:
+    """
+    Puxa o estado atual da cobrança direto da Asaas e atualiza o registro
+    local — fallback manual pra quando o webhook atrasa ou falha (a
+    reentrega da Asaas não é infinita). Uso do admin, numa cobrança que
+    parece travada em PENDING no painel.
+    """
+    payment = get_payment_by_id(payment_id=payment_id)
+    if payment is None:
+        raise PaymentNotFound()
+
+    response = AsaasClient().get_payment(payment_id=payment.asaas_payment_id)
+    return update_payment_status(payment=payment, status=response["status"])
+
+
+def refund_payment(*, payment_id, value=None, description: str | None = None) -> Payment:
+    """
+    Estorno manual, acionado pelo admin (nunca automático — cancelamento
+    de agendamento não estorna sozinho, ver cancel_payment_for_scheduling).
+
+    Só cobre Pix e cartão de crédito já RECEIVED/CONFIRMED. Boleto tem
+    fluxo próprio na Asaas (exige dados bancários do pagador) — fora de
+    escopo aqui.
+
+    value None = estorno integral. value informado = estorno parcial
+    (ex: reter taxa de cancelamento); a Asaas quem valida se cabe no
+    saldo disponível da cobrança, considerando estornos parciais
+    anteriores — não replicamos essa conta aqui, só a validação óbvia
+    (não deixar mandar mais que o valor total da cobrança).
+    """
+    payment = get_payment_by_id(payment_id=payment_id)
+    if payment is None:
+        raise PaymentNotFound()
+
+    if payment.billing_type == Payment.PaymentMode.BOLETO:
+        raise PaymentNotRefundable("Estorno de boleto exige dados bancários do cliente — não suportado por aqui.")
+
+    if payment.status not in _REFUNDABLE_STATUSES:
+        raise PaymentNotRefundable()
+
+    if value is not None and value > payment.value:
+        raise PaymentNotRefundable("Valor do estorno não pode ser maior que o valor da cobrança.")
+
+    response = AsaasClient().refund_payment(
+        payment.asaas_payment_id,
+        value=float(value) if value is not None else None,
+        description=description,
+    )
+
+    return update_payment_status(payment=payment, status=response["status"])
 
 
 def get_own_payment_detail(*, user_id, payment_id) -> Payment:
