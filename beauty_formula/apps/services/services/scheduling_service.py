@@ -72,7 +72,7 @@ FINAL_STATUSES = [
     Scheduling.SchedulingStatus.NO_SHOW,
     Scheduling.SchedulingStatus.RESCHEDULED,
 ]
-
+from beauty_formula.apps.payment.services.payment_service import cancel_payment_for_scheduling
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers internos
@@ -338,6 +338,7 @@ def cancel_own_scheduling_as_client(user_id: UUID, scheduling_id: UUID, reason: 
 
     user = User.objects.get(pk=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
+    cancel_payment_for_scheduling(scheduling.id)
     _dispatch_cancellation_emails(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
@@ -351,6 +352,7 @@ def cancel_scheduling_as_employee(user_id: UUID, scheduling_id: UUID, reason: st
 
     user = User.objects.get(pk=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
+    cancel_payment_for_scheduling(scheduling.id)
     _dispatch_cancellation_emails(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
@@ -365,6 +367,7 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
         raise SchedulingCannotBeCanceled()
 
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
+    cancel_payment_for_scheduling(scheduling.id)
     _dispatch_cancellation_emails(scheduling)
     return SchedulingPrivateOut.from_orm(scheduling)
 

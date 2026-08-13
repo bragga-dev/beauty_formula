@@ -196,3 +196,38 @@ def process_asaas_webhook(payload: dict) -> Payment:
         raise PaymentNotFound()
 
     return update_payment_status(payment=payment, status=status)
+
+
+def cancel_payment_for_scheduling(scheduling_id) -> None:
+    """
+    Cancela na Asaas a cobrança pendente vinculada ao agendamento, se
+    existir. Chamada pelo scheduling_service sempre que um agendamento é
+    cancelado (cliente, funcionário ou admin) — evita deixar uma cobrança
+    PENDING pendurada pra um serviço que não vai mais acontecer.
+
+    Se a cobrança já foi paga (RECEIVED/CONFIRMED), não mexe nela aqui —
+    a Asaas não permite excluir cobrança já paga; devolver o dinheiro é
+    caso de estorno (endpoint futuro), não de cancelamento.
+
+    Falha de comunicação com a Asaas NÃO impede o cancelamento do
+    agendamento: só loga o erro. Travar o cancelamento do cliente por
+    causa de uma chamada externa instável seria pior que deixar uma
+    cobrança órfã pra resolver depois manualmente.
+    """
+    payment = get_active_payment_for_scheduling(scheduling_id)
+    if payment is None or payment.status != Payment.PaymentStatus.PENDING:
+        return
+
+    try:
+        AsaasClient().cancel_payment(payment.asaas_payment_id)
+    except AsaasAPIError:
+        logger.exception(
+            "Falha ao cancelar cobrança %s na Asaas (agendamento %s) — "
+            "agendamento foi cancelado normalmente mesmo assim.",
+            payment.asaas_payment_id, scheduling_id,
+        )
+        return
+
+    update_payment_status(payment, status=Payment.PaymentStatus.CANCELLED)
+
+
