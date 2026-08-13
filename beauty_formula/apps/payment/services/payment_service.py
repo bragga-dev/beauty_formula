@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta
-
+from typing import Optional
 from django.conf import settings
 from django.utils import timezone
 
@@ -47,7 +47,7 @@ _REFUNDABLE_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CO
 
 logger = logging.getLogger(__name__)
 
-def _resolve_asaas_customer_id(scheduling: Scheduling, billing_type: str, cpf_cnpj: str | None, asaas: AsaasClient) -> str:
+def _resolve_asaas_customer_id(scheduling: Scheduling, billing_type: str, cpf_cnpj: Optional[str] | None, asaas: AsaasClient) -> str:
     """
     PIX/Boleto: sempre o customer único do dono do salão (settings.ASAAS_CUSTOMER_ID)
     — nenhum dado do cliente vai pra Asaas além do externalReference.
