@@ -94,3 +94,10 @@ class AverageRatingAlreadyExists(Exception):
     def __init__(self, message=None):
         self.message = message or _("Este agendamento já foi avaliado.")
         super().__init__(self.message)
+
+class SchedulingCannotBeConfirmed(Exception):
+    def __init__(self, message=None):
+        self.message = message or _(
+            "Este agendamento não pode ser confirmado, pois não está com o status 'Criado'."
+        )
+        super().__init__(self.message)

@@ -21,6 +21,8 @@ from uuid import UUID
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
+
+from beauty_formula.apps.payment.models.payment_model import Payment
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.selectors.client_selector import get_client_by_user_id
 from beauty_formula.apps.accounts.selectors.employee_selector import get_employee_by_id, get_employee_by_user_id
@@ -33,12 +35,14 @@ from beauty_formula.apps.core.exceptions.service_exception import (
     SchedulingConflict,
     SchedulingNotFound,
     ServiceNotFound,
+    SchedulingCannotBeConfirmed,
 )
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.repositories.scheduling_repository import (
     cancel_scheduling as cancel_scheduling_repo,
     complete_scheduling as complete_scheduling_repo,
     create_scheduling as create_scheduling_repo,
+    confirm_scheduling as confirm_scheduling_repo,
     delete_scheduling as delete_scheduling_repo,
     mark_scheduling_as_no_show as mark_no_show_repo,
     reschedule_scheduling as reschedule_scheduling_repo,
@@ -73,6 +77,15 @@ FINAL_STATUSES = [
     Scheduling.SchedulingStatus.RESCHEDULED,
 ]
 from beauty_formula.apps.payment.services.payment_service import cancel_payment_for_scheduling
+from beauty_formula.apps.payment.selectors.payment_selector import get_payments_by_scheduling
+from beauty_formula.apps.core.exceptions.payment_exception import (SchedulingPaymentPending)
+
+
+
+
+
+
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers internos
@@ -182,10 +195,28 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
         scheduled_time=data.scheduled_time,
         notes=data.notes,
     )
-    send_confirm_scheduling_to_client.delay(user_id=user_id, scheduling_id=scheduling.id)
-    send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling.id)
+    
     service.increment_bookings()
     return SchedulingOut.from_orm(scheduling)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Confirmação
+# ═══════════════════════════════════════════════════════════════════════════════
+def confirm_scheduling_for_client(user_id: UUID, scheduling_id:UUID) -> SchedulingOut:
+    """Confirma um agendamento mediante pagamento alterando o Status de Criado para Confirmado"""
+    scheduling = _get_own_client_scheduling(user_id=user_id, scheduling_id=scheduling_id)
+    if scheduling.SchedulingStatus != Scheduling.SchedulingStatus.CREATED:
+        raise SchedulingCannotBeConfirmed()
+    
+    payment = get_payments_by_scheduling(scheduling_id=scheduling_id)
+    if not payment.PaymentStatus != Payment.PaymentStatus.RECEIVED:
+        raise SchedulingPaymentPending()
+
+    scheduling_confirmed = confirm_scheduling_repo(scheduling)
+    send_confirm_scheduling_to_client.delay(user_id=user_id, scheduling_id=scheduling_confirmed.id)
+    send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling_confirmed.id)
+    return SchedulingOut.from_orm(scheduling_confirmed)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Listagem
@@ -268,14 +299,10 @@ def update_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, data: S
     scheduling = _get_own_client_scheduling(user_id, scheduling_id)
 
     if scheduling.status != Scheduling.SchedulingStatus.CONFIRMED:
-        raise SchedulingCannotBeModified(
-            _("Só é possível editar um agendamento enquanto ele estiver confirmado.")
-        )
+        raise SchedulingCannotBeModified(_("Só é possível editar um agendamento enquanto ele estiver confirmado."))
 
     if data.service_id is not None or data.employee_id is not None or data.scheduled_time is not None:
-        raise SchedulingCannotBeModified(
-            _("Para trocar serviço, funcionário ou horário, use o reagendamento.")
-        )
+        raise SchedulingCannotBeModified(_("Para trocar serviço, funcionário ou horário, use o reagendamento."))
 
     scheduling = update_scheduling_repo(scheduling, notes=data.notes)
     return SchedulingOut.from_orm(scheduling)

@@ -31,9 +31,9 @@ def get_payment_by_asaas_id(asaas_payment_id: str) -> Optional[Payment]:
 # Buscas por Agendamento / Cliente
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def get_payments_by_scheduling(scheduling_id: uuid.UUID) -> QuerySet[Payment]:
-    """Todas as cobranças já geradas pra um agendamento (pode ter mais de uma, ex: Pix expirado)."""
-    return Payment.objects.select_related(*DEFAULT_RELATED).filter(scheduling_id=scheduling_id).order_by("-created_at")
+def get_payments_by_scheduling(scheduling_id: uuid.UUID) -> Payment:
+    """Retorna um Pagamento associado a determinado Agendamento."""
+    return Payment.objects.select_related(*DEFAULT_RELATED).get(scheduling_id=scheduling_id)
 
 
 def get_active_payment_for_scheduling(scheduling_id: uuid.UUID) -> Optional[Payment]:

@@ -149,10 +149,8 @@ def asaas_webhook_router(request: HttpRequest):
     payload = json.loads(request.body)
 
     try:
-        process_asaas_webhook(payload)
+        process_asaas_webhook(payload=payload)
     except PaymentNotFound:
-        # Não achar o payment local não é erro do Asaas — devolve 200 pra
-        # ele não ficar reenviando o evento em loop.
         pass
 
     return 200, {"received": True}

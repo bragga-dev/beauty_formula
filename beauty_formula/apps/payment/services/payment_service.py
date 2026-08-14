@@ -35,6 +35,7 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
     PaymentNotRefundable,
     
 )
+from beauty_formula.apps.payment.tasks.send_payment_request import send_payment_request
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
@@ -122,13 +123,6 @@ def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str, cpf_
             net_value=response.get("netValue"),
         )
     except Exception:
-        # A cobrança já existe na Asaas nesse ponto. Se não conseguirmos
-        # persistir localmente (erro de banco, etc.), sem isso ela fica
-        # órfã: cliente pode acabar pagando algo que o sistema não sabe
-        # que existe, e get_active_payment_for_scheduling nunca vai achar
-        # pra evitar duplicidade. Tenta cancelar na Asaas pra compensar;
-        # se o cancelamento também falhar, ao menos loga pra reconciliação
-        # manual em vez de mascarar o problema.
         try:
             asaas.cancel_payment(response["id"])
         except AsaasAPIError:
@@ -146,15 +140,8 @@ def create_charge_for_scheduling(scheduling: Scheduling, billing_type: str, cpf_
             payment = attach_pix_data(payment, pix_qr_code=qrcode.get("encodedImage"), pix_copy_paste=qrcode.get("payload"),)
 
         except AsaasAPIError:
-            # A cobrança já foi criada na Asaas e já está persistida aqui —
-            # não é caso de propagar o erro (isso já derrubaria a resposta
-            # pro cliente com uma cobrança "fantasma": presa no banco sem
-            # PIX, e sem chance de recriar por causa do
-            # get_active_payment_for_scheduling). Só marca fora de sincronia
-            # pra reconciliar depois (job/consulta posterior via
-            # get_payment/get_pix_qrcode) e segue devolvendo a cobrança.
             payment = mark_payment_out_of_sync(payment)
-
+    send_payment_request.delay(user_id=scheduling.client.user.id, payment_id=payment.id)
     return payment
 
 

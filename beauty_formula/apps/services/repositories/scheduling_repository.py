@@ -104,8 +104,14 @@ def cancel_scheduling(scheduling: Scheduling, *, reason: str, canceled_by: User)
 
 
 @transaction.atomic
+def confirm_scheduling(scheduling: Scheduling) -> Scheduling:
+    """Confirma um atendimento."""
+    scheduling.confirm()
+    return scheduling
+
+@transaction.atomic
 def complete_scheduling(scheduling: Scheduling) -> Scheduling:
-    """Conclui um atendimento (agendamento confirmado)."""
+    """Conclui um atendimento ."""
     scheduling.complete()
     return scheduling
 

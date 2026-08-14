@@ -36,7 +36,7 @@ class Payment(models.Model):
         CANCELLED = "CANCELLED", _("Cancelado")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    scheduling = models.ForeignKey('services.Scheduling', on_delete=models.PROTECT, related_name="payments_scheduling")
+    scheduling = models.OneToOneField('services.Scheduling', on_delete=models.PROTECT, related_name="payments_scheduling")
     client = models.ForeignKey('accounts.Client', on_delete=models.PROTECT, related_name="payments_client")
     asaas_payment_id = models.CharField(_("ID da cobrança no Asaas"), max_length=50, blank=True, null=True, db_index=True)
     asaas_customer_id = models.CharField(_("ID do cliente no Asaas"), max_length=50, blank=True, null=True, db_index=True)

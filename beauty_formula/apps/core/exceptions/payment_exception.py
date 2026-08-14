@@ -54,3 +54,10 @@ class PaymentNotRefundable(Exception):
             "Pix ou cartão, ainda não totalmente estornadas."
         )
         super().__init__(self.message)
+
+class SchedulingPaymentPending(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _(
+            "Este agendamento possui um pagamento pendente."
+        )
+        super().__init__(self.message)
