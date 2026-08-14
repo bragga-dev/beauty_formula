@@ -1,4 +1,3 @@
-
 import uuid
 
 from django.conf import settings
@@ -12,7 +11,7 @@ from beauty_formula.apps.core.constants.gender import Gender
 
 def employee_photo_path(instance, filename):
     ext = filename.rsplit(".", 1)[-1].lower()
-    return f"photos/{instance.id}/photo.{ext}"
+    return f"photos/{instance.id}/{uuid.uuid4().hex}.{ext}"
 
 DEFAULT_EMPLOYEE_PHOTO = "default/employee_img.jpeg"
 
@@ -56,9 +55,24 @@ class Employee(models.Model):
             except Exception:
                 pass
         return self.photo.storage.url(DEFAULT_EMPLOYEE_PHOTO)    
+
+    @property
+    def gender_label(self) -> str:
+        """
+        Rótulo legível do gênero (ex: 'Masculino'). Property no model, não
+        só na schema — assim resolve certo mesmo quando EmployeeOut é usado
+        aninhado dentro de outro schema (resolução automática via getattr,
+        que não passa pelo from_orm() custom).
+        """
+        return self.get_gender_display()
+
     
     def get_full_name(self):
-        full_name = f"{self.first_name} {self.last_name}".strip()
+        # OBS: usar `filter(None, ...)` em vez de f"{self.first_name} {self.last_name}"
+        # direto — quando os dois campos são None, o f-string vira o texto
+        # literal "None None" (truthy), e o fallback pra username/placeholder
+        # abaixo nunca era acionado.
+        full_name = " ".join(filter(None, [self.first_name, self.last_name])).strip()
         return full_name or self.username or f"Employee {self.id}"
 
     def save(self, *args, **kwargs):

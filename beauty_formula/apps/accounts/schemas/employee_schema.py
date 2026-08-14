@@ -118,7 +118,7 @@ class EmployeeUpdateIn(Schema):
                     raise ValueError("Número de telefone inválido.")
             except NumberParseException:
                 raise ValueError("Número de telefone inválido.")
-        return 
+        return v
 
 class EmployeeTeamOut(Schema):
     """
@@ -144,11 +144,44 @@ class EmployeeTeamOut(Schema):
             instagram=employee.instagram,
         )
  
- 
+    
+class EmployeeServiceLinkOut(Schema):
+    """
+    Vínculo funcionário-serviço (EmployeeService) na visão pública do
+    perfil ("Nosso Time"). Definido aqui — e não reaproveitado do schema
+    `EmployeeServiceOut` da app `services` — para não criar import
+    circular entre `accounts.schemas.employee_schema` e
+    `services.schemas.employee_service_schema` (que já importa `EmployeeOut`
+    daqui). O formato é equivalente: id do vínculo + service_id + service.
+
+    IMPORTANTE: não existe (nem deve existir) um `from_orm` customizado
+    aqui construindo instâncias item a item. O django-ninja embrulha
+    QUALQUER valor atribuído a um campo aninhado do tipo Schema num
+    `DjangoGetter` novo e roda os resolvers de novo (ex:
+    `ServiceOut.resolve_duration_minutes`) — mesmo se o valor já for uma
+    instância válida do schema. Se a gente pré-converter pra
+    EmployeeServiceLinkOut/ServiceOut antes de entregar pro schema pai,
+    o resolver tenta ler `.duration` num objeto que não tem mais esse
+    atributo e quebra com "Field required". A entrada aqui tem que ser
+    sempre o model Django cru (`EmployeeService`), resolvido em uma única
+    passada pelo Schema pai (`EmployeeTeamDetailOut.from_orm`).
+    """
+    id: uuid.UUID
+    service_id: uuid.UUID
+    service: ServiceOut
+
+
 class EmployeeTeamDetailOut(EmployeeTeamOut):
-    """Página de detalhe pública de um funcionário: card + serviços que ele presta."""
-    services: List[ServiceOut] = []
- 
+    """
+    Página de detalhe pública de um funcionário: card + serviços que ele presta.
+
+    `services` expõe o vínculo EmployeeService (não o Service puro) — assim
+    o client enxerga o `id` do vínculo além do `service_id`, útil pra
+    referenciar o vínculo específico (ex: ao filtrar horários disponíveis
+    por serviço+funcionário).
+    """
+    services: List[EmployeeServiceLinkOut] = []
+
     @classmethod
     def from_orm(cls, employee: Employee, services=None) -> "EmployeeTeamDetailOut":
         return cls(
@@ -158,7 +191,11 @@ class EmployeeTeamDetailOut(EmployeeTeamOut):
             photo_url=employee.photo_url,
             bio=employee.bio,
             instagram=employee.instagram,
-            services=[ServiceOut.from_orm(s) for s in (services or [])],
+            # Lista de EmployeeService *crus* (model Django) — não pré-
+            # converter pra EmployeeServiceLinkOut aqui. O pydantic/ninja
+            # resolve o schema aninhado (e o ServiceOut dentro dele) numa
+            # única passada, a partir dos atributos reais do model.
+            services=list(services or []),
         )
  
  
@@ -180,20 +217,10 @@ class PromoteToEmployeeIn(Schema):
  
 
 
-
-
-
-class PromoteToEmployeeIn(Schema):
-    """
-    Não utilizado no path atual (user_id vem da URL), mantido apenas
-    caso queira adicionar um campo `reason` opcional no futuro.
-    """
-    reason: Optional[str] = None
-
-
 __all__ = [
     "EmployeeOut",
     "EmployeeTeamOut",
+    "EmployeeServiceLinkOut",
     "EmployeeTeamDetailOut",
     "EmployeeTeamPageOut",
     "EmployeeCreateIn",

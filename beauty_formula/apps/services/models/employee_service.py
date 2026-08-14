@@ -9,7 +9,7 @@ class EmployeeService(models.Model):
     employee = models.ForeignKey("accounts.Employee", on_delete=models.PROTECT, related_name="service_assignments")
     service = models.ForeignKey("services.Service", on_delete=models.PROTECT, related_name="employee_assignments")
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    active = models.BooleanField(_("Ativo"), default=True)
+    is_active = models.BooleanField(_("Ativo"), default=True)
     created_at = models.DateTimeField(_("Criado em"), auto_now_add=True)
 
     def __str__(self):
@@ -21,7 +21,14 @@ class EmployeeService(models.Model):
         ordering = ["employee", "service"]
         indexes = [
             models.Index(fields=["employee", "service"]),
+            models.Index(fields=["employee", "is_active"]),
+            models.Index(fields=["service", "is_active"]),
         ]
         constraints = [
             models.UniqueConstraint(fields=["employee", "service"], name="unique_employee_service"),
         ]
+
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

@@ -7,6 +7,7 @@ from beauty_formula.apps.accounts.models.client import Client
 from beauty_formula.apps.accounts.schemas.client_schema import GenderEnum
 from django.core.files import File
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from beauty_formula.apps.core.tasks.media import delete_old_media_file
 
 
 def create_client(
@@ -55,17 +56,18 @@ def delete_client(client: Client) -> None:
 
 
 def set_client_photo(client: Client, photo: InMemoryUploadedFile) -> Client:
-    if client.photo and client.photo.name != "default/client_img.jpg":
-        client.photo.delete(save=False)
+    old_name = client.photo.name if client.photo and client.photo.name != "default/client_img.jpg" else None
     client.photo = photo
     client.save(update_fields=["photo"])
+    if old_name:
+        delete_old_media_file.delay(old_name)
     return client
 
 
 def remove_client_photo(client: Client) -> Client:
-    if client.photo and client.photo.name != "default/client_img.jpg":
-        client.photo.delete(save=False)
+    old_name = client.photo.name if client.photo and client.photo.name != "default/client_img.jpg" else None
     client.photo = "default/client_img.jpg"
     client.save(update_fields=["photo"])
+    if old_name:
+        delete_old_media_file.delay(old_name)
     return client
-

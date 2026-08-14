@@ -146,6 +146,46 @@ class UserOut(Schema):
         )
 
 
+class UserAdminOut(Schema):
+    """
+    Visão administrativa de um usuário — inclui nome de exibição e foto do
+    profile (client ou employee) quando existir, para montar tabelas/listas
+    no painel admin sem exigir uma segunda chamada por usuário.
+    """
+    id:           uuid.UUID
+    email:        str
+    role:         UserRoleEnum
+    role_label:   Optional[str] = None
+    is_trusty:    bool
+    is_active:    bool
+    date_joined:  datetime
+    created_at:   datetime
+    display_name: Optional[str] = None
+    photo_url:    Optional[str] = None
+
+    @classmethod
+    def from_orm(cls, user: User) -> "UserAdminOut":
+        profile = getattr(user, "client_profile", None) or getattr(user, "employee_profile", None)
+        display_name = None
+        photo_url = None
+        if profile is not None:
+            display_name = " ".join(filter(None, [profile.first_name, profile.last_name])).strip() or None
+            photo_url = profile.photo_url
+
+        return cls(
+            id=user.id,
+            email=user.email,
+            role=user.role,
+            role_label=user.get_role_display(),
+            is_trusty=user.is_trusty,
+            is_active=user.is_active,
+            date_joined=user.date_joined,
+            created_at=user.created_at,
+            display_name=display_name,
+            photo_url=photo_url,
+        )
+
+
 class SessionOut(Schema):
     """Representa um refresh token ativo (uma sessão/dispositivo logado)."""
     id:         int
@@ -180,6 +220,7 @@ __all__ = [
     "PasswordResetRequestIn",
     "PasswordResetConfirmIn",
     "UserOut",
+    "UserAdminOut",
     "SessionOut",
     "MessageOut",
 ]

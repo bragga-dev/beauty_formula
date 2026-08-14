@@ -40,6 +40,7 @@ from beauty_formula.apps.accounts.selectors.client_selector import (
 )
 from beauty_formula.apps.accounts.selectors.user_selector import (
     email_exists,
+    filter_users_admin,
     get_user_by_email,
     get_user_by_id,
     get_user_confirmed_by_role,
@@ -320,3 +321,12 @@ def export_user_data(user_id: uuid.UUID) -> dict:
 
     data["gerado_em"] = timezone.now().isoformat()
     return data
+
+# ── Admin: listagem ──────────────────────────────────────────────────────────
+
+def list_users_admin(search: str = None, role: str = None, is_active: bool = None):
+    """
+    Lista usuários para o painel admin com filtros combináveis.
+    Retorna QuerySet pronto para paginação na camada de router.
+    """
+    return filter_users_admin(search=search, role=role, is_active=is_active)

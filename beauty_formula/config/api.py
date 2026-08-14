@@ -5,14 +5,24 @@ from django.http import HttpRequest
 from django.http import JsonResponse
 from beauty_formula.apps.core.exceptions import PermissionDenied
 from beauty_formula.apps.accounts.api.auth import router as auth_router
+from beauty_formula.apps.accounts.api.admin import router as admin_router
 from beauty_formula.apps.accounts.api.employees import router as employees_router
+from beauty_formula.apps.services.api.service import router as services_router
+from beauty_formula.apps.services.api.employee_service import router as employee_services_router
+from beauty_formula.apps.services.api.employee_working_hours import router as employee_working_hours_router
+from beauty_formula.apps.services.api.employee_time_off import router as employee_time_off_router
+from beauty_formula.apps.services.api.scheduling import router as scheduling_router
+from beauty_formula.apps.services.api.availability import router as availability_router
+from beauty_formula.apps.services.api.average_rating import router as average_rating_router
+from beauty_formula.apps.website.api.product import router as product_router
+from beauty_formula.apps.website.api.contact import router as contact_router
+
 from django_ratelimit.exceptions import Ratelimited
 import logging
 from django.conf import settings
 logger = logging.getLogger("django")
 
 
-# from beauty_formula.apps.accounts.api.admin import router as admin_router
 from beauty_formula.apps.core.permissions.auth_classes import (
     AdminOnlyAuth,
     EmployeeOnlyAuth,
@@ -22,7 +32,7 @@ from beauty_formula.apps.core.permissions.auth_classes import (
 )
 
 api = NinjaAPI(
-    title="FÓRMULA DA BEZELA API",
+    title="FÓRMULA DA BELEZA API",
     version="1.0.0",
     description="API para agendamento de serviços de beleza.",
     auth=[JWTAuth(), AdminOnlyAuth(), EmployeeOnlyAuth(), ClientOnlyAuth(), VerifiedUserAuth(), ActiveUserAuth()],
@@ -35,10 +45,17 @@ api = NinjaAPI(
 
 
 api.add_router("/auth/", auth_router, tags=["Auth"])
+api.add_router("/admin/", admin_router, tags=["Admin"])
 api.add_router("/employees/", employees_router, tags=["Employees"])
-
-
-# api.add_router("/admin/", admin_router, tags=["Admin"])
+api.add_router("/services/", services_router, tags=["Services"])
+api.add_router("/employee-services/", employee_services_router, tags=["Employee Services"])
+api.add_router("/employee-working-hours/", employee_working_hours_router, tags=["Employee Working Hours"])
+api.add_router("/employee-time-off/", employee_time_off_router, tags=["Employee Time Off"])
+api.add_router("/scheduling/", scheduling_router, tags=["Scheduling"])
+api.add_router("/availability/", availability_router, tags=["Availability"])
+api.add_router("/average-ratings/", average_rating_router, tags=["Average Ratings"])
+api.add_router("/products/", product_router, tags=["Products"])
+api.add_router("/contacts/", contact_router, tags=["Contacts"])
 
 # ── Handlers de erro globais ──────────────────────────────────────────────────
 

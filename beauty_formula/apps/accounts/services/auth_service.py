@@ -133,12 +133,3 @@ def revoke_session(user, session_id: int) -> None:
         raise SessionNotFound()
 
     BlacklistedToken.objects.get_or_create(token=token)
-
-
-
-def refresh_access_token(refresh_token: str) -> dict:
-    try:
-        token = RefreshToken(refresh_token)
-        return {"access": str(token.access_token)}
-    except Exception:
-        raise InvalidToken()

@@ -1,12 +1,10 @@
-
-
 import os
 from storages.backends.s3boto3 import S3Boto3Storage
 
 class MediaFilesStorage(S3Boto3Storage):
     bucket_name = os.environ.get("MINIO_BUCKET_MEDIA", "beautyformulamedia")
     default_acl = "public-read"
-    file_overwrite = False
+    file_overwrite = True
     custom_domain = (
     f"{os.environ.get('MINIO_PUBLIC_URL')}/"
     f"{os.environ.get('MINIO_BUCKET_MEDIA', 'beautyformulamedia')}")
@@ -22,5 +20,4 @@ class PrivateFilesStorage(S3Boto3Storage):
     default_acl = None        
     file_overwrite = False
     querystring_auth = True   
-    querystring_expire = 300  
-
+    querystring_expire = 300

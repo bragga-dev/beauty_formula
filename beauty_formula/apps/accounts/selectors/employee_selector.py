@@ -406,7 +406,7 @@ def get_employees_by_service(service_id: UUID) -> List[Employee]:
     """
     return Employee.objects.filter(
         service_assignments__service_id=service_id,
-        service_assignments__active=True,
+        service_assignments__is_active=True,
     ).select_related('user').distinct()
 
 
@@ -425,7 +425,7 @@ def get_employees_by_services(service_ids: List[UUID]) -> List[Employee]:
     
     return Employee.objects.filter(
         service_assignments__service_id__in=service_ids,
-        service_assignments__active=True,
+        service_assignments__is_active=True,
     ).select_related('user').distinct()
 
 
@@ -437,7 +437,7 @@ def get_employees_with_services() -> List[Employee]:
         List[Employee]: Lista de funcionários com serviços
     """
     return Employee.objects.filter(
-        service_assignments__active=True
+        service_assignments__is_active=True
     ).select_related('user').distinct()
 
 
@@ -449,7 +449,7 @@ def get_employees_without_services() -> List[Employee]:
         List[Employee]: Lista de funcionários sem serviços
     """
     return Employee.objects.exclude(
-        service_assignments__active=True
+        service_assignments__is_active=True
     ).select_related('user').distinct()
 
 
@@ -463,7 +463,7 @@ def get_public_team_employees(service_id: Optional[UUID] = None) -> QuerySet:
     if service_id:
         qs = qs.filter(
             service_assignments__service_id=service_id,
-            service_assignments__active=True,
+            service_assignments__is_active=True,
         )
     return qs.distinct().order_by('first_name', 'last_name')
 
@@ -612,7 +612,7 @@ def filter_employees(
         q &= Q(birth_date__lte=birth_date_before)
     
     if service_id:
-        q &= Q(service_assignments__service_id=service_id, service_assignments__active=True)
+        q &= Q(service_assignments__service_id=service_id, service_assignments__is_active=True)
     
     # Filtros de campos preenchidos
     if has_phone is not None:
@@ -641,9 +641,9 @@ def filter_employees(
     
     if has_services is not None:
         if has_services:
-            q &= Q(service_assignments__active=True)
+            q &= Q(service_assignments__is_active=True)
         else:
-            q &= ~Q(service_assignments__active=True)
+            q &= ~Q(service_assignments__is_active=True)
     
     if not q:
         return []

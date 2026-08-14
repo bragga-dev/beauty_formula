@@ -42,7 +42,25 @@ class EmployeeWorkingHours(models.Model):
         """Validação adicional"""
         if self.start_time >= self.end_time:
             raise ValidationError(_("O horário de início deve ser antes do horário de fim."))
-    
+
+        if self.employee_id is not None:
+            overlapping = (
+                EmployeeWorkingHours.objects
+                .filter(employee_id=self.employee_id, weekday=self.weekday)
+                .exclude(pk=self.pk)
+                .filter(start_time__lt=self.end_time, end_time__gt=self.start_time)
+            )
+            if overlapping.exists():
+                raise ValidationError(
+                    _("Já existe um turno cadastrado nesse dia que se sobrepõe a esse horário.")
+                )
+
+    def save(self, *args, **kwargs):
+        # Sem isso, clean() nunca roda de verdade — o mesmo padrão já
+        # existe em EmployeeTimeOff.save(), estava faltando aqui.
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     @property
     def total_hours(self):
         """Retorna o total de horas trabalhadas no dia"""
