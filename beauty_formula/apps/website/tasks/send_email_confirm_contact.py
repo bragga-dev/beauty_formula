@@ -5,6 +5,7 @@ Tasks Celery — envio de e-mails para client anomino após envio de formulário
 import logging
 from celery import shared_task
 from datetime import datetime
+from django.conf import settings
 from beauty_formula.apps.core.emails.sender import send_html_email
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,9 @@ def send_email_confirm_contact(self, full_name: str, email: str, subject: str, m
             "message": message,
             "created_at": created_at,
             "phone": phone,
-            
+            "services_url": f"{settings.FRONTEND_URL}/servicos",
+            "instagram_url": "https://www.instagram.com/_formuladabeleza/",
+
         }
 
         send_html_email(

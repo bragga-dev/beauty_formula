@@ -10,6 +10,7 @@ from ninja import File, Router, UploadedFile
 from beauty_formula.apps.website.services.product_service import (
     create_product_for_admin,
     update_product_for_admin,
+    update_image_product_for_admin,
     delete_product_for_admin,
     deactivate_product_for_admin,
     activate_product_for_admin,
@@ -150,6 +151,25 @@ def update_product_router(request, product_id: uuid.UUID, payload: ProductUpdate
     except Exception as e:
         return 400, {"detail": str(e)}
 
+
+
+@router.patch(
+    "/update-image-product/{product_id}",
+    response={200: ProductOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Atualiza somente a imagem de um produto existente",
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def update_image_product_router(request, product_id: uuid.UUID, image: UploadedFile = File(...)):
+    try:
+        product = update_image_product_for_admin(product_id, image=image)
+        return 200, product
+    except PermissionDenied:
+        raise
+    except ProductNotFound as e:
+        return 404, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
 
 
 @router.delete(

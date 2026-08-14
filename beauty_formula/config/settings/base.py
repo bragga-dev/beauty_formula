@@ -326,6 +326,7 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="bragawebdevelopment@gmai
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 EMAIL_SUBJECT_PREFIX = "[Beauty_formula]"
 ADMINS = [("Admin", env("ADMIN_EMAIL")),]
+ADMIN_EMAIL = env("ADMIN_EMAIL")
 EMAIL_TIMEOUT = 30
 EMAIL_USE_LOCALTIME = True
 EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)

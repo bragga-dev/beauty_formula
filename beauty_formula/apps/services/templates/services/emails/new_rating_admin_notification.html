@@ -1,8 +1,8 @@
 {% extends "core/emails/base.html" %}
 
-{% block title %}Novo contato recebido — Fórmula da Beleza{% endblock %}
+{% block title %}Nova avaliação recebida — Fórmula da Beleza{% endblock %}
 
-{% block preheader %}Um novo cliente entrou em contato através do formulário do site.{% endblock %}
+{% block preheader %}Um cliente avaliou um atendimento. A avaliação aguarda sua moderação.{% endblock %}
 
 {% block extra_styles %}
 <style>
@@ -61,6 +61,14 @@
         line-height: 1.75;
     }
 
+    .stars {
+        text-align: center;
+        font-size: 30px;
+        letter-spacing: 4px;
+        color: #f5a623;
+        margin: 4px 0 14px;
+    }
+
     .message-box {
         background: #ffffff;
         border: 1px solid #f0f0f0;
@@ -80,7 +88,7 @@
 
     .highlight-badge {
         display: inline-block;
-        background: linear-gradient(135deg, #d81e2a, #b0151f);
+        background: linear-gradient(135deg, #f5a623, #d68a0e);
         color: #ffffff !important;
         font-family: Arial, Helvetica, sans-serif;
         font-size: 13px;
@@ -135,8 +143,8 @@
         border-radius: 12px;
         font-size: 12px;
         font-weight: 700;
-        background: #e8f5e9;
-        color: #2e7d32;
+        background: #fff4e0;
+        color: #b3720a;
     }
 
     @media only screen and (max-width: 600px) {
@@ -154,99 +162,88 @@
         .action-box { background: #2a1a1a !important; border-color: #d81e2a !important; }
         .action-box p { color: #e8e8e8 !important; }
         .divider { border-color: #2a2a2a !important; }
-        .status-badge { background: #1e3a1e; color: #81c784; }
+        .status-badge { background: #3a2e12; color: #f0c674; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 
-    <span class="section-label">🔔 Novo contato</span>
-    <h1 class="heading">Novo contato recebido!</h1>
+    <span class="section-label">⭐ Nova avaliação</span>
+    <h1 class="heading">Uma nova avaliação chegou!</h1>
 
     <p class="body-text">
-        Um novo cliente preencheu o formulário de contato no site da 
-        <strong>Fórmula da Beleza</strong>. Verifique os detalhes abaixo e 
-        entre em contato o mais breve possível.
+        <strong>{{ client_name }}</strong> avaliou o atendimento de
+        <strong>{{ employee_full_name }}</strong> na <strong>Fórmula da Beleza</strong>.
+        Ela ainda não está visível publicamente — revise e autorize no painel
+        para que apareça no site.
     </p>
 
     <div style="text-align: center; margin: 12px 0 20px;">
-        <span class="highlight-badge">📩 Nova mensagem</span>
+        <span class="highlight-badge">📝 Aguardando moderação</span>
     </div>
 
-    <!-- Dados do cliente -->
+    <!-- Nota -->
+    <div class="info-box" style="text-align: center;">
+        <p class="info-box-title">NOTA DADA</p>
+        <div class="stars">{{ rating_stars }}</div>
+        <p class="info-box-text">{{ rating_value }} de 5 estrelas</p>
+    </div>
+
+    <!-- Dados da avaliação -->
     <div class="info-box">
-        <p class="info-box-title">👤 Dados do cliente</p>
+        <p class="info-box-title">📋 Detalhes</p>
         <p class="info-box-text">
-            <strong>Nome:</strong> {{ full_name }}<br>
-            <strong>E-mail:</strong> <a href="mailto:{{ email }}" style="color: #d81e2a; text-decoration: none;">{{ email }}</a><br>
-            {% if phone %}
-            <strong>Telefone:</strong> <a href="tel:{{ phone }}" style="color: #d81e2a; text-decoration: none;">{{ phone }}</a><br>
-            {% endif %}
-            <strong>Data do contato:</strong> {{ created_at|date:"d/m/Y H:i" }}<br>
-            <strong>Status:</strong> <span class="status-badge">Aguardando resposta</span>
+            <strong>Cliente:</strong> {{ client_name }}<br>
+            <strong>Profissional avaliado:</strong> {{ employee_full_name }}<br>
+            <strong>Serviço:</strong> {{ service_name }}<br>
+            <strong>Status:</strong> <span class="status-badge">Aguardando moderação</span>
         </p>
     </div>
 
-    <!-- Detalhes da mensagem -->
-    <div class="info-box">
-        <p class="info-box-title">📝 Detalhes da mensagem</p>
-        <p class="info-box-text">
-            <strong>Assunto:</strong> {{ subject }}
-        </p>
-    </div>
-
-    <!-- Conteúdo da mensagem -->
+    {% if comment %}
+    <!-- Comentário -->
     <div class="message-box">
         <p style="font-size: 13px; color: #999; margin-bottom: 8px; font-style: normal;">
-            <strong>Conteúdo da mensagem:</strong>
+            <strong>Comentário do cliente:</strong>
         </p>
         <p>
-            "{{ message }}"
+            "{{ comment }}"
         </p>
     </div>
+    {% endif %}
 
     <hr class="divider">
 
     <!-- Ações rápidas para o admin -->
     <div class="action-box">
         <p style="font-weight: 700; margin-bottom: 8px; color: #d81e2a;">
-            ⚡ Ações rápidas recomendadas
+            ⚡ Ação recomendada
         </p>
         <p>
-            1. 📞 Retornar o contato via telefone ou WhatsApp<br>
-            2. 📧 Responder o e-mail do cliente<br>
-            3. ✅ Atualizar o status do contato no painel
+            Revise o conteúdo da avaliação e, se estiver adequada, autorize-a
+            para que passe a contar na média pública do serviço e do
+            profissional.
         </p>
         <div style="text-align: center; margin-top: 16px;">
             <!--[if mso]>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ admin_contacts_url }}" style="height:48px;v-text-anchor:middle;width:200px;" arcsize="50%" stroke="f" fillcolor="#d81e2a">
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ admin_ratings_url }}" style="height:48px;v-text-anchor:middle;width:220px;" arcsize="50%" stroke="f" fillcolor="#d81e2a">
                 <w:anchorlock/>
-                <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">VER NO PAINEL</center>
+                <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">MODERAR AVALIAÇÃO</center>
             </v:roundrect>
             <![endif]-->
             <!--[if !mso]><!-->
-            <a href="{{ admin_contacts_url }}" class="cta-btn">
-                Ver no Painel Administrativo
+            <a href="{{ admin_ratings_url }}" class="cta-btn">
+                Moderar no Painel
             </a>
             <!--<![endif]-->
         </div>
     </div>
 
-    <!-- Informações adicionais -->
-    <div class="info-box" style="background: #f5f0f0; border: 1px solid #fdecec;">
-        <p class="info-box-title">💡 Dica de atendimento</p>
-        <p class="info-box-text">
-            Lembre-se de responder este contato em até <strong>24 horas</strong> 
-            para garantir uma excelente experiência ao cliente. Um atendimento 
-            rápido e personalizado faz toda a diferença!
-        </p>
-    </div>
-
     <!-- Rodapé administrativo -->
     <div style="text-align: center; margin-top: 32px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
         <p style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #999; margin: 0;">
-            🏢 Fórmula da Beleza - Atendimento ao Cliente<br>
+            🏢 Fórmula da Beleza - Moderação de Avaliações<br>
             Este é um e-mail automático enviado para a equipe administrativa
         </p>
     </div>
