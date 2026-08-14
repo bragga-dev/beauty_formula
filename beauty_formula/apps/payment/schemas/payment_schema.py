@@ -1,5 +1,3 @@
-
-
 from __future__ import annotations
 import uuid
 from datetime import date, datetime
@@ -63,6 +61,11 @@ class PaymentCreateSchema(Schema):
 class PaymentResponseSchema(Schema):
     id: uuid.UUID
     scheduling_id: uuid.UUID
+    client_id: uuid.UUID
+    client_name: str
+    client_email: str
+    service_name: Optional[str] = None
+    scheduled_time: Optional[datetime] = None
     asaas_payment_id: Optional[str] = None
     asaas_customer_id: Optional[str] = None
     value: Decimal
@@ -83,9 +86,15 @@ class PaymentResponseSchema(Schema):
 
     @classmethod
     def from_orm(cls, payment: Payment) -> "PaymentResponseSchema":
+        client_full_name = " ".join(filter(None, [payment.client.first_name, payment.client.last_name])).strip()
         return cls(
             id=payment.id,
             scheduling_id=payment.scheduling_id,
+            client_id=payment.client_id,
+            client_name=client_full_name or payment.client.user.email,
+            client_email=payment.client.user.email,
+            service_name=getattr(payment.scheduling.service, "name", None) if payment.scheduling_id else None,
+            scheduled_time=getattr(payment.scheduling, "scheduled_time", None) if payment.scheduling_id else None,
             asaas_payment_id=payment.asaas_payment_id,
             asaas_customer_id=payment.asaas_customer_id,
             value=payment.value,
@@ -120,6 +129,7 @@ class PaymentStatusUpdateSchema(Schema):
 
 class PaymentFilterSchema(Schema):
     client_id: Optional[uuid.UUID] = None
+    search: Optional[str] = None
     status: Optional[PaymentStatusEnum] = None
     billing_type: Optional[PaymentBillingTypeEnum] = None
     start_date: Optional[date] = None

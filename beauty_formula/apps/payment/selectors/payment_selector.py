@@ -10,7 +10,7 @@ from django.db.models import Q, QuerySet
 
 from beauty_formula.apps.payment.models.payment_model import Payment
 
-DEFAULT_RELATED = ("scheduling", "client", "client__user")
+DEFAULT_RELATED = ("scheduling", "scheduling__service", "client", "client__user")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -58,6 +58,7 @@ def get_payments_by_client(client_id: uuid.UUID) -> QuerySet[Payment]:
 
 def filter_payments(
     client_id: Optional[uuid.UUID] = None,
+    search: Optional[str] = None,
     status: Optional[str] = None,
     billing_type: Optional[str] = None,
     start_date: Optional[date] = None,
@@ -69,6 +70,12 @@ def filter_payments(
 
     if client_id:
         q &= Q(client_id=client_id)
+    if search:
+        q &= (
+            Q(client__first_name__icontains=search)
+            | Q(client__last_name__icontains=search)
+            | Q(client__user__email__icontains=search)
+        )
     if status:
         q &= Q(status=status)
     if billing_type:

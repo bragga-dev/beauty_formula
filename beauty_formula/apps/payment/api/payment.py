@@ -12,7 +12,7 @@ from uuid import UUID
 from django.conf import settings
 from django.http import HttpRequest
 from django_ratelimit.decorators import ratelimit
-from ninja import Router
+from ninja import Query, Router
 
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.schemas.user_schema import MessageOut
@@ -120,9 +120,10 @@ def get_my_payment_router(request, payment_id: UUID):
     auth=AdminOnlyAuth(),
     summary="Admin lista todas as cobranças, com filtros",
 )
-def list_all_payments_router(request, filters: PaymentFilterSchema = ..., page: int = 1, page_size: int = PAGE_SIZE_DEFAULT):
+def list_all_payments_router(request, filters: PaymentFilterSchema = Query(...), page: int = 1, page_size: int = PAGE_SIZE_DEFAULT):
     payments_qs = filter_payments(
         client_id=filters.client_id,
+        search=filters.search,
         status=filters.status.value if filters.status else None,
         billing_type=filters.billing_type.value if filters.billing_type else None,
         start_date=filters.start_date,
