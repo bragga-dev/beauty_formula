@@ -24,21 +24,22 @@ from beauty_formula.apps.services.models.service import Service
 
 @transaction.atomic
 def create_scheduling(
-    *, service: Service, client: Client, employee: Employee, scheduled_time: datetime, notes: Optional[str] = None
+    *,
+    service: Service,
+    client: Client,
+    employee: Employee,
+    scheduled_time: datetime,
+    notes: Optional[str] = None,
+    status: Optional[str] = None,
 ) -> Scheduling:
-    """
-    Cria um novo agendamento. `price_at_booking`/`duration_at_booking` são
-    preenchidos automaticamente pelo `Scheduling.save()` a partir do
-    `service`. `full_clean()` (chamado no save do model) valida conflito
-    de horário do funcionário — convertido aqui pra `SchedulingConflict`,
-    a exceção de domínio usada pelas camadas acima.
-    """
+   
     scheduling = Scheduling(
         service=service,
         client=client,
         employee=employee,
         scheduled_time=scheduled_time,
         notes=notes,
+        **({"status": status} if status is not None else {}),
     )
     try:
         scheduling.save()
@@ -97,8 +98,13 @@ def update_scheduling(
 
 
 @transaction.atomic
-def cancel_scheduling(scheduling: Scheduling, *, reason: str, canceled_by: User) -> Scheduling:
-    """Cancela o agendamento (usa o método de domínio já definido no model)."""
+def cancel_scheduling(scheduling: Scheduling, *, reason: str, canceled_by: Optional[User]) -> Scheduling:
+    """
+    Cancela o agendamento (usa o método de domínio já definido no model).
+    `canceled_by=None` é válido — usado por cancelamentos automáticos do
+    sistema, como `expire_unpaid_scheduling`, que não têm um usuário por
+    trás da ação.
+    """
     scheduling.cancel(reason=reason, canceled_by=canceled_by)
     return scheduling
 
@@ -132,32 +138,21 @@ def reschedule_scheduling(
     scheduled_time: datetime,
     notes: Optional[str] = None,
 ) -> Scheduling:
-    """
-    Reagenda um atendimento: cria um novo agendamento (já CONFIRMED, via
-    `create_scheduling`) e marca o atual como RESCHEDULED, vinculando os
-    dois registros. Não reaproveita/edita o registro atual — o histórico
-    original é preservado intacto.
-    """
+  
     new_scheduling = create_scheduling(
         service=service,
         client=scheduling.client,
         employee=employee,
         scheduled_time=scheduled_time,
         notes=notes if notes is not None else scheduling.notes,
+        status=Scheduling.SchedulingStatus.CONFIRMED,
     )
-    # `mark_as_rescheduled` valida a transição de status internamente e
-    # levanta `InvalidSchedulingStatusTransition` se o agendamento não
-    # estiver mais CONFIRMED — deixamos propagar como está, a camada de
-    # service é quem decide como traduzir isso pra resposta HTTP.
+    
     scheduling.mark_as_rescheduled(new_scheduling)
     return new_scheduling
 
 
 @transaction.atomic
 def delete_scheduling(scheduling: Scheduling) -> None:
-    """
-    Exclui o agendamento permanentemente do banco.
-    Use com cautela — prefira cancelar (soft delete) na maioria dos casos,
-    já que isso apaga o histórico do agendamento de vez.
-    """
+   
     scheduling.delete()

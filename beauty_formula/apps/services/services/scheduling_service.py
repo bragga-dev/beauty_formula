@@ -1,25 +1,44 @@
 """
 Regras de negócio de Scheduling (agendamentos).
 
-Fluxo geral (simplificado — sem confirmação manual nem status "em
-andamento"):
-- Todo agendamento já nasce CONFIRMED: a disponibilidade e os conflitos
-  já são validados na criação, então não existe um estado pendente
-  aguardando aprovação.
-- Cliente cria/edita/cancela/reagenda os PRÓPRIOS agendamentos.
+Fluxo geral:
+- Todo agendamento nasce CREATED: é uma reserva de horário aguardando
+  pagamento. Enquanto CREATED, ele NÃO ocupa a agenda do funcionário de
+  verdade (ver BUSY_STATUSES em scheduling_selector) — só bloqueia o
+  horário para outros clientes a partir do momento em que é CONFIRMED.
+- A confirmação (CREATED -> CONFIRMED) acontece automaticamente quando o
+  pagamento vinculado é identificado como recebido — normalmente pelo
+  webhook da Asaas (`confirm_scheduling_after_payment`, chamada por
+  `payment_service.process_asaas_webhook`/`sync_payment_with_asaas`).
+  Também existe um endpoint manual (`confirm_scheduling_for_client`) como
+  fallback, caso o cliente já tenha pago mas o webhook ainda não tenha
+  processado.
+- Cliente cria/edita/cancela/reagenda os PRÓPRIOS agendamentos. Uma
+  reserva CREATED pode ser cancelada livremente (ainda não foi paga);
+  uma vez CONFIRMED, vale a janela mínima de cancelamento.
 - Funcionário conclui o atendimento, marca não comparecimento ou cancela
   os agendamentos que atende.
 - Admin tem visão total: lista qualquer agendamento, cancela, e é o
   único que pode excluir (hard delete) um registro.
 - Reagendar NÃO altera o registro atual: ele é marcado como RESCHEDULED
-  e um novo agendamento (já CONFIRMED) é criado em seu lugar, preservando
-  o histórico para auditoria e relatórios.
+  e um novo agendamento (já CONFIRMED — o reagendamento parte de um
+  agendamento que já foi pago, não é cobrado de novo) é criado em seu
+  lugar, preservando o histórico para auditoria e relatórios.
 """
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
+from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+logger = logging.getLogger(__name__)
+
+# Quanto tempo uma reserva (Scheduling CREATED) fica esperando pagamento
+# antes de ser liberada automaticamente (`expire_unpaid_scheduling`).
+SCHEDULING_RESERVATION_TTL_MINUTES = getattr(settings, "SCHEDULING_RESERVATION_TTL_MINUTES", 30)
 
 
 from beauty_formula.apps.payment.models.payment_model import Payment
@@ -69,8 +88,7 @@ from beauty_formula.apps.services.tasks.send_confirm_scheduling_to_employee impo
 from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_client import send_cancel_scheduling_to_client
 from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_employee import send_cancel_scheduling_to_employee
 from beauty_formula.apps.services.tasks.send_scheduling_completed_thanks import send_scheduling_completed_thanks
-
-
+from beauty_formula.apps.services.tasks.expire_unpaid_scheduling import expire_unpaid_scheduling
 from beauty_formula.apps.services.selectors.average_rating_selector import get_rating_for_client_service_employee
 
 FINAL_STATUSES = [
@@ -80,8 +98,12 @@ FINAL_STATUSES = [
     Scheduling.SchedulingStatus.RESCHEDULED,
 ]
 from beauty_formula.apps.payment.services.payment_service import cancel_payment_for_scheduling
-from beauty_formula.apps.payment.selectors.payment_selector import get_payments_by_scheduling
-from beauty_formula.apps.core.exceptions.payment_exception import (SchedulingPaymentPending)
+from beauty_formula.apps.payment.selectors.payment_selector import get_active_payment_for_scheduling
+from beauty_formula.apps.core.exceptions.payment_exception import SchedulingPaymentPending
+
+# Status de pagamento que a Asaas usa pra indicar que o dinheiro já entrou
+# (mesmo conjunto usado por payment_service._REFUNDABLE_STATUSES).
+PAID_PAYMENT_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
 
 
 
@@ -198,28 +220,78 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
         scheduled_time=data.scheduled_time,
         notes=data.notes,
     )
-    
+
     service.increment_bookings()
+
+    expire_unpaid_scheduling.apply_async(
+        kwargs={"scheduling_id": str(scheduling.id)},
+        eta=timezone.now() + timedelta(minutes=SCHEDULING_RESERVATION_TTL_MINUTES),
+    )
+
     return SchedulingOut.from_orm(scheduling)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Confirmação
 # ═══════════════════════════════════════════════════════════════════════════════
-def confirm_scheduling_for_client(user_id: UUID, scheduling_id:UUID) -> SchedulingOut:
-    """Confirma um agendamento mediante pagamento alterando o Status de Criado para Confirmado"""
+
+def _confirm_scheduling(scheduling: Scheduling) -> Scheduling:
+    """
+    Efetiva a transição CREATED -> CONFIRMED e dispara os e-mails de
+    confirmação. Compartilhado entre o fluxo automático (webhook/sync de
+    pagamento) e o endpoint manual do cliente — ambos precisam do mesmo
+    efeito colateral (repo + notificações).
+    """
+    scheduling_confirmed = confirm_scheduling_repo(scheduling)
+    send_confirm_scheduling_to_client.delay(
+        user_id=scheduling_confirmed.client.user.id, scheduling_id=scheduling_confirmed.id
+    )
+    send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling_confirmed.id)
+    return scheduling_confirmed
+
+
+@transaction.atomic
+def confirm_scheduling_for_client(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
+    """
+    Confirma manualmente um agendamento (CREATED -> CONFIRMED) mediante
+    pagamento já recebido.
+
+    Fallback pro cliente: normalmente a confirmação acontece sozinha via
+    webhook da Asaas (`confirm_scheduling_after_payment`) assim que o
+    pagamento é identificado como recebido — este endpoint serve pro caso
+    do cliente já ter pago mas o webhook ainda não ter processado.
+    """
     scheduling = _get_own_client_scheduling(user_id=user_id, scheduling_id=scheduling_id)
-    if scheduling.SchedulingStatus != Scheduling.SchedulingStatus.CREATED:
+    if scheduling.status != Scheduling.SchedulingStatus.CREATED:
         raise SchedulingCannotBeConfirmed()
-    
-    payment = get_payments_by_scheduling(scheduling_id=scheduling_id)
-    if not payment.PaymentStatus != Payment.PaymentStatus.RECEIVED:
+
+    payment = get_active_payment_for_scheduling(scheduling_id=scheduling_id)
+    if payment is None or payment.status not in PAID_PAYMENT_STATUSES:
         raise SchedulingPaymentPending()
 
-    scheduling_confirmed = confirm_scheduling_repo(scheduling)
-    send_confirm_scheduling_to_client.delay(user_id=user_id, scheduling_id=scheduling_confirmed.id)
-    send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling_confirmed.id)
+    scheduling_confirmed = _confirm_scheduling(scheduling)
     return SchedulingOut.from_orm(scheduling_confirmed)
+
+
+@transaction.atomic
+def confirm_scheduling_after_payment(scheduling_id: UUID) -> Optional[Scheduling]:
+    """
+    Confirma um agendamento automaticamente assim que o pagamento
+    vinculado é identificado como recebido. Chamada pelo
+    `payment_service` (webhook da Asaas e sincronização manual do admin),
+    nunca diretamente por uma rota.
+
+    Idempotente e silenciosa por design: se o agendamento não existe mais,
+    ou já não está mais CREATED (já confirmado por uma execução anterior,
+    cancelado pelo cliente antes do pagamento cair, etc.), não faz nada —
+    evita erro em reentregas de webhook da Asaas ou corrida com o
+    endpoint manual (`confirm_scheduling_for_client`).
+    """
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None or scheduling.status != Scheduling.SchedulingStatus.CREATED:
+        return scheduling
+
+    return _confirm_scheduling(scheduling)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Listagem
@@ -292,17 +364,18 @@ def update_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, data: S
     """
     Cliente edita um agendamento próprio.
 
-    Como todo agendamento já nasce CONFIRMED e ocupa a agenda do
-    funcionário desde a criação, mudar serviço/funcionário/horário aqui
-    passaria por trás da máquina de estados — esse tipo de alteração deve
-    usar o endpoint de reagendamento (`reschedule_own_scheduling_for_client`),
-    que preserva o histórico do agendamento original. Este endpoint só
-    permite editar campos que não afetam a agenda, como `notes`.
+    Uma vez CONFIRMED, o agendamento ocupa a agenda do funcionário — mudar
+    serviço/funcionário/horário aqui passaria por trás da máquina de
+    estados — esse tipo de alteração deve usar o endpoint de
+    reagendamento (`reschedule_own_scheduling_for_client`), que preserva
+    o histórico do agendamento original. Este endpoint só permite editar
+    campos que não afetam a agenda, como `notes` — permitido tanto em
+    CREATED (aguardando pagamento) quanto em CONFIRMED.
     """
     scheduling = _get_own_client_scheduling(user_id, scheduling_id)
 
-    if scheduling.status != Scheduling.SchedulingStatus.CONFIRMED:
-        raise SchedulingCannotBeModified(_("Só é possível editar um agendamento enquanto ele estiver confirmado."))
+    if scheduling.status not in {Scheduling.SchedulingStatus.CREATED, Scheduling.SchedulingStatus.CONFIRMED}:
+        raise SchedulingCannotBeModified(_("Só é possível editar um agendamento enquanto ele estiver aguardando pagamento ou confirmado."))
 
     if data.service_id is not None or data.employee_id is not None or data.scheduled_time is not None:
         raise SchedulingCannotBeModified(_("Para trocar serviço, funcionário ou horário, use o reagendamento."))
@@ -405,10 +478,10 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Transições de status (funcionário/admin)
 #
-# Sem confirmação manual nem "em andamento": todo agendamento já nasce
-# CONFIRMED. Daqui só se sai por COMPLETED, CANCELED, NO_SHOW ou
-# RESCHEDULED — a checagem em si é feita pela máquina de estados do
-# model (`Scheduling.can_transition_to`), essas funções só resolvem o
+# Funcionário/admin só atuam a partir de CONFIRMED (agendamento já pago):
+# daqui só se sai por COMPLETED, CANCELED, NO_SHOW ou RESCHEDULED — a
+# checagem em si é feita pela máquina de estados do model
+# (`Scheduling.can_transition_to`), essas funções só resolvem o
 # agendamento do funcionário e traduzem a falha de transição pra
 # exceção de domínio esperada pelo router.
 # ═══════════════════════════════════════════════════════════════════════════════

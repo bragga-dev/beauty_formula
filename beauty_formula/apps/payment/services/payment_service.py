@@ -36,7 +36,7 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
     
 )
 from beauty_formula.apps.payment.tasks.send_payment_request import send_payment_request
-from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
+from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound, SchedulingConflict
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
 from beauty_formula.apps.accounts.repositories.client_repository import (
@@ -45,6 +45,7 @@ from beauty_formula.apps.accounts.repositories.client_repository import (
 from beauty_formula.apps.core.validators.validate_cpf_cnpj import validate_cnpj, validate_cpf
 
 _REFUNDABLE_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
+_PAID_PAYMENT_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +171,9 @@ def sync_payment_with_asaas(payment_id) -> Payment:
         raise PaymentNotFound()
 
     response = AsaasClient().get_payment(payment_id=payment.asaas_payment_id)
-    return update_payment_status(payment=payment, status=response["status"])
+    payment = update_payment_status(payment=payment, status=response["status"])
+    _confirm_scheduling_if_paid(payment)
+    return payment
 
 
 def refund_payment(*, payment_id, value=None, description: str | None = None) -> Payment:
@@ -221,11 +224,51 @@ def get_own_payment_detail(*, user_id, payment_id) -> Payment:
     return payment
 
 
+
+
+def _confirm_scheduling_if_paid(payment: Payment) -> None:
+    """
+    Se o pagamento acabou de virar RECEIVED/CONFIRMED, confirma o
+    agendamento vinculado (CREATED -> CONFIRMED).
+
+    Import local pra evitar import circular: scheduling_service já
+    importa deste módulo (`cancel_payment_for_scheduling`) no nível do
+    módulo, então importar scheduling_service aqui em cima criaria um
+    ciclo.
+
+    Nunca deixa uma falha de confirmação derrubar o processamento do
+    pagamento em si (webhook precisa responder 200 rápido pra Asaas não
+    ficar reentregando) — só loga pra reconciliação manual. O caso mais
+    provável de falhar aqui é `SchedulingConflict`: o horário foi
+    ocupado por outro agendamento confirmado enquanto este esperava
+    pagamento — dinheiro recebido, mas o horário já era. Precisa de
+    estorno manual (endpoint de refund) e contato com o cliente.
+    """
+    if payment.status not in _PAID_PAYMENT_STATUSES:
+        return
+
+    from beauty_formula.apps.services.services.scheduling_service import confirm_scheduling_after_payment
+
+    try:
+        confirm_scheduling_after_payment(scheduling_id=payment.scheduling_id)
+    except SchedulingConflict:
+        logger.error(
+            "Pagamento %s recebido mas o agendamento %s não pôde ser confirmado "
+            "(horário não está mais disponível) — requer estorno manual e "
+            "reconciliação com o cliente.",
+            payment.id, payment.scheduling_id,
+        )
+
+
 def process_asaas_webhook(payload: dict) -> Payment:
     """
     Aplica o status vindo do webhook do Asaas. O payload já traz o objeto
     `payment` completo com `status` atualizado — não precisamos reconstruir
     o status a partir do nome do evento (`event`), só usar o que já veio.
+
+    Quando o novo status indica pagamento recebido, confirma o agendamento
+    vinculado (ver `_confirm_scheduling_if_paid`) — é isso que efetiva a
+    transição CREATED -> CONFIRMED no fluxo normal.
     """
     payment_data = payload.get("payment") or {}
     asaas_payment_id = payment_data.get("id")
@@ -238,7 +281,9 @@ def process_asaas_webhook(payload: dict) -> Payment:
     if payment is None:
         raise PaymentNotFound()
 
-    return update_payment_status(payment=payment, status=status)
+    payment = update_payment_status(payment=payment, status=status)
+    _confirm_scheduling_if_paid(payment)
+    return payment
 
 
 def cancel_payment_for_scheduling(scheduling_id) -> None:
@@ -272,5 +317,3 @@ def cancel_payment_for_scheduling(scheduling_id) -> None:
         return
 
     update_payment_status(payment, status=Payment.PaymentStatus.CANCELLED)
-
-

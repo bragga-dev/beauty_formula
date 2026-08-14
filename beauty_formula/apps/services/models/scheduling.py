@@ -21,8 +21,8 @@ class Scheduling(models.Model):
 
     ALLOWED_TRANSITIONS = \
     {
-        SchedulingStatus.CREATED: {SchedulingStatus.CONFIRMED},
-        
+        SchedulingStatus.CREATED: {SchedulingStatus.CONFIRMED, SchedulingStatus.CANCELED},
+
         SchedulingStatus.CONFIRMED: 
         {
             SchedulingStatus.COMPLETED,
@@ -142,7 +142,18 @@ class Scheduling(models.Model):
 
     @property
     def can_be_canceled_by_client(self):
-        """Verifica se o cliente pode cancelar"""
+        """
+        Verifica se o cliente pode cancelar.
+
+        Uma reserva CREATED (ainda não paga) pode ser cancelada a
+        qualquer momento — a janela mínima de 2h só se aplica a partir
+        do momento em que o agendamento é efetivamente CONFIRMED, pois
+        antes disso o horário nem está de fato ocupado (ver BUSY_STATUSES
+        em scheduling_selector).
+        """
+        if self.status == self.SchedulingStatus.CREATED:
+            return True
+
         if self.status != self.SchedulingStatus.CONFIRMED:
             return False
 
@@ -152,7 +163,7 @@ class Scheduling(models.Model):
     @property
     def can_be_canceled_by_admin(self):
         """Verifica se o admin/funcionário pode cancelar"""
-        return self.status == self.SchedulingStatus.CONFIRMED
+        return self.status in {self.SchedulingStatus.CREATED, self.SchedulingStatus.CONFIRMED}
 
     @property
     def can_be_rescheduled(self):
