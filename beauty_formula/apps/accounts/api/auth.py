@@ -4,10 +4,16 @@ Login endpoint — autenticação de usuários.
 import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django_ratelimit.decorators import ratelimit
 from ninja import File, Router, UploadedFile
 from ninja_jwt.authentication import JWTAuth
+
+from beauty_formula.apps.core.tokens.cookies import (
+    REFRESH_COOKIE_NAME,
+    set_refresh_cookie,
+    clear_refresh_cookie,
+)
 
 from beauty_formula.apps.accounts.services.auth_service import (
     change_password,
@@ -56,11 +62,11 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     MessageOut,
     PasswordResetConfirmIn,
     PasswordResetRequestIn,
-    RefreshIn,
     RegisterIn,
     RegisterEmployeeIn,
     SessionOut,
-    TokenOut,
+    AccessTokenOut,
+    EmployeeCreatedOut,
 )
 
 from beauty_formula.apps.accounts.schemas.me_schema import (
@@ -130,47 +136,71 @@ def me_router(request):
 
 
 
-@router.post("/login", response={200: TokenOut, 401: MessageOut, 403: MessageOut}, auth=None, summary="Login")
+@router.post(
+    "/login",
+    response={200: AccessTokenOut, 401: MessageOut, 403: MessageOut},
+    auth=None,
+    summary="Login",
+    description="O refresh token vai num cookie httpOnly — não aparece no corpo da resposta nem fica acessível via JS.",
+)
 @ratelimit(key="ip", rate="5/m", block=True)
 def login_router(request, payload: LoginIn):
     try:
         tokens = login_user(payload.email, payload.password)
-        return 200, tokens
     except EmailNotVerified:
         return 403, {"detail": "E-mail não verificado."}
     except InvalidCredentials:
         return 401, {"detail": "E-mail ou senha inválidos."}
-    
+
+    response = JsonResponse({"access": tokens["access"]}, status=200)
+    set_refresh_cookie(response, tokens["refresh"])
+    return response
 
 @router.post(
     "/google",
-    response={200: TokenOut, 201: TokenOut, 401: MessageOut},
+    response={200: AccessTokenOut, 201: AccessTokenOut, 401: MessageOut},
     auth=None,
     summary="Login/Cadastro de Cliente via Google",
     description=(
         "Recebe o id_token (credential) emitido pelo Google Identity Services "
         "no frontend. Se já existir um usuário com o e-mail da conta Google, "
         "efetua login (200). Caso contrário, cria um novo Cliente já verificado (201). "
-        "Sempre cadastra/loga com role 'client'."
+        "Sempre cadastra/loga com role 'client'. O refresh token vai num cookie httpOnly."
     ),
 )
 @ratelimit(key="ip", rate="10/m", block=True)
 def google_login_router(request, payload: GoogleLoginIn):
     try:
         tokens, created = login_or_register_client_google(payload.id_token)
-        return (201 if created else 200), tokens
     except InvalidGoogleToken as e:
         return 401, {"detail": str(e)}
 
+    response = JsonResponse({"access": tokens["access"]}, status=201 if created else 200)
+    set_refresh_cookie(response, tokens["refresh"])
+    return response
 
-@router.post("/logout", response={200: MessageOut, 401: MessageOut},  auth=AllRolesAuth(), summary="Logout (blacklista o refresh token)",)
+
+@router.post(
+    "/logout",
+    response={200: MessageOut},
+    auth=AllRolesAuth(),
+    summary="Logout (blacklista o refresh token)",
+    description="Lê o refresh do cookie httpOnly, blacklista e limpa o cookie. Idempotente: mesmo sem cookie válido, retorna sucesso.",
+)
 @ratelimit(key="user", rate="30/m", block=True)
-def logout_router(request, payload: RefreshIn):
-    try:
-        logout_user(payload.refresh)
-        return 200, {"detail": "Logout realizado com sucesso."}
-    except InvalidToken as e:
-        return 401, {"detail": str(e)}
+def logout_router(request):
+    refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+    if refresh_token:
+        try:
+            logout_user(refresh_token)
+        except InvalidToken:
+            # Cookie presente mas token já expirado/blacklistado — não há
+            # nada a mais a revogar, só encerra a sessão do lado do cliente.
+            pass
+
+    response = JsonResponse({"detail": "Logout realizado com sucesso."}, status=200)
+    clear_refresh_cookie(response)
+    return response
 
 
 @router.post(
@@ -237,29 +267,46 @@ def password_reset_confirm_router(request, payload: PasswordResetConfirmIn):
         return 400, {"detail": "Token inválido ou expirado."}
 
 
-@router.post("/refresh", response={200: dict, 401: MessageOut}, auth=None, summary="Renovar access token",)
-@ratelimit(key="ip", rate="30/m",  block=True,)
-def refresh_router(request, payload: RefreshIn):
+@router.post(
+    "/refresh",
+    response={200: AccessTokenOut, 401: MessageOut},
+    auth=None,
+    summary="Renovar access token",
+    description="Lê o refresh token do cookie httpOnly (não vai mais no body). A cada uso, rotaciona: o refresh antigo é blacklistado e um novo é setado no cookie.",
+)
+@ratelimit(key="ip", rate="30/m", block=True)
+def refresh_router(request):
+    refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+    if not refresh_token:
+        return 401, {"detail": "Sessão expirada. Faça login novamente."}
+
     try:
-        data = refresh_access_token(payload.refresh)
-        return 200, data
+        data = refresh_access_token(refresh_token)
     except InvalidToken as e:
         return 401, {"detail": str(e)}
-    
 
-@router.post("/register", response={201: TokenOut, 409: MessageOut}, auth=None, summary="Cadastro de Cliente",)
-@ratelimit(key="ip", rate="5/h", block=True,)
+    response = JsonResponse({"access": data["access"]}, status=200)
+    if "refresh" in data:
+        set_refresh_cookie(response, data["refresh"])
+    return response
+
+@router.post(
+    "/register",
+    response={201: AccessTokenOut, 409: MessageOut},
+    auth=None,
+    summary="Cadastro de Cliente",
+    description="Cria o usuário (inativo até confirmar e-mail) e dispara e-mail de verificação em background. Refresh token vai em cookie httpOnly.",
+)
+@ratelimit(key="ip", rate="5/h", block=True)
 def register_router(request, payload: RegisterIn):
-    """
-    Cria o usuário com role "client" e retorna tokens JWT.
-    Um e-mail de verificação é enviado em background via Celery.
-    """
     try:
         tokens = register_user_default_client(payload)
-        return 201, tokens
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
-    
+
+    response = JsonResponse({"access": tokens["access"]}, status=201)
+    set_refresh_cookie(response, tokens["refresh"])
+    return response
 
 
 @router.get("/verify-email/{uidb64}/{token}", summary="Confirmar e-mail",  description="Confirma o email e redireciona para o frontend.", auth=None,)
@@ -292,10 +339,13 @@ def resend_verification_email_router(request, email: str):
 
 
 
-@router.post("/change-password",  response={200: TokenOut, 400: MessageOut, 429: MessageOut},
-        auth=AllRolesAuth(), summary="Alterar senha", description=(
+@router.post(
+    "/change-password",
+    response={200: AccessTokenOut, 400: MessageOut, 429: MessageOut},
+    auth=AllRolesAuth(), summary="Alterar senha", description=(
         "Troca a senha do usuário autenticado. "
-        "Todos os tokens anteriores são invalidados e um novo par é retornado."
+        "Todos os tokens anteriores são invalidados; um novo access volta no corpo "
+        "e um novo refresh é setado no cookie httpOnly."
     ),
 )
 @ratelimit(key="user", rate="5/h", block=True)
@@ -306,10 +356,12 @@ def change_password_router(request, payload: ChangePasswordIn):
             old_password=payload.old_password,
             new_password=payload.new_password,
         )
-        return 200, tokens
     except InvalidPassword as e:
         return 400, {"detail": str(e)}
-    
+
+    response = JsonResponse({"access": tokens["access"]}, status=200)
+    set_refresh_cookie(response, tokens["refresh"])
+    return response
 
 
 @router.delete(
@@ -351,16 +403,24 @@ def export_my_data_router(request):
 
 
 
-@router.post("/register-employee", response={201: TokenOut, 409: MessageOut}, auth=AdminOnlyAuth(), summary="Cadastro de Funcionário",)
+@router.post(
+    "/register-employee",
+    response={201: EmployeeCreatedOut, 409: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Cadastro de Funcionário",
+    description=(
+        "Cria o funcionário e envia a senha temporária por e-mail. Não retorna "
+        "tokens de sessão: quem chama este endpoint é o admin, não o funcionário — "
+        "devolver o par access/refresh aqui vazaria uma sessão válida de outra "
+        "pessoa pro admin. O funcionário loga por conta própria com a senha "
+        "recebida por e-mail."
+    ),
+)
 @ratelimit(key="ip", rate="20/h", block=True,)
 def register_employee_router(request, payload: RegisterEmployeeIn):
-    """
-    Cria o usuário com role "employee" e retorna tokens JWT.
-    Um e-mail de verificação é enviado em background via Celery.
-    """
     try:
-        tokens = register_user_default_employee(payload)
-        return 201, tokens
+        result = register_user_default_employee(payload)
+        return 201, result
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
 

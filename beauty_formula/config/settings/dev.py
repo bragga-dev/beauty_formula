@@ -92,8 +92,13 @@ NINJA_PAGINATION_PER_PAGE = 20
 # =========================================================
 # CORS (FUTURO FRONTEND SEPARADO)
 # =========================================================
-
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOW_ALL_ORIGINS foi removido: com CORS_ALLOW_CREDENTIALS=True
+# (necessário pro cookie httpOnly do refresh token ir e voltar), o
+# django-cors-headers passa a refletir qualquer Origin recebida — ou seja,
+# ALLOW_ALL + CREDENTIALS na prática abre a API pra qualquer site ler
+# respostas autenticadas via CORS. A lista explícita abaixo já cobre os
+# hosts de dev (Vite e o preview em :3000).
+CORS_ALLOW_CREDENTIALS = True
 
 # =========================================================
 # CELERY
@@ -140,5 +145,3 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
 
 ]
-
-CORS_ALLOW_ALL_ORIGINS = True

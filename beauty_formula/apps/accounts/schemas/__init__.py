@@ -1,5 +1,3 @@
-
-
 from beauty_formula.apps.accounts.schemas.client_schema import (
     ClientOut,
     ClientCreateIn,
@@ -18,6 +16,8 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     RegisterIn,
     LoginIn,
     TokenOut,
+    AccessTokenOut,
+    EmployeeCreatedOut,
     RefreshIn,
     ChangePasswordIn,
     PasswordResetRequestIn,
@@ -40,6 +40,8 @@ __all__ = [
     "RegisterIn",
     "LoginIn",
     "TokenOut",
+    "AccessTokenOut",
+    "EmployeeCreatedOut",
     "RefreshIn",
     "ChangePasswordIn",
     "PasswordResetRequestIn",

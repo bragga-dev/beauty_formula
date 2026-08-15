@@ -1,5 +1,6 @@
 from ninja import NinjaAPI, Swagger
 from ninja_jwt.authentication import JWTAuth
+from ninja_jwt.exceptions import AuthenticationFailed as JWTAuthenticationFailed
 from ninja.errors import ValidationError, AuthenticationError
 from django.http import HttpRequest
 from django.http import JsonResponse
@@ -75,6 +76,24 @@ def validation_error(request: HttpRequest, exc: ValidationError):
 def auth_error(request: HttpRequest, exc: AuthenticationError):
     return JsonResponse(
         {"detail": "Credenciais inválidas ou token expirado."},
+        status=401,
+    )
+
+
+@api.exception_handler(JWTAuthenticationFailed)
+def jwt_authentication_failed(request: HttpRequest, exc: JWTAuthenticationFailed):
+    """
+    Cobre AuthenticationFailed/InvalidToken do ninja_jwt (ex.: usuário
+    inativo, token expirado/blacklistado). Sem esse handler, o ninja cai no
+    handler genérico de Exception e devolve o dict interno cru do DRF
+    (`{'detail': ErrorDetail(...), 'code': ErrorDetail(...)}`) como texto
+    pro frontend — foi o que apareceu na tela de cadastro.
+    """
+    detail = exc.args[0] if exc.args else {}
+    message = detail.get("detail") if isinstance(detail, dict) else str(detail)
+    return api.create_response(
+        request,
+        {"detail": str(message)},
         status=401,
     )
 

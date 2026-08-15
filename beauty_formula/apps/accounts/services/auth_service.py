@@ -4,6 +4,7 @@ Auth Services — autenticação, login, logout, refresh token.
 from django.contrib.auth import authenticate
 from django.db.models import QuerySet
 from ninja_jwt.tokens import RefreshToken
+from ninja_jwt.settings import api_settings as jwt_api_settings
 
 from django.utils import timezone
 from ninja_jwt.token_blacklist.models import OutstandingToken, BlacklistedToken
@@ -54,9 +55,33 @@ def logout_user(refresh_token: str) -> None:
 
 
 def refresh_access_token(refresh_token: str) -> dict:
+    """
+    Gera um novo access token a partir do refresh.
+
+    Também aplica ROTATE_REFRESH_TOKENS/BLACKLIST_AFTER_ROTATION (configurados
+    em NINJA_JWT mas que não tinham efeito nenhum aqui — essa função só
+    lia o access token e devolvia, nunca rotacionava nem blacklistava o
+    refresh antigo). Sem isso, um refresh token vazado continuava válido
+    pelo resto do prazo dele (dias) mesmo depois de usado — a rotação é
+    justamente o que fecha essa janela: cada uso invalida o token anterior.
+    """
     try:
         token = RefreshToken(refresh_token)
-        return {"access": str(token.access_token)}
+        data = {"access": str(token.access_token)}
+
+        if jwt_api_settings.ROTATE_REFRESH_TOKENS:
+            if jwt_api_settings.BLACKLIST_AFTER_ROTATION:
+                try:
+                    token.blacklist()
+                except AttributeError:
+                    pass
+
+            token.set_jti()
+            token.set_exp()
+            token.set_iat()
+            data["refresh"] = str(token)
+
+        return data
     except Exception:
         raise InvalidToken()
 

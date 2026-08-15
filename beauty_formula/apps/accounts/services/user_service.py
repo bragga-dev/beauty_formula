@@ -165,8 +165,16 @@ def login_or_register_client_google(id_token: str) -> tuple[dict, bool]:
 @transaction.atomic
 def register_user_default_employee(data: RegisterEmployeeIn) -> dict:
     """
-    Cria o User + Employee e dispara e-mail de verificação.
-    Retorna os tokens JWT diretamente para o cliente já poder operar.
+    Cria o User + Employee e dispara e-mail de verificação com a senha
+    temporária.
+
+    NÃO retorna tokens JWT: quem chama esse endpoint é o ADMIN (é ele quem
+    está autenticado na requisição), não o funcionário recém-criado. Devolver
+    o par access/refresh do funcionário aqui entregava pro admin uma sessão
+    válida de outra pessoa — qualquer admin conseguiria se autenticar como
+    qualquer funcionário que ele mesmo cadastrasse, sem precisar da senha.
+    O funcionário loga por conta própria com a senha temporária enviada
+    por e-mail.
     """
     if email_exists(data.email):
         raise UserAlreadyExists("e-mail")
@@ -177,7 +185,7 @@ def register_user_default_employee(data: RegisterEmployeeIn) -> dict:
         create_employee(user)
 
     send_verification_email_employee.delay(user.pk, password)
-    return make_tokens(user)
+    return {"email": user.email}
 
 
 @transaction.atomic
