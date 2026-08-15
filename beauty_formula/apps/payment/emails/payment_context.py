@@ -51,13 +51,10 @@ def build_payment_block(payment: Payment) -> dict:
         "payment_asaas_customer_id": payment.asaas_customer_id,
         "payment_asaas_id": payment.asaas_payment_id,
         "payment_billing_type": payment.billing_type,
-        "payment_due_date": payment.client,
+        "payment_due_date": payment.due_date,
         "payment_invoice_url": payment.invoice_url,
         "payment_pix_qr_code": payment.pix_qr_code,
         "payment_created_at": payment.created_at,
         "payment_pix_copy_paste": payment.pix_copy_paste,    
         
     }
-
-
-

@@ -9,12 +9,12 @@ from celery import shared_task
 
 from beauty_formula.apps.core.emails.sender import send_html_email
 from beauty_formula.apps.services.emails.scheduling_context import (
+    build_employee_block,
     build_service_block,
     format_datetime_br,
     new_scheduling_url,
     rate_scheduling_url,
     resolve_client_display_name,
-    resolve_employee_display_name,
 )
 from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
 
@@ -39,9 +39,9 @@ def send_scheduling_completed_thanks(self, scheduling_id: uuid.UUID) -> None:
 
         context = {
             "client_name": resolve_client_display_name(client_user),
-            "employee_full_name": resolve_employee_display_name(scheduling.employee),
 
             **build_service_block(scheduling),
+            **build_employee_block(scheduling.employee),
 
             "completed_at": format_datetime_br(scheduling.scheduled_time),
             "rate_url": rate_scheduling_url(scheduling.id),

@@ -1,283 +1,33 @@
 {% extends "core/emails/base.html" %}
 
-{% block title %}Obrigado pela Preferência! — Fórmula da Beleza{% endblock %}
+{% block title %}Obrigado pela Preferência — Fórmula da Beleza{% endblock %}
 
-{% block preheader %}Seu atendimento foi concluído com sucesso! Avalie seu serviço e agende novamente.{% endblock %}
-
-{% block extra_styles %}
-<style>
-    .section-label {
-        display: inline-block;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 10px;
-        font-weight: 700;
-        color: #d81e2a;
-        background: #fdecec;
-        padding: 5px 12px;
-        border-radius: 20px;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        margin: 0 0 16px;
-    }
-
-    .heading {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 26px;
-        font-weight: 900;
-        color: #0a0a0a;
-        margin: 0 0 22px;
-        line-height: 1.3;
-    }
-
-    .greeting {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 15px;
-        color: #1a1a1a;
-        margin: 0 0 10px;
-        line-height: 1.7;
-    }
-
-    .body-text {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 15px;
-        color: #5a5a5a;
-        margin: 0 0 28px;
-        line-height: 1.75;
-    }
-
-    .info-box {
-        background: #fafafa;
-        border-radius: 18px;
-        padding: 20px 24px;
-        margin-bottom: 28px;
-        border-left: 4px solid #d81e2a;
-    }
-
-    .info-box.success {
-        border-left-color: #2e7d32;
-        background: #f0f8f0;
-    }
-
-    .info-box-title {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 12px;
-        font-weight: 700;
-        color: #0a0a0a;
-        letter-spacing: 0.5px;
-        margin: 0 0 8px;
-        text-transform: uppercase;
-    }
-
-    .info-box-text {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 14px;
-        color: #6a6a6a;
-        margin: 0;
-        line-height: 1.75;
-    }
-
-    .info-box-text strong {
-        color: #0a0a0a;
-        font-weight: 600;
-    }
-
-    .cta-wrap {
-        text-align: center;
-        margin: 8px 0 26px;
-    }
-
-    .cta-btn {
-        display: inline-block;
-        background: #d81e2a;
-        color: #ffffff !important;
-        text-decoration: none !important;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 15px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        padding: 17px 56px;
-        border-radius: 100px;
-        box-shadow: 0 10px 24px rgba(216,30,42,0.3);
-    }
-
-    .cta-btn-secondary {
-        display: inline-block;
-        background: transparent;
-        color: #d81e2a !important;
-        text-decoration: none !important;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 15px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        padding: 15px 40px;
-        border-radius: 100px;
-        border: 2px solid #d81e2a;
-        margin-top: 12px;
-        transition: all 0.3s ease;
-    }
-
-    .service-image {
-        width: 100%;
-        max-width: 200px;
-        height: auto;
-        border-radius: 12px;
-        display: block;
-        margin: 0 auto 16px;
-    }
-
-    .service-name {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 18px;
-        font-weight: 700;
-        color: #0a0a0a;
-        margin: 0 0 8px;
-        text-align: center;
-    }
-
-    .service-description {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 14px;
-        color: #6a6a6a;
-        margin: 0 0 12px;
-        text-align: center;
-        line-height: 1.6;
-    }
-
-    .detail-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin: 16px 0 8px;
-    }
-
-    .detail-item {
-        background: #f5f5f5;
-        border-radius: 12px;
-        padding: 14px 16px;
-        text-align: center;
-    }
-
-    .detail-item .label {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 11px;
-        font-weight: 600;
-        color: #999;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        display: block;
-        margin-bottom: 4px;
-    }
-
-    .detail-item .value {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 16px;
-        font-weight: 700;
-        color: #0a0a0a;
-        display: block;
-    }
-
-    .detail-item .value.price {
-        color: #d81e2a;
-    }
-
-    .employee-info {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 16px 0;
-    }
-
-    .employee-photo {
-        width: 70px;
-        height: 70px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #fdecec;
-        flex-shrink: 0;
-    }
-
-    .employee-details {
-        flex: 1;
-    }
-
-    .employee-name {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 16px;
-        font-weight: 700;
-        color: #0a0a0a;
-        margin: 0 0 4px;
-    }
-
-    .employee-bio {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 13px;
-        color: #6a6a6a;
-        margin: 0;
-        line-height: 1.5;
-    }
-
-    .stars {
-        text-align: center;
-        font-size: 32px;
-        letter-spacing: 4px;
-        color: #f5a623;
-        margin: 8px 0 16px;
-    }
-
-    @media only screen and (max-width: 600px) {
-        .heading { font-size: 22px !important; }
-        .cta-btn { display: block !important; padding: 17px 24px !important; }
-        .cta-btn-secondary { display: block !important; padding: 15px 24px !important; }
-        .detail-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-        .detail-item { padding: 12px 10px; }
-        .employee-info { flex-direction: column; text-align: center; }
-        .service-image { max-width: 150px; }
-        .info-box { padding: 16px; }
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .heading { color: #f2f2f2 !important; }
-        .greeting { color: #e8e8e8 !important; }
-        .body-text { color: #b0b0b0 !important; }
-        .info-box { background: #1e1e1e !important; border-left-color: #d81e2a !important; }
-        .info-box.success { background: #1a2a1a !important; border-left-color: #2e7d32 !important; }
-        .info-box-text { color: #b0b0b0 !important; }
-        .info-box-text strong { color: #f2f2f2 !important; }
-        .service-name { color: #f2f2f2 !important; }
-        .service-description { color: #b0b0b0 !important; }
-        .detail-item { background: #2a2a2a !important; }
-        .detail-item .value { color: #f2f2f2 !important; }
-        .detail-item .value.price { color: #d81e2a !important; }
-        .employee-name { color: #f2f2f2 !important; }
-        .employee-bio { color: #b0b0b0 !important; }
-    }
-</style>
-{% endblock %}
+{% block preheader %}Seu atendimento foi concluído. Avalie sua experiência e agende novamente!{% endblock %}
 
 {% block content %}
 
-    <span class="section-label">🎉 Atendimento concluído</span>
+    <span class="section-label gold">Atendimento concluído</span>
     <h1 class="heading">Obrigado pela preferência!</h1>
 
     <p class="greeting">
-        Olá, <strong style="color:#d81e2a;">{{ client_name }}</strong>!
+        Olá, <strong>{{ client_name }}</strong>!
     </p>
 
     <p class="body-text">
-        Seu atendimento na <strong>Fórmula da Beleza</strong> foi <strong>concluído com sucesso</strong>! 🎊
+        Seu atendimento na <strong>Fórmula da Beleza</strong> foi <strong>concluído com sucesso</strong>!
         Foi um prazer atender você. Esperamos que tenha tido uma experiência incrível!
     </p>
 
     <!-- Service Card -->
-    <div class="info-box success">
-        <p class="info-box-title">📋 Detalhes do atendimento</p>
-        
+    <div class="info-box gold">
+        <p class="info-box-title">Detalhes do atendimento</p>
+
         {% if service_image %}
         <img src="{{ service_image }}" alt="{{ service_name }}" class="service-image">
         {% endif %}
-        
+
         <div class="service-name">{{ service_name }}</div>
-        
+
         {% if service_description %}
         <p class="service-description">{{ service_description }}</p>
         {% endif %}
@@ -299,8 +49,8 @@
     </div>
 
     <!-- Employee Info -->
-    <div class="info-box">
-        <p class="info-box-title">💇 Quem te atendeu</p>
+    <div class="info-box plain">
+        <p class="info-box-title">Quem te atendeu</p>
         <div class="employee-info">
             {% if employee_photo %}
             <img src="{{ employee_photo }}" alt="{{ employee_full_name }}" class="employee-photo">
@@ -315,22 +65,22 @@
     </div>
 
     <!-- Avaliação -->
-    <div class="info-box" style="text-align: center; background: #fafafa; border-left-color: #f5a623;">
-        <p class="info-box-title">⭐ Avalie seu atendimento</p>
+    <div class="info-box plain" style="text-align: center;">
+        <p class="info-box-title">Avalie seu atendimento</p>
         <div class="stars">★★★★★</div>
         <p class="info-box-text" style="margin-bottom: 16px;">
-            Sua opinião é muito importante para nós! <br>
+            Sua opinião é muito importante para nós!<br>
             Avalie o serviço e nos ajude a melhorar ainda mais.
         </p>
-        
+
         <!--[if mso]>
-        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ rate_url }}" style="height:48px;v-text-anchor:middle;width:200px;" arcsize="50%" stroke="f" fillcolor="#f5a623">
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ rate_url }}" style="height:48px;v-text-anchor:middle;width:200px;" arcsize="15%" stroke="f" fillcolor="#d4af6a">
             <w:anchorlock/>
-            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">AVALIAR SERVIÇO</center>
+            <center style="color:#0a0a0b;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;letter-spacing:1px;">AVALIAR SERVIÇO</center>
         </v:roundrect>
         <![endif]-->
         <!--[if !mso]><!-->
-        <a href="{{ rate_url }}" style="display: inline-block; background: #f5a623; color: #ffffff !important; text-decoration: none !important; font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; padding: 14px 40px; border-radius: 100px; box-shadow: 0 8px 20px rgba(245,166,35,0.3);">
+        <a href="{{ rate_url }}" class="cta-btn-gold">
             Avaliar serviço
         </a>
         <!--<![endif]-->
@@ -338,14 +88,14 @@
 
     <!-- Ações -->
     <div class="cta-wrap">
-        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #6a6a6a; margin-bottom: 16px;">
+        <p class="body-text" style="margin-bottom: 16px;">
             Deseja agendar novamente? Estamos te esperando!
         </p>
-        
+
         <!--[if mso]>
-        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ new_scheduling_url }}" style="height:52px;v-text-anchor:middle;width:240px;" arcsize="50%" stroke="f" fillcolor="#d81e2a">
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ new_scheduling_url }}" style="height:50px;v-text-anchor:middle;width:240px;" arcsize="15%" stroke="f" fillcolor="#c6172e">
             <w:anchorlock/>
-            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;letter-spacing:1px;">AGENDAR NOVAMENTE</center>
+            <center style="color:#faf9f7;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">AGENDAR NOVAMENTE</center>
         </v:roundrect>
         <![endif]-->
         <!--[if !mso]><!-->
@@ -356,24 +106,20 @@
     </div>
 
     <!-- Conteúdo motivacional -->
-    <div class="info-box" style="background: #fafafa; border-left-color: #d81e2a;">
-        <p class="info-box-title">💡 Por que avaliar?</p>
+    <div class="info-box plain">
+        <p class="info-box-title">Por que avaliar?</p>
         <p class="info-box-text">
-            ✅ Ajuda outros clientes a escolherem o melhor serviço<br>
-            ✅ Reconhece o trabalho do profissional que te atendeu<br>
-            ✅ Nos ajuda a melhorar a qualidade dos nossos serviços<br>
-            ✅ Você pode ganhar descontos em futuros agendamentos!
+            Ajuda outros clientes a escolherem o melhor serviço<br>
+            Reconhece o trabalho do profissional que te atendeu<br>
+            Nos ajuda a melhorar a qualidade dos nossos serviços<br>
+            Você pode ganhar descontos em futuros agendamentos!
         </p>
     </div>
 
     <!-- Mensagem final -->
-    <div style="text-align: center; margin-top: 32px; padding: 20px; border-top: 1px solid #f0f0f0;">
-        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #6a6a6a; font-style: italic; margin: 0;">
-            "Sua satisfação é a nossa maior recompensa! Até a próxima! 💆✨"
-        </p>
-        <p style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #999; margin: 8px 0 0;">
-            Equipe Fórmula da Beleza
-        </p>
+    <div class="closing-note">
+        <p class="script">"Sua satisfação é a nossa maior recompensa! Até a próxima."</p>
+        <p class="team">Equipe Fórmula da Beleza</p>
     </div>
 
 {% endblock %}

@@ -1,5 +1,5 @@
 """
-Tasks Celery — envio de e-mails de agendamento (confirmação ao cliente).
+Tasks Celery — envio de e-mails de pagamento (solicitação de pagamento ao cliente).
 """
 
 import logging
@@ -10,15 +10,13 @@ from celery import shared_task
 from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
 from beauty_formula.apps.core.emails.sender import send_html_email
 from beauty_formula.apps.services.emails.scheduling_context import (
-    client_appointments_url,
     resolve_client_display_name,
     saloon_url,
 )
 from beauty_formula.apps.payment.selectors.payment_selector import get_payment_by_id
 from beauty_formula.apps.payment.emails.payment_context import (
-    build_frontend_url,
     build_payment_block,
-    client_payments_url ,
+    client_payments_url,
 )
 logger = logging.getLogger(__name__)
 
@@ -39,18 +37,17 @@ def send_payment_request(self, user_id: uuid.UUID, payment_id: uuid.UUID) -> Non
         payment = get_payment_by_id(payment_id=payment_id)
 
         context = {
-            
             "client_name": resolve_client_display_name(user),
             "user_email": user.email,
 
             **build_payment_block(payment=payment),
 
-            "appointments_url": client_appointments_url(),
+            "client_payments_url": client_payments_url(),
             "saloon_url": saloon_url(),
         }
 
         send_html_email(
-            subject=" Pagamento — Fórmula da Beleza",
+            subject="Pagamento — Fórmula da Beleza",
             to_email=user.email,
             template_name="payment/emails/send_payment_request.html",
             context=context,
