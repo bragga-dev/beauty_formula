@@ -86,6 +86,8 @@ from beauty_formula.apps.services.tasks.send_cancel_scheduling_to_employee impor
 from beauty_formula.apps.services.tasks.send_scheduling_completed_thanks import send_scheduling_completed_thanks
 from beauty_formula.apps.services.tasks.expire_unpaid_scheduling import expire_unpaid_scheduling
 from beauty_formula.apps.services.selectors.average_rating_selector import get_rating_for_client_service_employee
+from beauty_formula.apps.services.tasks.send_confirm_rescheduling_to_client import send_confirm_rescheduling_to_client
+from beauty_formula.apps.services.tasks.send_confirm_rescheduling_to_employee import send_confirm_rescheduling_to_employee
 
 FINAL_STATUSES = [
     Scheduling.SchedulingStatus.COMPLETED,
@@ -238,6 +240,13 @@ def _confirm_scheduling(scheduling: Scheduling) -> Scheduling:
     )
     send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling_confirmed.id)
     return scheduling_confirmed
+
+
+def _confirm_rescheduling(scheduling: Scheduling) -> Scheduling:
+    """Envia email de notificação de REAGENDAMENTO para Cliente e Funcionário"""    
+    send_confirm_rescheduling_to_client.delay(user_id=scheduling.client.user.id, scheduling_id=scheduling.id)
+    send_confirm_rescheduling_to_employee.delay(scheduling_id=scheduling.id)
+    return scheduling
 
 
 @transaction.atomic
@@ -523,6 +532,7 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
         notes=data.notes,
     )
     service.increment_bookings()
+    _confirm_rescheduling(scheduling=scheduling)
     return SchedulingOut.from_orm(new_scheduling)
 
 # ═══════════════════════════════════════════════════════════════════════════════

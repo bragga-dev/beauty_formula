@@ -42,7 +42,7 @@ from beauty_formula.apps.services.selectors.scheduling_selector import get_sched
 from beauty_formula.apps.accounts.repositories.client_repository import (
     set_client_asaas_customer_id,
 )
-from beauty_formula.apps.core.validators.validate_cpf_cnpj import validate_cnpj, validate_cpf
+from beauty_formula.apps.core.validators.validate_cpf_cnpj import validate_cpf_or_cnpj
 
 _REFUNDABLE_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
 _PAID_PAYMENT_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
@@ -70,9 +70,7 @@ def _resolve_asaas_customer_id(scheduling: Scheduling, billing_type: str, cpf_cn
     if not cpf_cnpj:
         raise CpfOrCnpjRequired()
     
-    if not validate_cpf(value=cpf_cnpj) or not validate_cnpj(value=cpf_cnpj):
-        raise  CpfOrCnpjRequired("CPF ou CNPJ inválido!")
-
+    validate_cpf_or_cnpj(cpf_cnpj)
 
     response = asaas.create_customer(
         name=client.get_full_name(),
