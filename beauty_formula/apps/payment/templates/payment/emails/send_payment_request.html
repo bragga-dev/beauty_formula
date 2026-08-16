@@ -64,7 +64,7 @@
 
         {% if payment_pix_qr_code %}
         <div class="qr-code-container">
-            <img src="{{ payment_pix_qr_code }}" alt="QR Code PIX" />
+            <img src="{{ payment_pix_qr_code }}" alt="QR Code PIX" width="180" height="180" />
         </div>
         {% endif %}
 
@@ -96,8 +96,8 @@
 
     <!-- Botões de Ação -->
     <div class="cta-wrap">
-        <a href="{{ client_payments_url }}" class="cta-btn">
-            Ver meus pagamentos
+        <a href="{{ client_appointments_url }}" class="cta-btn">
+            Ver meus agendamentos
         </a>
         <a href="{{ saloon_url }}" class="cta-btn-secondary">
             Voltar ao salão

@@ -10,13 +10,13 @@ from celery import shared_task
 from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
 from beauty_formula.apps.core.emails.sender import send_html_email
 from beauty_formula.apps.services.emails.scheduling_context import (
+    client_appointments_url,
     resolve_client_display_name,
     saloon_url,
 )
 from beauty_formula.apps.payment.selectors.payment_selector import get_payment_by_id
 from beauty_formula.apps.payment.emails.payment_context import (
     build_payment_block,
-    client_payments_url,
 )
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def send_payment_request(self, user_id: uuid.UUID, payment_id: uuid.UUID) -> Non
 
             **build_payment_block(payment=payment),
 
-            "client_payments_url": client_payments_url(),
+            "client_appointments_url": client_appointments_url(),
             "saloon_url": saloon_url(),
         }
 

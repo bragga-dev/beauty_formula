@@ -590,7 +590,7 @@ def get_client_full_name_display(client: Client) -> str:
         return client.first_name
     elif client.last_name:
         return client.last_name
-    return client.username or f"Cliente {client.id}"
+    return client.username or client.user.email
 
 
 def get_client_contact_info(client: Client) -> Dict[str, Optional[str]]:

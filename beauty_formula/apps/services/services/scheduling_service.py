@@ -7,12 +7,10 @@ Fluxo geral:
   verdade (ver BUSY_STATUSES em scheduling_selector) — só bloqueia o
   horário para outros clientes a partir do momento em que é CONFIRMED.
 - A confirmação (CREATED -> CONFIRMED) acontece automaticamente quando o
-  pagamento vinculado é identificado como recebido — normalmente pelo
-  webhook da Asaas (`confirm_scheduling_after_payment`, chamada por
-  `payment_service.process_asaas_webhook`/`sync_payment_with_asaas`).
-  Também existe um endpoint manual (`confirm_scheduling_for_client`) como
-  fallback, caso o cliente já tenha pago mas o webhook ainda não tenha
-  processado.
+  pagamento vinculado é identificado como recebido — pelo webhook da
+  Asaas (`confirm_scheduling_after_payment`, chamada por
+  `payment_service.process_asaas_webhook`) ou pela sincronização manual
+  do admin (`sync_payment_with_asaas`), caso o webhook atrase.
 - Cliente cria/edita/cancela/reagenda os PRÓPRIOS agendamentos. Uma
   reserva CREATED pode ser cancelada livremente (ainda não foi paga);
   uma vez CONFIRMED, vale a janela mínima de cancelamento.
@@ -41,7 +39,6 @@ logger = logging.getLogger(__name__)
 SCHEDULING_RESERVATION_TTL_MINUTES = getattr(settings, "SCHEDULING_RESERVATION_TTL_MINUTES", 30)
 
 
-from beauty_formula.apps.payment.models.payment_model import Payment
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.selectors.client_selector import get_client_by_user_id
 from beauty_formula.apps.accounts.selectors.employee_selector import get_employee_by_id, get_employee_by_user_id
@@ -54,7 +51,6 @@ from beauty_formula.apps.core.exceptions.service_exception import (
     SchedulingConflict,
     SchedulingNotFound,
     ServiceNotFound,
-    SchedulingCannotBeConfirmed,
 )
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.repositories.scheduling_repository import (
@@ -98,12 +94,6 @@ FINAL_STATUSES = [
     Scheduling.SchedulingStatus.RESCHEDULED,
 ]
 from beauty_formula.apps.payment.services.payment_service import cancel_payment_for_scheduling
-from beauty_formula.apps.payment.selectors.payment_selector import get_active_payment_for_scheduling
-from beauty_formula.apps.core.exceptions.payment_exception import SchedulingPaymentPending
-
-# Status de pagamento que a Asaas usa pra indicar que o dinheiro já entrou
-# (mesmo conjunto usado por payment_service._REFUNDABLE_STATUSES).
-PAID_PAYMENT_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
 
 
 
@@ -251,29 +241,6 @@ def _confirm_scheduling(scheduling: Scheduling) -> Scheduling:
 
 
 @transaction.atomic
-def confirm_scheduling_for_client(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
-    """
-    Confirma manualmente um agendamento (CREATED -> CONFIRMED) mediante
-    pagamento já recebido.
-
-    Fallback pro cliente: normalmente a confirmação acontece sozinha via
-    webhook da Asaas (`confirm_scheduling_after_payment`) assim que o
-    pagamento é identificado como recebido — este endpoint serve pro caso
-    do cliente já ter pago mas o webhook ainda não ter processado.
-    """
-    scheduling = _get_own_client_scheduling(user_id=user_id, scheduling_id=scheduling_id)
-    if scheduling.status != Scheduling.SchedulingStatus.CREATED:
-        raise SchedulingCannotBeConfirmed()
-
-    payment = get_active_payment_for_scheduling(scheduling_id=scheduling_id)
-    if payment is None or payment.status not in PAID_PAYMENT_STATUSES:
-        raise SchedulingPaymentPending()
-
-    scheduling_confirmed = _confirm_scheduling(scheduling)
-    return SchedulingOut.from_orm(scheduling_confirmed)
-
-
-@transaction.atomic
 def confirm_scheduling_after_payment(scheduling_id: UUID) -> Optional[Scheduling]:
     """
     Confirma um agendamento automaticamente assim que o pagamento
@@ -284,8 +251,7 @@ def confirm_scheduling_after_payment(scheduling_id: UUID) -> Optional[Scheduling
     Idempotente e silenciosa por design: se o agendamento não existe mais,
     ou já não está mais CREATED (já confirmado por uma execução anterior,
     cancelado pelo cliente antes do pagamento cair, etc.), não faz nada —
-    evita erro em reentregas de webhook da Asaas ou corrida com o
-    endpoint manual (`confirm_scheduling_for_client`).
+    evita erro em reentregas de webhook da Asaas.
     """
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None or scheduling.status != Scheduling.SchedulingStatus.CREATED:
