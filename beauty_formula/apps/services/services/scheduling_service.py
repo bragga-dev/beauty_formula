@@ -532,7 +532,7 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
         notes=data.notes,
     )
     service.increment_bookings()
-    _confirm_rescheduling(scheduling=scheduling)
+    _confirm_rescheduling(scheduling=new_scheduling)
     return SchedulingOut.from_orm(new_scheduling)
 
 # ═══════════════════════════════════════════════════════════════════════════════
