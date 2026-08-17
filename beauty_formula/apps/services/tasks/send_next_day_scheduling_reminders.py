@@ -3,7 +3,6 @@ Tasks Celery — envio de e-mails relacionados a agendamentos.
 """
 
 import logging
-import uuid
 
 from celery import shared_task
 
@@ -31,4 +30,3 @@ def send_next_day_scheduling_reminders() -> None:
     for scheduling in schedulings.iterator():
         sending_reminder.delay(scheduling.id)
         logger.info("Reminder task queued for scheduling=%s", scheduling.id)
-

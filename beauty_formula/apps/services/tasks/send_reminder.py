@@ -7,7 +7,6 @@ import uuid
 
 from celery import shared_task
 
-from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
 from beauty_formula.apps.core.emails.sender import send_html_email
 from beauty_formula.apps.services.emails.scheduling_context import (
     build_employee_block,
@@ -20,10 +19,9 @@ from beauty_formula.apps.services.emails.scheduling_context import (
 )
 from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
 from beauty_formula.apps.services.repositories.scheduling_repository import update_reminder_sent_at
-from beauty_formula.apps.services.models.scheduling import Scheduling
+
 
 logger = logging.getLogger(__name__)
-
 
 
 @shared_task(
@@ -46,7 +44,7 @@ def sending_reminder(self, scheduling_id: uuid.UUID) -> None:
             logger.info("Skipping reminder for inactive scheduling=%s", scheduling.id)
             return
 
-        if scheduling.status != Scheduling.SchedulingStatus.CONFIRMED:
+        if scheduling.status != scheduling.SchedulingStatus.CONFIRMED:
             logger.info(
                 "Skipping reminder for non-confirmed scheduling=%s "
                 "(status=%s)",
@@ -55,7 +53,10 @@ def sending_reminder(self, scheduling_id: uuid.UUID) -> None:
             )
             return
 
-        user = get_user_by_id(user_id=scheduling.client.user)
+        # `get_scheduling_by_id` já faz select_related de client__user, então
+        # usar scheduling.client.user direto evita uma query desnecessária
+        # (e Scheduling não tem FK direta pra User — só via client).
+        user = scheduling.client.user
 
         context = {
             "client_name": resolve_client_display_name(user),
@@ -82,7 +83,7 @@ def sending_reminder(self, scheduling_id: uuid.UUID) -> None:
         )
 
         update_reminder_sent_at(scheduling=scheduling)
-        
+
         logger.info(
             "Scheduling reminder email sent to %s "
             "(scheduling=%s)",
