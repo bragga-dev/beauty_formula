@@ -20,7 +20,7 @@ from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingConflict
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.models.service import Service
-
+from django.utils import timezone
 
 @transaction.atomic
 def create_scheduling(
@@ -156,3 +156,7 @@ def reschedule_scheduling(
 def delete_scheduling(scheduling: Scheduling) -> None:
    
     scheduling.delete()
+
+def update_reminder_sent_at(scheduling: Scheduling) -> Scheduling:
+    scheduling.reminder_sent_at = timezone.now()
+    scheduling.save(update_fields=["reminder_sent_at"])

@@ -5,6 +5,8 @@ disponibilidade, pra saber quais horários do funcionário já estão ocupados.
 from datetime import date as date_type, datetime, timedelta
 from typing import Optional
 import uuid
+from django.utils import timezone
+from datetime import timedelta
 
 from django.db.models import Q, QuerySet
 
@@ -149,4 +151,17 @@ def get_active_schedulings_for_employee_on_date(
     )
     if exclude_scheduling_id is not None:
         qs = qs.exclude(pk=exclude_scheduling_id)
+    return qs
+
+
+def list_confirmed_schedulings_for_reminder() -> QuerySet[Scheduling]:
+    today = timezone.localdate()  
+    tomorrow = today + timedelta(days=1)
+
+    qs = Scheduling.objects.filter(
+        is_active=True,
+        status__in=BUSY_STATUSES,
+        scheduled_time__date=tomorrow,
+        reminder_sent_at__isnull=True,
+    )
     return qs

@@ -61,7 +61,7 @@ class Scheduling(models.Model):
     is_active = models.BooleanField(_("Ativo"), default=True, help_text=_("Desative em vez de deletar para não quebrar agendamentos antigos."))
     created_at = models.DateTimeField(_("Criado em"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Atualizado em"), auto_now=True)
-
+    reminder_sent_at = models.DateTimeField(_("Lembrete enviado em"), null=True, blank=True)
     class Meta:
         verbose_name = _("Agendamento")
         verbose_name_plural = _("Agendamentos")
