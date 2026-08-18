@@ -176,6 +176,7 @@ def delete_my_average_rating_router(request, rating_id: UUID):
 @router.get(
     "/all",
     response={200: PageOut[AverageRatingOut], 400: MessageOut},
+     auth=None,
     summary="Lista todas as avaliações autorizadas (públicas), com filtros e paginação",
 )
 @ratelimit(key="ip", rate="60/m", block=True)
@@ -198,6 +199,7 @@ def list_all_public_ratings_router(
 @router.get(
     "/service/{service_id}",
     response={200: PageOut[AverageRatingOut], 400: MessageOut, 404: MessageOut},
+     auth=None,
     summary="Lista as avaliações autorizadas de um serviço",
 )
 @ratelimit(key="ip", rate="60/m", block=True)
@@ -215,6 +217,7 @@ def list_service_ratings_router(request, service_id: UUID, page: int = 1, page_s
 @router.get(
     "/service/{service_id}/summary",
     response={200: ServiceAverageRatingOut, 400: MessageOut, 404: MessageOut},
+     auth=None,
     summary="Média de avaliações de um serviço",
 )
 @ratelimit(key="ip", rate="60/m", block=True)
@@ -230,6 +233,7 @@ def get_service_rating_summary_router(request, service_id: UUID):
 @router.get(
     "/employee/{employee_id}",
     response={200: PageOut[AverageRatingOut], 400: MessageOut, 404: MessageOut},
+     auth=None,
     summary="Lista as avaliações autorizadas de um funcionário",
 )
 @ratelimit(key="ip", rate="60/m", block=True)
@@ -247,6 +251,7 @@ def list_employee_ratings_router(request, employee_id: UUID, page: int = 1, page
 @router.get(
     "/employee/{employee_id}/summary",
     response={200: EmployeeAverageRatingOut, 400: MessageOut, 404: MessageOut},
+     auth=None,
     summary="Média de avaliações de um funcionário",
 )
 @ratelimit(key="ip", rate="60/m", block=True)

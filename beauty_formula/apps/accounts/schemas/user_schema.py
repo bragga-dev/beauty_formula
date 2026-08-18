@@ -68,8 +68,22 @@ class GoogleLoginIn(Schema):
 
 
 class TokenOut(Schema):
+    """Uso interno (services) — o par completo access+refresh."""
     access:  str
     refresh: str
+
+
+class AccessTokenOut(Schema):
+    """
+    Resposta pública dos endpoints de auth. Só o access token vai no corpo
+    — o refresh vai num cookie httpOnly (ver apps/core/tokens/cookies.py),
+    pra não ficar acessível via JS/localStorage no frontend.
+    """
+    access: str
+
+
+class EmployeeCreatedOut(Schema):
+    email: str
 
 
 class RefreshIn(Schema):
@@ -214,6 +228,8 @@ __all__ = [
     "LoginIn",
     "GoogleLoginIn",
     "TokenOut",
+    "AccessTokenOut",
+    "EmployeeCreatedOut",
     "RefreshIn",
     "ChangePasswordIn",
     "DeleteAccountIn",

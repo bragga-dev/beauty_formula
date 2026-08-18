@@ -1,0 +1,131 @@
+<!-- payment/emails/send_payment_request.html -->
+
+{% extends "core/emails/base.html" %}
+
+{% block title %}Solicitação de Pagamento — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}Confirme seu agendamento realizando o pagamento.{% endblock %}
+
+{% block content %}
+
+    <span class="section-label">Solicitação de pagamento</span>
+    <h1 class="heading">Confirme seu agendamento!</h1>
+
+    <p class="greeting">
+        Olá, <strong>{{ client_name }}</strong>!
+    </p>
+
+    <p class="body-text">
+        Para garantir a confirmação do seu agendamento, realize o pagamento abaixo.
+        Você tem até <strong>{{ payment_due_date|date:"d/m/Y" }}</strong> para efetuar o pagamento.
+    </p>
+
+    <div style="text-align: center; margin: 4px 0 24px;">
+        <span class="highlight-badge">Aguardando pagamento</span>
+    </div>
+
+    <!-- Detalhes do Pagamento -->
+    <div class="info-box">
+        <p class="info-box-title">Detalhes do pagamento</p>
+
+        <div class="payment-row">
+            <span class="payment-label">Descrição</span><br>
+            <span class="payment-value">{{ payment_description }}</span>
+        </div>
+
+        <div class="payment-row">
+            <span class="payment-label">Valor</span><br>
+            <span class="payment-value amount">R$ {{ payment_value|floatformat:2 }}</span>
+        </div>
+
+        <div class="payment-row">
+            <span class="payment-label">Vencimento</span><br>
+            <span class="payment-value">{{ payment_due_date|date:"d/m/Y" }}</span>
+        </div>
+
+        <div class="payment-row">
+            <span class="payment-label">Tipo de pagamento</span><br>
+            <span class="payment-value">{{ payment_billing_type|upper }}</span>
+        </div>
+
+        <div class="payment-row">
+            <span class="payment-label">Código do pagamento</span><br>
+            <span class="payment-value" style="font-family: 'Courier New', monospace; font-size: 12px;">{{ code_payment }}</span>
+        </div>
+    </div>
+
+    <!-- PIX - Pagamento via QR Code -->
+    {% if payment_billing_type == "PIX" %}
+    <div class="pix-section">
+        <h3>Pagamento via PIX</h3>
+        <p class="body-text" style="margin-bottom: 12px;">
+            Escaneie o QR Code abaixo ou copie o código PIX
+        </p>
+
+        {% if payment_pix_qr_code %}
+        <div class="qr-code-container">
+            <img src="{{ payment_pix_qr_code }}" alt="QR Code PIX" width="180" height="180" />
+        </div>
+        {% endif %}
+
+        {% if payment_pix_copy_paste %}
+        <p class="info-box-text" style="margin: 8px 0 4px;">
+            <strong>Copie o código PIX:</strong>
+        </p>
+        <div class="pix-copy-area">
+            {{ payment_pix_copy_paste }}
+        </div>
+        {% endif %}
+
+        <p style="font-family: 'Inter', Arial, Helvetica, sans-serif; font-size: 12px; color: #6b6862; margin-top: 10px;">
+            O pagamento é processado em até 5 minutos
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Link para fatura/Invoice -->
+    {% if payment_invoice_url %}
+    <div style="text-align: center; margin: 4px 0 20px;">
+        <p class="info-box-text" style="text-align: center;">
+            <a href="{{ payment_invoice_url }}">Visualizar fatura</a>
+        </p>
+    </div>
+    {% endif %}
+
+    <hr class="divider">
+
+    <!-- Botões de Ação -->
+    <div class="cta-wrap">
+        <a href="{{ client_appointments_url }}" class="cta-btn">
+            Ver meus agendamentos
+        </a>
+        <a href="{{ saloon_url }}" class="cta-btn-secondary">
+            Voltar ao salão
+        </a>
+    </div>
+
+    <!-- Informações adicionais -->
+    <div class="info-box gold">
+        <p class="info-box-title">Importante</p>
+        <p class="info-box-text">
+            O pagamento é <strong>obrigatório</strong> para confirmar seu agendamento.<br>
+            Após a confirmação do pagamento, você receberá um e-mail de confirmação.<br>
+            Em caso de dúvidas, entre em contato pelo nosso WhatsApp.
+        </p>
+    </div>
+
+    <!-- Mensagem final -->
+    <div style="text-align: center; margin-top: 4px;">
+        <p class="body-text" style="margin: 0;">Agradecemos pela preferência!</p>
+    </div>
+
+    <div class="warning-box">
+        <p>
+            <strong>Atenção:</strong>
+            Este é um e-mail automático de solicitação de pagamento.
+            Não compartilhe seu código PIX com terceiros.
+            Em caso de problemas, entre em contato com nosso suporte.
+        </p>
+    </div>
+
+{% endblock %}

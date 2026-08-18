@@ -684,7 +684,7 @@ def get_employee_full_name_display(employee: Employee) -> str:
         return employee.first_name
     elif employee.last_name:
         return employee.last_name
-    return employee.username or f"Funcionário {employee.id}"
+    return employee.username or employee.user.email
 
 
 def get_employee_contact_info(employee: Employee) -> Dict[str, Optional[str]]:

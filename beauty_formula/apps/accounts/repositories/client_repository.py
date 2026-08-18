@@ -71,3 +71,13 @@ def remove_client_photo(client: Client) -> Client:
     if old_name:
         delete_old_media_file.delay(old_name)
     return client
+
+
+def set_client_asaas_customer_id(client: Client, asaas_customer_id: str) -> Client:
+    """
+    Grava o customer criado na Asaas na primeira cobrança via cartão do
+    cliente, pra reaproveitar nas próximas — evita pedir CPF de novo.
+    """
+    client.asaas_customer_id = asaas_customer_id
+    client.save(update_fields=["asaas_customer_id"])
+    return client

@@ -17,6 +17,7 @@ from beauty_formula.apps.services.schemas.service_schema import ServiceOut
 
 class SchedulingStatusEnum(str, Enum):
     """Enum para status do agendamento - espelha o modelo Scheduling.SchedulingStatus"""
+    CREATED = "created"
     CONFIRMED = "confirmed"
     COMPLETED = "completed"
     CANCELED = "canceled"

@@ -1,0 +1,131 @@
+{% extends "core/emails/base.html" %}
+
+{% block title %}Lembrete de Agendamento — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}Não se esqueça! Seu agendamento na Fórmula da Beleza está marcado para amanhã.{% endblock %}
+
+{% block content %}
+
+    <span class="section-label gold">Lembrete de agendamento</span>
+    <h1 class="heading">Seu agendamento é amanhã!</h1>
+
+    <p class="greeting">
+        Olá, <strong>{{ client_name }}</strong>!
+    </p>
+
+    <p class="body-text">
+        Estamos passando para lembrar que você tem um agendamento marcado na <strong>Fórmula da Beleza</strong> <strong>amanhã</strong>.
+        Confira os detalhes abaixo e prepare-se para um momento especial!
+    </p>
+
+    <!-- Service Card -->
+    <div class="info-box">
+        <p class="info-box-title">Detalhes do serviço</p>
+
+        {% if service_image %}
+        <img src="{{ service_image }}" alt="{{ service_name }}" class="service-image">
+        {% endif %}
+
+        <div class="service-name">{{ service_name }}</div>
+
+        {% if service_description %}
+        <p class="service-description">{{ service_description }}</p>
+        {% endif %}
+
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="label">Valor</span>
+                <span class="value price">R$ {{ scheduling_service_price|floatformat:2 }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Duração</span>
+                <span class="value">{{ scheduling_service_duration }} min</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Data e Hora</span>
+                <span class="value" style="font-size: 14px;">{{ scheduling_service_time }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Status</span>
+                <span class="status-badge">{{ scheduling_service_status }}</span>
+            </div>
+        </div>
+
+        {% if scheduling_service_notes %}
+        <div class="notes-box">
+            <p>{{ scheduling_service_notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Employee Info -->
+    <div class="info-box plain">
+        <p class="info-box-title">Profissional responsável</p>
+        <div class="employee-info">
+            {% if employee_photo %}
+            <img src="{{ employee_photo }}" alt="{{ employee_full_name }}" class="employee-photo" width="52" height="52">
+            {% endif %}
+            <div class="employee-details">
+                <p class="employee-name">{{ employee_full_name }}</p>
+                {% if employee_bio %}
+                <p class="employee-bio">{{ employee_bio }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações adicionais -->
+    <div class="info-box">
+        <p class="info-box-title">Informações importantes</p>
+        <p class="info-box-text">
+            <strong>Data do agendamento:</strong> {{ scheduling_service_created_at }}<br>
+            <strong>E-mail de contato:</strong> {{ user_email }}<br><br>
+            Recomendamos chegar com 10 minutos de antecedência para
+            garantir o melhor atendimento.
+        </p>
+    </div>
+
+    <!-- Ações -->
+    <div class="cta-wrap">
+        <p class="body-text" style="margin-bottom: 16px;">
+            Precisa remarcar ou cancelar seu agendamento?
+        </p>
+
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ appointments_url }}" style="height:50px;v-text-anchor:middle;width:240px;" arcsize="15%" stroke="f" fillcolor="#c6172e">
+            <w:anchorlock/>
+            <center style="color:#faf9f7;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">GERENCIAR AGENDAMENTO</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ appointments_url }}" class="cta-btn">
+            Gerenciar agendamento
+        </a>
+        <!--<![endif]-->
+    </div>
+
+    <!-- Segundo CTA -->
+    <div style="text-align: center; margin-bottom: 28px;">
+        <a href="{{ saloon_url }}" class="cta-btn-secondary">
+            Ver salão
+        </a>
+    </div>
+
+    <!-- Lembrete -->
+    <div class="info-box plain">
+        <p class="info-box-title">Preparativos para seu dia</p>
+        <p class="info-box-text">
+            ✓ Chegue com 10 minutos de antecedência<br>
+            ✓ Leve os itens necessários para o serviço<br>
+            ✓ Caso precise cancelar, faça com até 24h de antecedência<br>
+            ✓ Avalie seu atendimento após o serviço
+        </p>
+    </div>
+
+    <!-- Mensagem final -->
+    <div class="closing-note">
+        <p class="script">"Estamos ansiosos para recebê-lo(a) amanhã! Prepare-se para uma experiência incrível."</p>
+        <p class="team">Equipe Fórmula da Beleza</p>
+    </div>
+
+{% endblock %}

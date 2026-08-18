@@ -5,6 +5,8 @@ disponibilidade, pra saber quais horários do funcionário já estão ocupados.
 from datetime import date as date_type, datetime, timedelta
 from typing import Optional
 import uuid
+from django.utils import timezone
+from datetime import timedelta
 
 from django.db.models import Q, QuerySet
 
@@ -149,4 +151,39 @@ def get_active_schedulings_for_employee_on_date(
     )
     if exclude_scheduling_id is not None:
         qs = qs.exclude(pk=exclude_scheduling_id)
+    return qs
+
+
+def list_confirmed_schedulings_for_reminder() -> QuerySet[Scheduling]:
+    today = timezone.localdate()  
+    tomorrow = today + timedelta(days=1)
+
+    qs = Scheduling.objects.filter(
+        is_active=True,
+        status__in=BUSY_STATUSES,
+        scheduled_time__date=tomorrow,
+        reminder_sent_at__isnull=True,
+    )
+    return qs
+
+
+
+def list_confirmed_schedulings_overdue_for_auto_completion(grace_period: timedelta) -> QuerySet[Scheduling]:
+    """
+    Agendamentos CONFIRMED cujo scheduled_time já passou há mais de
+    `grace_period` e que ninguém (funcionário/admin) fechou manualmente
+    (completar, no-show, cancelar) — candidatos ao fechamento automático
+    feito por `close_overdue_schedulings`.
+
+    Cutoff é contado a partir de scheduled_time (início do atendimento),
+    não do fim (scheduled_time + duration_at_booking) — decisão de
+    produto, não técnica.
+    """
+    cutoff = timezone.now() - grace_period
+
+    qs = Scheduling.objects.filter(
+        is_active=True,
+        status=Scheduling.SchedulingStatus.CONFIRMED,
+        scheduled_time__lte=cutoff,
+    )
     return qs

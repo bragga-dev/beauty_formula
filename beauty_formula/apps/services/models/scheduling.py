@@ -12,14 +12,19 @@ from django.utils import timezone
 
 class Scheduling(models.Model):
     class SchedulingStatus(models.TextChoices):
+        CREATED = "created", _("Criado")
         CONFIRMED = "confirmed", _("Confirmado")
         COMPLETED = "completed", _("Concluído")
         CANCELED = "canceled", _("Cancelado")
         NO_SHOW = "no_show", _("Não compareceu")
         RESCHEDULED = "rescheduled", _("Reagendado")
 
-    ALLOWED_TRANSITIONS = {
-        SchedulingStatus.CONFIRMED: {
+    ALLOWED_TRANSITIONS = \
+    {
+        SchedulingStatus.CREATED: {SchedulingStatus.CONFIRMED, SchedulingStatus.CANCELED},
+
+        SchedulingStatus.CONFIRMED: 
+        {
             SchedulingStatus.COMPLETED,
             SchedulingStatus.CANCELED,
             SchedulingStatus.NO_SHOW,
@@ -36,7 +41,7 @@ class Scheduling(models.Model):
     client = models.ForeignKey('accounts.Client', on_delete=models.PROTECT, related_name="client_schedulings")
     employee = models.ForeignKey('accounts.Employee', on_delete=models.PROTECT, related_name="employee_schedulings")
     scheduled_time = models.DateTimeField(_("Horário agendado"))
-    status = models.CharField(_("Status"), max_length=20, choices=SchedulingStatus.choices, default=SchedulingStatus.CONFIRMED, db_index=True)
+    status = models.CharField(_("Status"), max_length=20, choices=SchedulingStatus.choices, default=SchedulingStatus.CREATED, db_index=True)
     price_at_booking = models.DecimalField(_("Preço no momento do agendamento"), max_digits=10, decimal_places=2, editable=False)
     duration_at_booking = models.DurationField(_("Duração no momento do agendamento"), editable=False)
     notes = models.TextField(_("Observações"), blank=True, null=True)
@@ -56,7 +61,7 @@ class Scheduling(models.Model):
     is_active = models.BooleanField(_("Ativo"), default=True, help_text=_("Desative em vez de deletar para não quebrar agendamentos antigos."))
     created_at = models.DateTimeField(_("Criado em"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Atualizado em"), auto_now=True)
-
+    reminder_sent_at = models.DateTimeField(_("Lembrete enviado em"), null=True, blank=True)
     class Meta:
         verbose_name = _("Agendamento")
         verbose_name_plural = _("Agendamentos")
@@ -137,7 +142,18 @@ class Scheduling(models.Model):
 
     @property
     def can_be_canceled_by_client(self):
-        """Verifica se o cliente pode cancelar"""
+        """
+        Verifica se o cliente pode cancelar.
+
+        Uma reserva CREATED (ainda não paga) pode ser cancelada a
+        qualquer momento — a janela mínima de 2h só se aplica a partir
+        do momento em que o agendamento é efetivamente CONFIRMED, pois
+        antes disso o horário nem está de fato ocupado (ver BUSY_STATUSES
+        em scheduling_selector).
+        """
+        if self.status == self.SchedulingStatus.CREATED:
+            return True
+
         if self.status != self.SchedulingStatus.CONFIRMED:
             return False
 
@@ -147,7 +163,7 @@ class Scheduling(models.Model):
     @property
     def can_be_canceled_by_admin(self):
         """Verifica se o admin/funcionário pode cancelar"""
-        return self.status == self.SchedulingStatus.CONFIRMED
+        return self.status in {self.SchedulingStatus.CREATED, self.SchedulingStatus.CONFIRMED}
 
     @property
     def can_be_rescheduled(self):
@@ -178,6 +194,12 @@ class Scheduling(models.Model):
         self.canceled_by = canceled_by
         self.is_active = False
         self.save()
+
+    def confirm(self):
+        """Marca uma agendamendo como Confirmado"""
+        self._ensure_transition_allowed(self.SchedulingStatus.CONFIRMED)
+        self.status = self.SchedulingStatus.CONFIRMED
+        self.save()                
 
     def complete(self):
         """Conclui o atendimento"""
