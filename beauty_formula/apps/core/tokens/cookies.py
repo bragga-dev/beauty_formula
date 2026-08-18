@@ -26,11 +26,21 @@ def set_refresh_cookie(response: HttpResponse, refresh_token: str) -> None:
         max_age=int(api_settings.REFRESH_TOKEN_LIFETIME.total_seconds()),
         path=REFRESH_COOKIE_PATH,
         httponly=True,
-        # Em dev (HTTP puro / ngrok sem TLS local) o cookie Secure seria
-        # descartado pelo browser. Em prod (DEBUG=False, sempre HTTPS por
-        # causa do SECURE_SSL_REDIRECT) fica Secure de verdade.
-        secure=not settings.DEBUG,
-        samesite="Lax",
+        # Antes: secure=not settings.DEBUG e samesite="Lax" fixos.
+        # Isso quebra quando front e back ficam em domínios diferentes
+        # (ex.: front na Vercel + back local via ngrok) — SameSite=Lax
+        # não é enviado em requisições cross-site (fetch/axios), então o
+        # refresh nunca funcionaria nesse cenário.
+        #
+        # Agora isso vem de settings.COOKIE_SECURE / settings.COOKIE_SAMESITE
+        # (definidos via env COOKIE_SECURE / COOKIE_SAMESITE), com os
+        # mesmos defaults de sempre (secure=not DEBUG, samesite=Lax) para
+        # não mudar nada no dev local puro. Para testar via Vercel + ngrok,
+        # setar no .env: COOKIE_SAMESITE=None e COOKIE_SECURE=True
+        # (SameSite=None exige Secure=True, e como Vercel e ngrok já são
+        # HTTPS, isso funciona sem problema).
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
     )
 
 

@@ -224,6 +224,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
+# Cookie do refresh token (usado em apps/core/tokens/cookies.py).
+# Default replica o comportamento antigo (Lax / secure=not DEBUG).
+# Para testar front na Vercel + back local via ngrok (domínios
+# diferentes = cross-site), setar no .env:
+#   COOKIE_SAMESITE=None
+#   COOKIE_SECURE=True
+COOKIE_SAMESITE = env("COOKIE_SAMESITE", default="Lax")
+COOKIE_SECURE = env.bool("COOKIE_SECURE", default=not DEBUG)
+
 
 # =========================================================
 # REDIS

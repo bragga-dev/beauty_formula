@@ -143,5 +143,13 @@ NINJA_JWT = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
+    # TROCAR pelo domínio real do seu projeto na Vercel
+    "https://beauty-formula-front.vercel.app",
+]
 
+# Opcional: libera também os domínios de preview que a Vercel gera por
+# branch/PR (ex.: formula-da-beleza-frontend-git-minha-branch-user.vercel.app).
+# Ajuste o prefixo pro nome real do seu projeto na Vercel.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://beauty-formula-front.*\.vercel\.app$",
 ]
