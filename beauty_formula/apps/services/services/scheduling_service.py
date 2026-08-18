@@ -474,6 +474,35 @@ def complete_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> Sche
         send_scheduling_completed_thanks.delay(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
+@transaction.atomic
+def auto_complete_overdue_scheduling(scheduling_id: UUID) -> Optional[Scheduling]:
+    """
+    Fecha automaticamente um agendamento CONFIRMED cujo horário já
+    passou e que ninguém (funcionário/admin) fechou manualmente — chamada
+    pela task periódica `close_overdue_schedulings`, nunca por uma rota.
+
+    Idempotente e silenciosa por design, no mesmo espírito de
+    `confirm_scheduling_after_payment`: se o agendamento não existe mais,
+    ou já não está mais CONFIRMED (funcionário já concluiu/marcou
+    no-show, admin cancelou, etc., entre a hora em que a task orquestradora
+    montou a lista e a hora em que essa task individual rodou), não faz
+    nada — evita sobrescrever uma decisão manual que já aconteceu.
+
+    Não dispara o e-mail de "avalie seu atendimento" — esse pedido de
+    avaliação só sai quando o funcionário conclui manualmente
+    (`complete_scheduling_for_employee`), porque aqui não há confirmação
+    real de que o serviço aconteceu.
+    """
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None or scheduling.status != Scheduling.SchedulingStatus.CONFIRMED:
+        return scheduling
+
+    scheduling = complete_scheduling_repo(scheduling)
+
+    logger.info("Agendamento %s concluído automaticamente (horário vencido).", scheduling.id)
+    return scheduling
+
+
 
 def mark_scheduling_as_no_show_for_employee(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
     """Funcionário marca um agendamento confirmado como não comparecido."""

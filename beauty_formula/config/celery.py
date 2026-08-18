@@ -10,10 +10,13 @@ app = Celery('beauty_formula')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
 app.autodiscover_tasks()
-
 app.conf.beat_schedule = {
     "send-next-day-scheduling-reminders": {
         "task": "beauty_formula.apps.services.tasks.send_next_day_scheduling_reminders.send_next_day_scheduling_reminders",
         "schedule": crontab(hour=6, minute=0),
+    },
+    "close-overdue-schedulings": {
+        "task": "beauty_formula.apps.services.tasks.close_overdue_schedulings.close_overdue_schedulings",
+        "schedule": crontab(minute=0),
     },
 }

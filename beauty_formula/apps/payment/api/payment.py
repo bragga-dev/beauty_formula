@@ -139,6 +139,7 @@ def list_all_payments_router(request, filters: PaymentFilterSchema = Query(...),
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/webhook", response={200: dict, 401: dict}, auth=None, summary="Webhook do Asaas")
+@ratelimit(key="ip", rate="60/m", block=True)
 def asaas_webhook_router(request: HttpRequest):
     received_token = request.headers.get("asaas-access-token", "")
     expected_token = settings.ASAAS_WEBHOOK_TOKEN
