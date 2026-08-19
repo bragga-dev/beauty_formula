@@ -143,8 +143,7 @@ NINJA_JWT = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
-    # TROCAR pelo domínio real do seu projeto na Vercel
-    "https://beauty-formula-front.vercel.app",
+
 ]
 
 # Opcional: libera também os domínios de preview que a Vercel gera por
@@ -153,3 +152,14 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://beauty-formula-front.*\.vercel\.app$",
 ]
+
+# O front (services/api.ts) manda `ngrok-skip-browser-warning` em TODA
+# requisição — não só quando o back está atrás de um túnel ngrok — pra não
+# precisar de dois clients axios diferentes. Sem esse header na allowlist,
+# o preflight OPTIONS responde 200 normalmente, mas o browser recusa
+# mandar a requisição real (POST/GET) por trás dos panos: no Network tab
+# só aparecem os OPTIONS, nunca a chamada seguinte, o que parece "não
+# acontece nada" sem nenhum erro óbvio de servidor.
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = list(default_headers) + ["ngrok-skip-browser-warning"]

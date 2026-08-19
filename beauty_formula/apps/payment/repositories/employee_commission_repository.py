@@ -74,16 +74,26 @@ def delete_commission(commission: EmployeeCommission) -> None:
 
 
 @transaction.atomic
-def bulk_update_commission_status(commission_ids: list[UUID], *, status: str) -> int:
+def bulk_update_commission_status(commissions: list[EmployeeCommission], *, status: str) -> int:
     """
-    Persiste o novo status pra um conjunto de IDs já resolvido e já
-    filtrado pelo service/selector (ex.: só os PENDING de um período).
-    Não decide QUAIS ids são elegíveis — só grava. `update()` em massa
-    não passa por `save()`/signals, mas o model não depende de nenhum,
-    então é seguro e bem mais rápido que um loop.
+    Recebe as instâncias já resolvidas e filtradas pelo selector (ex.: só
+    as PENDING de um período) — não faz nenhuma busca, só grava o novo
+    status em cada uma via `bulk_update`, sem passar por `save()`/signals.
     """
-    update_fields = {"status": status, "updated_at": timezone.now()}
-    if status == EmployeeCommission.CommissionStatus.PAID:
-        update_fields["paid_at"] = timezone.now()
+    if not commissions:
+        return 0
 
-    return EmployeeCommission.objects.filter(id__in=commission_ids).update(**update_fields)
+    now = timezone.now()
+    fields = ["status", "updated_at"]
+
+    for commission in commissions:
+        commission.status = status
+        commission.updated_at = now
+        if status == EmployeeCommission.CommissionStatus.PAID:
+            commission.paid_at = now
+
+    if status == EmployeeCommission.CommissionStatus.PAID:
+        fields.append("paid_at")
+
+    EmployeeCommission.objects.bulk_update(commissions, fields=fields)
+    return len(commissions)

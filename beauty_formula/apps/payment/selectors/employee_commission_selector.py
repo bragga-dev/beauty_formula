@@ -125,16 +125,15 @@ def list_completed_schedulings_without_commission(
     return Scheduling.objects.select_related("service", "employee", "client").filter(q).order_by("scheduled_time")
 
 
-def get_pending_commission_ids_in_period(
+def get_pending_commissions_in_period(
     employee_id: Optional[uuid.UUID],
     start_date: date,
     end_date: date,
-) -> list[uuid.UUID]:
-    """IDs das comissões PENDING de um período — alvo da atualização de status em lote."""
-    qs = filter_commissions(
+) -> QuerySet[EmployeeCommission]:
+    """Instâncias das comissões PENDING de um período — alvo da atualização de status em lote."""
+    return filter_commissions(
         employee_id=employee_id,
         status=EmployeeCommission.CommissionStatus.PENDING,
         start_date=start_date,
         end_date=end_date,
     )
-    return list(qs.values_list("id", flat=True))

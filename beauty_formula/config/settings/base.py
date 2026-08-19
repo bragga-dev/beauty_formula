@@ -56,7 +56,6 @@ THIRD_PARTY_APPS = [
     "ninja_jwt",
     "ninja_jwt.token_blacklist",
     "storages",
-    # "encrypted_model_fields",
     "corsheaders",
     "phonenumber_field",
 ]
@@ -94,6 +93,7 @@ INSTALLED_APPS = (
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -101,7 +101,6 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "ninja.compatibility.files.fix_request_files_middleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 
@@ -223,13 +222,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # =========================================================
 
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
-
-# Cookie do refresh token (usado em apps/core/tokens/cookies.py).
-# Default replica o comportamento antigo (Lax / secure=not DEBUG).
-# Para testar front na Vercel + back local via ngrok (domínios
-# diferentes = cross-site), setar no .env:
-#   COOKIE_SAMESITE=None
-#   COOKIE_SECURE=True
 COOKIE_SAMESITE = env("COOKIE_SAMESITE", default="Lax")
 COOKIE_SECURE = env.bool("COOKIE_SECURE", default=not DEBUG)
 
@@ -419,7 +411,7 @@ FIELD_ENCRYPTION_KEY = env("FIELD_ENCRYPTION_KEY")
 # =========================================================
 # FRONTEND  
 # =========================================================
-FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
 BACKEND_URL  = env("BACKEND_URL",  default="http://localhost:8000")
 
 

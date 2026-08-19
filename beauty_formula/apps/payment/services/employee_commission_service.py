@@ -57,7 +57,7 @@ from beauty_formula.apps.payment.selectors.employee_commission_selector import (
     get_commission_by_id,
     get_commission_by_scheduling,
     get_commissions_by_employee,
-    get_pending_commission_ids_in_period,
+    get_pending_commissions_in_period,
     list_completed_schedulings_without_commission,
 )
 from beauty_formula.apps.services.models.scheduling import Scheduling
@@ -221,10 +221,13 @@ def update_commission_status_for_period(data: CommissionBulkStatusIn) -> Commiss
     período — o passo final do fluxo: gerar o período inteiro e, depois
     de conferido, pagar tudo de uma vez.
     """
-    commission_ids = get_pending_commission_ids_in_period(
-        employee_id=data.employee_id, start_date=data.start_date, end_date=data.end_date
+    commissions = list(
+        get_pending_commissions_in_period(
+            employee_id=data.employee_id, start_date=data.start_date, end_date=data.end_date
+        )
     )
-    updated_count = bulk_update_commission_status_repo(commission_ids, status=data.status.value)
+    commission_ids = [c.id for c in commissions]
+    updated_count = bulk_update_commission_status_repo(commissions, status=data.status.value)
     return CommissionBulkStatusOut(updated_count=updated_count, commission_ids=commission_ids)
 
 
