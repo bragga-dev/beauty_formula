@@ -61,3 +61,30 @@ class SchedulingPaymentPending(Exception):
             "Este agendamento possui um pagamento pendente."
         )
         super().__init__(self.message)
+
+class CommissionNotFound(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _("Comissão não encontrada.")
+        super().__init__(self.message)
+
+
+class CommissionAlreadyExists(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _("Este agendamento já possui uma comissão registrada.")
+        super().__init__(self.message)
+
+
+class SchedulingNotCompleted(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _(
+            "Só é possível gerar comissão para um atendimento concluído (COMPLETED)."
+        )
+        super().__init__(self.message)
+
+
+class CommissionCannotBeModified(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _(
+            "Esta comissão não pode mais ser alterada — só comissões pendentes podem ser editadas ou canceladas."
+        )
+        super().__init__(self.message)
