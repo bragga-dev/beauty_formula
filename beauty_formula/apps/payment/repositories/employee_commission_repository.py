@@ -69,8 +69,17 @@ def cancel_commission(commission: EmployeeCommission) -> EmployeeCommission:
 
 
 @transaction.atomic
-def delete_commission(commission: EmployeeCommission) -> None:
-    commission.delete()
+def revert_commission_to_pending(commission: EmployeeCommission) -> EmployeeCommission:
+    """
+    Reverte uma comissão PAGA de volta pra PENDING — corrige um pagamento
+    marcado por engano, sem apagar o histórico (o registro nunca é
+    excluído, só transita de status; `paid_at` é limpo pois deixou de
+    valer).
+    """
+    commission.status = EmployeeCommission.CommissionStatus.PENDING
+    commission.paid_at = None
+    commission.save(update_fields=["status", "paid_at", "updated_at"])
+    return commission
 
 
 @transaction.atomic

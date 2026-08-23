@@ -88,3 +88,11 @@ class CommissionCannotBeModified(Exception):
             "Esta comissão não pode mais ser alterada — só comissões pendentes podem ser editadas ou canceladas."
         )
         super().__init__(self.message)
+
+
+class CommissionNotPaid(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _(
+            "Só é possível reverter comissões que estejam pagas."
+        )
+        super().__init__(self.message)

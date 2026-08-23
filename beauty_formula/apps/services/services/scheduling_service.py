@@ -96,6 +96,9 @@ FINAL_STATUSES = [
     Scheduling.SchedulingStatus.RESCHEDULED,
 ]
 from beauty_formula.apps.payment.services.payment_service import cancel_payment_for_scheduling
+from beauty_formula.apps.payment.services.employee_commission_service import (
+    generate_commission_for_completed_scheduling,
+)
 
 
 
@@ -464,11 +467,19 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
 
 @transaction.atomic
 def complete_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> SchedulingOut:
-    """Funcionário conclui um atendimento confirmado."""
+    """
+    Funcionário conclui um atendimento confirmado.
+
+    A conclusão gera automaticamente a comissão PENDING correspondente
+    (dentro da mesma transação): a partir daqui, todo atendimento
+    concluído pelo funcionário já aparece pro admin com sua comissão a
+    pagar, sem depender de geração manual/em lote.
+    """
     scheduling = _get_own_employee_scheduling(user_id, scheduling_id)
     if not scheduling.can_transition_to(Scheduling.SchedulingStatus.COMPLETED):
         raise InvalidSchedulingStatusTransition(_("Só é possível concluir um agendamento confirmado."))
     scheduling = complete_scheduling_repo(scheduling)
+    generate_commission_for_completed_scheduling(scheduling)
     rating_exist =  get_rating_for_client_service_employee(client_id=scheduling.client.id, service_id=scheduling.service.id, employee_id=scheduling.employee.id)
     if not rating_exist:
         send_scheduling_completed_thanks.delay(scheduling_id=scheduling.id)
@@ -492,12 +503,17 @@ def auto_complete_overdue_scheduling(scheduling_id: UUID) -> Optional[Scheduling
     avaliação só sai quando o funcionário conclui manualmente
     (`complete_scheduling_for_employee`), porque aqui não há confirmação
     real de que o serviço aconteceu.
+
+    A comissão, porém, é gerada do mesmo jeito: pro admin, todo COMPLETED
+    precisa aparecer com sua comissão PENDING, seja ele fechado pelo
+    funcionário ou por atraso.
     """
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None or scheduling.status != Scheduling.SchedulingStatus.CONFIRMED:
         return scheduling
 
     scheduling = complete_scheduling_repo(scheduling)
+    generate_commission_for_completed_scheduling(scheduling)
 
     logger.info("Agendamento %s concluído automaticamente (horário vencido).", scheduling.id)
     return scheduling

@@ -157,3 +157,44 @@ class CommissionBulkStatusOut(Schema):
     """Resultado da atualização de status em lote."""
     updated_count: int
     commission_ids: list[uuid.UUID]
+
+
+class CommissionBulkMarkPaidIn(Schema):
+    """
+    Marca como paga uma seleção manual e específica de comissões (ex.: o
+    admin marcou várias linhas na tabela e clicou em "pagar
+    selecionadas"). Diferente de `CommissionBulkStatusIn`, que opera
+    sobre TODO um período — aqui a seleção é explícita, por ID.
+    IDs que não existirem mais ou que não estiverem PENDING (já pagos,
+    cancelados) são simplesmente ignorados e voltam em `skipped_ids`.
+    """
+    commission_ids: list[uuid.UUID]
+
+    @field_validator("commission_ids")
+    @classmethod
+    def validate_commission_ids(cls, v: list[uuid.UUID]) -> list[uuid.UUID]:
+        if not v:
+            raise ValueError("Selecione ao menos uma comissão.")
+        return v
+
+
+class CommissionBulkMarkPaidOut(Schema):
+    """Resultado da marcação em lote por seleção manual."""
+    updated_count: int
+    commission_ids: list[uuid.UUID]
+    skipped_ids: list[uuid.UUID]
+
+
+class CommissionTotalsOut(Schema):
+    """
+    Soma dos valores de comissão por status, respeitando os mesmos
+    filtros de funcionário/período da listagem — usado pra exibir o
+    total a pagar (e o já pago/cancelado) sem precisar somar linha a
+    linha no front.
+    """
+    total_pending: Decimal
+    total_paid: Decimal
+    total_canceled: Decimal
+    pending_count: int
+    paid_count: int
+    canceled_count: int

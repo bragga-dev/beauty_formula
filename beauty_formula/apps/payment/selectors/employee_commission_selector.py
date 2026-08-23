@@ -8,7 +8,7 @@ from datetime import date
 from typing import Optional
 import uuid
 
-from django.db.models import Q, QuerySet
+from django.db.models import Q, QuerySet, Sum
 
 from beauty_formula.apps.payment.models.employee_commission_model import EmployeeCommission
 from beauty_formula.apps.services.models.scheduling import Scheduling
@@ -35,6 +35,23 @@ def get_commission_by_id(commission_id: uuid.UUID) -> Optional[EmployeeCommissio
 def get_commission_by_scheduling(scheduling_id: uuid.UUID) -> Optional[EmployeeCommission]:
     """Retorna a comissão vinculada a um agendamento (relação é OneToOne)."""
     return EmployeeCommission.objects.select_related(*DEFAULT_RELATED).filter(scheduling_id=scheduling_id).first()
+
+
+def get_commissions_by_ids(
+    commission_ids: list[uuid.UUID],
+    status: Optional[str] = None,
+) -> QuerySet[EmployeeCommission]:
+    """
+    Retorna as comissões existentes cujo ID esteja na lista informada —
+    base da marcação em lote por seleção manual (`update_status_bulk`).
+    `status` opcional restringe a busca (ex.: só as ainda PENDING, pra
+    ignorar silenciosamente quem já foi paga/cancelada e for reenviada
+    por engano numa seleção antiga).
+    """
+    qs = EmployeeCommission.objects.select_related(*DEFAULT_RELATED).filter(id__in=commission_ids)
+    if status:
+        qs = qs.filter(status=status)
+    return qs
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -123,6 +140,35 @@ def list_completed_schedulings_without_commission(
         q &= Q(scheduled_time__date__lte=end_date)
 
     return Scheduling.objects.select_related("service", "employee", "client").filter(q).order_by("scheduled_time")
+
+
+def get_commission_totals(
+    employee_id: Optional[uuid.UUID] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> dict:
+    """
+    Soma o valor das comissões por status, dentro dos mesmos filtros de
+    funcionário/período usados na listagem — independe de um filtro de
+    status pontual, pra sempre mostrar o quadro completo (quanto falta
+    pagar, quanto já foi pago, quanto foi cancelado).
+    """
+    qs = filter_commissions(employee_id=employee_id, status=None, start_date=start_date, end_date=end_date)
+
+    aggregated = qs.aggregate(
+        total_pending=Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PENDING)),
+        total_paid=Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PAID)),
+        total_canceled=Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.CANCELED)),
+    )
+
+    return {
+        "total_pending": aggregated["total_pending"] or 0,
+        "total_paid": aggregated["total_paid"] or 0,
+        "total_canceled": aggregated["total_canceled"] or 0,
+        "pending_count": qs.filter(status=EmployeeCommission.CommissionStatus.PENDING).count(),
+        "paid_count": qs.filter(status=EmployeeCommission.CommissionStatus.PAID).count(),
+        "canceled_count": qs.filter(status=EmployeeCommission.CommissionStatus.CANCELED).count(),
+    }
 
 
 def get_pending_commissions_in_period(
