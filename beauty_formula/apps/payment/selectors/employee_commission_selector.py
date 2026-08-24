@@ -63,11 +63,19 @@ def filter_commissions(
     status: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    competencia: Optional[date] = None,
 ) -> QuerySet[EmployeeCommission]:
     """
     Listagem administrativa de comissões com filtros combináveis.
-    O período filtra pela data do ATENDIMENTO (scheduling__scheduled_time),
-    não pela data de criação do registro de comissão.
+
+    `start_date`/`end_date` continuam filtrando pela data do ATENDIMENTO
+    (scheduling__scheduled_time) — úteis pra períodos ad-hoc (ex.: "toda
+    quinzena"). `competencia`, se informado, filtra pelo mês de
+    referência da comissão (qualquer dia do mês desejado serve; o filtro
+    normaliza pro mês inteiro) — é o filtro certo pra relatório mensal
+    auditável, já que reflete o valor que pode ter sido corrigido
+    manualmente pelo admin, e não necessariamente a data real do
+    agendamento.
     """
     q = Q()
 
@@ -79,6 +87,8 @@ def filter_commissions(
         q &= Q(scheduling__scheduled_time__date__gte=start_date)
     if end_date:
         q &= Q(scheduling__scheduled_time__date__lte=end_date)
+    if competencia:
+        q &= Q(competencia__year=competencia.year, competencia__month=competencia.month)
 
     return EmployeeCommission.objects.select_related(*DEFAULT_RELATED).filter(q).order_by("-scheduling__scheduled_time")
 
@@ -146,14 +156,15 @@ def get_commission_totals(
     employee_id: Optional[uuid.UUID] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    competencia: Optional[date] = None,
 ) -> dict:
     """
     Soma o valor das comissões por status, dentro dos mesmos filtros de
-    funcionário/período usados na listagem — independe de um filtro de
-    status pontual, pra sempre mostrar o quadro completo (quanto falta
-    pagar, quanto já foi pago, quanto foi cancelado).
+    funcionário/período/competência usados na listagem — independe de um
+    filtro de status pontual, pra sempre mostrar o quadro completo
+    (quanto falta pagar, quanto já foi pago, quanto foi cancelado).
     """
-    qs = filter_commissions(employee_id=employee_id, status=None, start_date=start_date, end_date=end_date)
+    qs = filter_commissions(employee_id=employee_id, status=None, start_date=start_date, end_date=end_date, competencia=competencia)
 
     aggregated = qs.aggregate(
         total_pending=Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PENDING)),

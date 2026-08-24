@@ -31,6 +31,7 @@ class EmployeeOut(Schema):
     gender_label: str
     birth_date: Optional[date] = None
     bio: Optional[str] = None
+    booking_window_days: int
       
     
     @classmethod
@@ -48,6 +49,7 @@ class EmployeeOut(Schema):
             birth_date=employee.birth_date,
             bio=employee.bio,
             photo_url=employee.photo_url, 
+            booking_window_days=employee.booking_window_days,
            
         )
 
@@ -206,6 +208,29 @@ class EmployeeTeamPageOut(Schema):
     page: int
     page_size: int
     total_pages: int
+
+
+class EmployeeBookingWindowUpdateIn(Schema):
+    """
+    Admin ajusta a janela de agendamento (`booking_window_days`) de UM
+    funcionário — quantos dias à frente a agenda dele fica aberta pra
+    clientes agendarem. Espelha os mesmos limites do model
+    (`Employee.booking_window_days`: 1 a 365 dias).
+    """
+    booking_window_days: int
+
+    @field_validator("booking_window_days")
+    @classmethod
+    def validate_booking_window(cls, v: int) -> int:
+        if not (1 <= v <= 365):
+            raise ValueError("A janela de agendamento deve ser entre 1 e 365 dias.")
+        return v
+
+
+class EmployeeBookingWindowOut(Schema):
+    """Confirmação da janela de agendamento após o ajuste."""
+    employee_id: uuid.UUID
+    booking_window_days: int
  
  
 class PromoteToEmployeeIn(Schema):
@@ -225,5 +250,7 @@ __all__ = [
     "EmployeeTeamPageOut",
     "EmployeeCreateIn",
     "EmployeeUpdateIn",
+    "EmployeeBookingWindowUpdateIn",
+    "EmployeeBookingWindowOut",
     "PromoteToEmployeeIn",
 ]

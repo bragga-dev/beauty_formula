@@ -16,6 +16,15 @@ Regras de negócio de EmployeeCommission.
 - Geração em lote é idempotente: rodar de novo pro mesmo período/
   funcionário não duplica nada, porque só considera schedulings que
   ainda não têm comissão (garantido pelo OneToOneField).
+- Toda comissão nasce com uma `competencia` (mês de referência pra
+  relatório/auditoria), calculada automaticamente a partir de
+  `scheduling.completed_at` (fallback: `scheduled_time`, pra cobrir
+  schedulings antigos sem completed_at). Esse valor calculado fica
+  congelado em `competencia_original` pra sempre; o campo `competencia`
+  em si pode ser corrigido manualmente pelo admin
+  (`update_commission_competencia_by_admin`) a qualquer momento,
+  independente do status — é só um rótulo de relatório, não mexe em
+  dinheiro.
 """
 from datetime import date
 from decimal import Decimal
@@ -25,6 +34,7 @@ from uuid import UUID
 from django.db import transaction
 from django.db.models import QuerySet
 
+from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.selectors.employee_selector import get_employee_by_user_id
 from beauty_formula.apps.core.exceptions.payment_exception import (
     CommissionAlreadyExists,
@@ -42,6 +52,7 @@ from beauty_formula.apps.payment.repositories.employee_commission_repository imp
     create_commission as create_commission_repo,
     mark_commission_as_paid as mark_commission_as_paid_repo,
     revert_commission_to_pending as revert_commission_to_pending_repo,
+    update_commission_competencia as update_commission_competencia_repo,
     update_commission_value as update_commission_value_repo,
 )
 from beauty_formula.apps.payment.schemas.employee_commission_schema import (
@@ -89,12 +100,27 @@ def _calculate_commission_value(scheduling: Scheduling) -> Decimal:
     return (scheduling.price_at_booking * scheduling.service.commission_percentage / Decimal("100")).quantize(Decimal("0.01"))
 
 
+def _calculate_reference_month(scheduling: Scheduling) -> date:
+    """
+    Mês de competência da comissão: dia 1 do mês de `completed_at`
+    (horário local). Fallback pra `scheduled_time` cobre schedulings
+    concluídos antes deste campo existir — na prática, pra tudo daqui
+    pra frente, é sempre `completed_at`.
+    """
+    from django.utils import timezone
+
+    reference_dt = scheduling.completed_at or scheduling.scheduled_time
+    reference_date = timezone.localtime(reference_dt).date()
+    return reference_date.replace(day=1)
+
+
 def _create_commission_for_completed_scheduling(scheduling: Scheduling) -> EmployeeCommission:
     """Assume que `scheduling` já foi validado como COMPLETED e sem comissão."""
     return create_commission_repo(
         employee=scheduling.employee,
         scheduling=scheduling,
         commission_value=_calculate_commission_value(scheduling),
+        competencia=_calculate_reference_month(scheduling),
     )
 
 
@@ -175,6 +201,8 @@ def generate_commissions_for_period(data: CommissionBulkGenerateIn) -> Commissio
             commission = _create_commission_for_completed_scheduling(scheduling)
             created.append(CommissionOut.from_orm(commission))
         except CommissionAlreadyExists:
+            # Corrida rara: outra geração pegou esse scheduling entre a
+            # listagem acima e este create. Só ignora e segue o lote.
             continue
 
     return CommissionBulkGenerateOut(
@@ -202,9 +230,12 @@ def list_all_commissions(
     status: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    competencia: Optional[date] = None,
 ) -> QuerySet[EmployeeCommission]:
     """Admin lista todas as comissões, com filtros combináveis."""
-    return filter_commissions(employee_id=employee_id, status=status, start_date=start_date, end_date=end_date)
+    return filter_commissions(
+        employee_id=employee_id, status=status, start_date=start_date, end_date=end_date, competencia=competencia
+    )
 
 
 @transaction.atomic
@@ -216,6 +247,25 @@ def update_commission_value_by_admin(commission_id: UUID, commission_value: Deci
 
     _ensure_pending(commission)
     commission = update_commission_value_repo(commission, commission_value=commission_value)
+    return CommissionOut.from_orm(commission)
+
+
+@transaction.atomic
+def update_commission_competencia_by_admin(commission_id: UUID, competencia: date, changed_by: User) -> CommissionOut:
+    """
+    Correção manual do mês de competência — diferente de
+    `update_commission_value_by_admin`, não é restrita a comissões
+    PENDING: é só um rótulo de relatório/auditoria, não afeta o valor
+    já pago ou o repasse em si, então pode ser corrigida mesmo numa
+    comissão PAID ou CANCELED (ex.: reclassificação retroativa de mês
+    pra um relatório fechado).
+    """
+    commission = get_commission_by_id(commission_id=commission_id)
+    if commission is None:
+        raise CommissionNotFound()
+
+    reference_month = competencia.replace(day=1)
+    commission = update_commission_competencia_repo(commission, competencia=reference_month, changed_by=changed_by)
     return CommissionOut.from_orm(commission)
 
 
@@ -263,9 +313,10 @@ def get_commission_totals_for_admin(
     employee_id: Optional[UUID] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    competencia: Optional[date] = None,
 ) -> CommissionTotalsOut:
-    """Soma o valor das comissões por status (pendente/paga/cancelada) pro período/funcionário filtrado."""
-    totals = get_commission_totals(employee_id=employee_id, start_date=start_date, end_date=end_date)
+    """Soma o valor das comissões por status (pendente/paga/cancelada) pro período/funcionário/competência filtrado."""
+    totals = get_commission_totals(employee_id=employee_id, start_date=start_date, end_date=end_date, competencia=competencia)
     return CommissionTotalsOut(**totals)
 
 

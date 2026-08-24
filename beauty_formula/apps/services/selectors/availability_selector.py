@@ -65,6 +65,16 @@ def _get_free_intervals(employee_id: UUID, target_date: date_type, exclude_sched
     return subtract_intervals(free, blocked)
 
 
+def get_free_intervals_for_date(employee_id: UUID, target_date: date_type) -> List[Interval]:
+    """
+    Wrapper público de `_get_free_intervals` — janela livre "crua" do dia
+    (sem fatiar em slots de um serviço específico). Usado pela visão de
+    calendário mensal, que só precisa saber SE existe algum espaço livre
+    naquele dia, não o tamanho exato do slot.
+    """
+    return _get_free_intervals(employee_id, target_date)
+
+
 def get_available_slots(employee_id: UUID, target_date: date_type, slot_duration: timedelta) -> List[Interval]:
     """
     Retorna os slots livres de um funcionário numa data, já fatiados no

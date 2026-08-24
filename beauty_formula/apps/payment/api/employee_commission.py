@@ -42,6 +42,7 @@ from beauty_formula.apps.payment.schemas.employee_commission_schema import (
     CommissionOut,
     CommissionStatusEnum,
     CommissionTotalsOut,
+    CommissionUpdateCompetenciaIn,
     CommissionUpdateValueIn,
 )
 from beauty_formula.apps.payment.services.employee_commission_service import (
@@ -57,6 +58,7 @@ from beauty_formula.apps.payment.services.employee_commission_service import (
     mark_commission_as_paid_by_admin,
     mark_commissions_as_paid_by_ids,
     revert_commission_to_pending_by_admin,
+    update_commission_competencia_by_admin,
     update_commission_status_for_period,
     update_commission_value_by_admin,
 )
@@ -123,6 +125,7 @@ def list_all_commissions_router(
     status: Optional[CommissionStatusEnum] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    competencia: Optional[date] = None,
 ):
     try:
         commissions_qs = list_all_commissions(
@@ -130,6 +133,7 @@ def list_all_commissions_router(
             status=status.value if status else None,
             start_date=start_date,
             end_date=end_date,
+            competencia=competencia,
         )
         result = paginate_queryset(commissions_qs, page, page_size, CommissionOut.from_orm)
         return 200, result
@@ -149,9 +153,12 @@ def get_commission_totals_router(
     employee_id: Optional[UUID] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    competencia: Optional[date] = None,
 ):
     try:
-        totals = get_commission_totals_for_admin(employee_id=employee_id, start_date=start_date, end_date=end_date)
+        totals = get_commission_totals_for_admin(
+            employee_id=employee_id, start_date=start_date, end_date=end_date, competencia=competencia
+        )
         return 200, totals
     except Exception as e:
         return 400, {"detail": str(e)}
@@ -199,6 +206,34 @@ def update_commission_value_router(request, commission_id: UUID, payload: Commis
         return 404, {"detail": str(e)}
     except CommissionCannotBeModified as e:
         return 400, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+@router.patch(
+    "/update-competencia/{uuid:commission_id}",
+    response={200: CommissionOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Admin corrige manualmente o mês de competência de uma comissão (qualquer status)",
+    description=(
+        "Reclassifica em qual mês a comissão entra nos relatórios de "
+        "auditoria. Não afeta valor nem repasse — por isso funciona "
+        "mesmo em comissões já pagas ou canceladas. O valor calculado "
+        "automaticamente na criação fica preservado em "
+        "`competencia_original` pra sempre dar pra ver se e quanto foi "
+        "ajustado manualmente."
+    ),
+)
+@ratelimit(key="user", rate="20/m", block=True)
+def update_commission_competencia_router(request, commission_id: UUID, payload: CommissionUpdateCompetenciaIn):
+    user: User = request.auth
+    try:
+        commission = update_commission_competencia_by_admin(
+            commission_id=commission_id, competencia=payload.competencia, changed_by=user
+        )
+        return 200, commission
+    except CommissionNotFound as e:
+        return 404, {"detail": str(e)}
     except Exception as e:
         return 400, {"detail": str(e)}
 

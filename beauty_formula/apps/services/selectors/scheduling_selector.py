@@ -48,6 +48,23 @@ def get_scheduling_by_id_inactive(scheduling_id: uuid.UUID) -> Optional[Scheduli
 # Buscas por Funcionário
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def get_schedulings_for_employee_calendar_date(employee_id: uuid.UUID, target_date: date_type) -> QuerySet[Scheduling]:
+    """
+    Agendamentos ATIVOS de um funcionário que caem exatamente nessa data
+    (por `scheduled_time__date`) — usado pra montar a visão de calendário
+    mensal (exibição), diferente de `get_active_schedulings_for_employee_on_date`
+    (que é pro cálculo de disponibilidade e por isso usa uma janela mais
+    ampla, incluindo o dia anterior). Cobre CREATED/CONFIRMED/COMPLETED —
+    o que já foi cancelado/no-show/reagendado (is_active=False) não
+    aparece, pra o calendário sempre refletir o estado atual da agenda.
+    """
+    return (
+        Scheduling.objects.select_related(*DEFAULT_RELATED)
+        .filter(employee_id=employee_id, scheduled_time__date=target_date, is_active=True)
+        .order_by("scheduled_time")
+    )
+
+
 def get_schedulings_by_employee(employee_id: uuid.UUID, active_only: bool = False) -> QuerySet[Scheduling]:
     """Retorna os agendamentos que um funcionário tem."""
     qs = Scheduling.objects.select_related(*DEFAULT_RELATED).filter(employee_id=employee_id)

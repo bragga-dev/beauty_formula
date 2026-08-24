@@ -42,6 +42,11 @@ class CommissionOut(Schema):
     commission_value: Decimal
     status: CommissionStatusEnum
     paid_at: Optional[datetime] = None
+    competencia: date
+    competencia_original: date
+    competencia_was_adjusted: bool
+    competencia_changed_by_name: Optional[str] = None
+    competencia_changed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -61,6 +66,15 @@ class CommissionOut(Schema):
             commission_value=commission.commission_value,
             status=commission.status,
             paid_at=commission.paid_at,
+            competencia=commission.competencia,
+            competencia_original=commission.competencia_original,
+            competencia_was_adjusted=commission.competencia != commission.competencia_original,
+            competencia_changed_by_name=(
+                commission.competencia_changed_by.email
+                if commission.competencia_changed_by_id
+                else None
+            ),
+            competencia_changed_at=commission.competencia_changed_at,
             created_at=commission.created_at,
             updated_at=commission.updated_at,
         )
@@ -88,12 +102,23 @@ class CommissionUpdateValueIn(Schema):
         return v
 
 
+class CommissionUpdateCompetenciaIn(Schema):
+    """
+    Correção manual do mês de competência de UMA comissão — qualquer
+    status (não é restrito a PENDING, já que não mexe em valor/repasse,
+    só no rótulo usado pros relatórios mensais). Aceita qualquer dia do
+    mês desejado; o mês é normalizado pro dia 1 internamente.
+    """
+    competencia: date
+
+
 class CommissionFilter(Schema):
     """Filtros combináveis para listagem — todos opcionais."""
     employee_id: Optional[uuid.UUID] = None
     status: Optional[CommissionStatusEnum] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    competencia: Optional[date] = None
 
 
 class CommissionBulkGenerateIn(Schema):

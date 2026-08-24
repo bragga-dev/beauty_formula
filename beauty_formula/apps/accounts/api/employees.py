@@ -1,11 +1,14 @@
 """
-Employees endpoints — listagem/detalhe públicos ("Nosso Time").
+Employees endpoints — listagem/detalhe públicos ("Nosso Time") e ajustes
+administrativos pontuais (janela de agendamento).
 """
 import uuid
 from ninja import Router
 from django_ratelimit.decorators import ratelimit
 
 from beauty_formula.apps.accounts.schemas.employee_schema import (
+    EmployeeBookingWindowOut,
+    EmployeeBookingWindowUpdateIn,
     EmployeeTeamDetailOut,
     EmployeeTeamOut,
 )
@@ -14,9 +17,12 @@ from beauty_formula.apps.accounts.selectors.employee_selector import (
     get_employee_by_id,
     get_public_team_employees,
 )
+from beauty_formula.apps.accounts.services.employee_service import update_employee_booking_window
 from beauty_formula.apps.services.selectors.employee_service_selector import (
     get_services_for_employee,
 )
+from beauty_formula.apps.core.exceptions.permissions import EmployeeNotFoundError
+from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
 from beauty_formula.apps.core.utils.pagination import paginate_queryset
 from beauty_formula.apps.core.schemas.deafult_schema import PageOut
 
@@ -54,3 +60,25 @@ def team_detail_router(request, employee_id: uuid.UUID):
 
     services = get_services_for_employee(employee_id)
     return 200, EmployeeTeamDetailOut.from_orm(employee, services=services)
+
+
+@router.patch(
+    "/team/{employee_id}/booking-window",
+    response={200: EmployeeBookingWindowOut, 400: MessageOut, 404: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Admin ajusta a janela de agendamento (dias à frente) de um funcionário",
+    description=(
+        "Quantos dias à frente a agenda deste funcionário fica aberta pra "
+        "clientes agendarem (padrão: 30). Substitui a antiga constante "
+        "global fixa — cada funcionário agora tem a sua própria janela."
+    ),
+)
+@ratelimit(key="user", rate="20/m", block=True)
+def update_employee_booking_window_router(request, employee_id: uuid.UUID, payload: EmployeeBookingWindowUpdateIn):
+    try:
+        result = update_employee_booking_window(employee_id=employee_id, booking_window_days=payload.booking_window_days)
+        return 200, result
+    except EmployeeNotFoundError:
+        return 404, {"detail": "Funcionário não encontrado."}
+    except Exception as e:
+        return 400, {"detail": str(e)}

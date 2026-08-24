@@ -82,6 +82,13 @@ class EmployeeAdmin(ExportCsvMixin, admin.ModelAdmin):
         }),
         (_("Contato"), {"fields": ("phone", "instagram")}),
         (_("Sobre"), {"fields": ("bio",)}),
+        (_("Agenda"), {
+            "fields": ("booking_window_days",),
+            "description": _(
+                "Quantos dias à frente a agenda deste funcionário fica aberta "
+                "pra clientes agendarem. Padrão: 30 dias."
+            ),
+        }),
         (_("Foto"), {"fields": ("photo", "photo_preview")}),
     )
 
