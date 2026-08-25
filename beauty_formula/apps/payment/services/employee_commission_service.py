@@ -76,6 +76,7 @@ from beauty_formula.apps.payment.selectors.employee_commission_selector import (
     get_commissions_by_ids,
     get_pending_commissions_in_period,
     list_completed_schedulings_without_commission,
+    list_distinct_competencias,
 )
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
@@ -318,6 +319,15 @@ def get_commission_totals_for_admin(
     """Soma o valor das comissões por status (pendente/paga/cancelada) pro período/funcionário/competência filtrado."""
     totals = get_commission_totals(employee_id=employee_id, start_date=start_date, end_date=end_date, competencia=competencia)
     return CommissionTotalsOut(**totals)
+
+
+def get_available_competencias_for_admin(employee_id: Optional[UUID] = None) -> list[date]:
+    """
+    Meses de competência que realmente existem — usado pra popular o
+    dropdown de filtro no front de forma dinâmica (só ano/mês com
+    comissão de verdade), em vez de um intervalo fixo arbitrário.
+    """
+    return list_distinct_competencias(employee_id=employee_id)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

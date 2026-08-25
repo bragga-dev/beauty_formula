@@ -194,3 +194,16 @@ def get_pending_commissions_in_period(
         start_date=start_date,
         end_date=end_date,
     )
+
+
+def list_distinct_competencias(employee_id: Optional[uuid.UUID] = None) -> list[date]:
+    """
+    Meses de competência distintos que de fato têm alguma comissão —
+    base pro dropdown de filtro "dinâmico" no front (só mostra
+    ano/mês que existem de verdade, em vez de um intervalo fixo
+    arbitrário). Mais recente primeiro.
+    """
+    qs = EmployeeCommission.objects.all()
+    if employee_id:
+        qs = qs.filter(employee_id=employee_id)
+    return list(qs.order_by("-competencia").values_list("competencia", flat=True).distinct())

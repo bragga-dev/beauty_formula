@@ -12,7 +12,7 @@ Rotas de EmployeeCommission (Comissões / repasse de funcionário).
   caso de invalidar uma comissão sem apagar o histórico.
 """
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from django_ratelimit.decorators import ratelimit
@@ -49,6 +49,7 @@ from beauty_formula.apps.payment.services.employee_commission_service import (
     cancel_commission_by_admin,
     create_commission_for_scheduling,
     generate_commissions_for_period,
+    get_available_competencias_for_admin,
     get_commission_detail,
     get_commission_totals_for_admin,
     get_own_commission_detail_for_employee,
@@ -160,6 +161,28 @@ def get_commission_totals_router(
             employee_id=employee_id, start_date=start_date, end_date=end_date, competencia=competencia
         )
         return 200, totals
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+@router.get(
+    "/competencias",
+    response={200: List[date], 400: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Admin vê os meses de competência que realmente têm comissão (pra popular o filtro dinamicamente)",
+    description=(
+        "Lista, mais recente primeiro, os meses (dia 1) em que existe ao "
+        "menos uma comissão — filtrado por funcionário se informado. Usado "
+        "pra montar o dropdown de filtro de competência só com "
+        "ano/mês que existem de verdade, em vez de um intervalo fixo "
+        "arbitrário."
+    ),
+)
+@ratelimit(key="user", rate="30/m", block=True)
+def get_available_competencias_router(request, employee_id: Optional[UUID] = None):
+    try:
+        competencias = get_available_competencias_for_admin(employee_id=employee_id)
+        return 200, competencias
     except Exception as e:
         return 400, {"detail": str(e)}
 
