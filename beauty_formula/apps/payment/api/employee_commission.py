@@ -59,6 +59,7 @@ from beauty_formula.apps.payment.services.employee_commission_service import (
     mark_commission_as_paid_by_admin,
     mark_commissions_as_paid_by_ids,
     revert_commission_to_pending_by_admin,
+    sync_missing_commissions,
     update_commission_competencia_by_admin,
     update_commission_status_for_period,
     update_commission_value_by_admin,
@@ -102,6 +103,21 @@ def create_commission_router(request, payload: CommissionCreateIn):
 def generate_commissions_for_period_router(request, payload: CommissionBulkGenerateIn):
     try:
         result = generate_commissions_for_period(payload)
+        return 201, result
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+@router.post(
+    "/sync",
+    response={201: CommissionBulkGenerateOut, 400: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Admin varre TODO o histórico (sem recorte de período) e gera a comissão de todo COMPLETED que ainda não tem",
+)
+@ratelimit(key="user", rate="10/m", block=True)
+def sync_missing_commissions_router(request, employee_id: Optional[UUID] = None):
+    try:
+        result = sync_missing_commissions(employee_id=employee_id)
         return 201, result
     except Exception as e:
         return 400, {"detail": str(e)}

@@ -88,6 +88,7 @@ from beauty_formula.apps.core.exceptions import (
 )
 
 from beauty_formula.apps.core.exceptions import (
+    AccountHasProtectedRecords,
     EmailNotVerified,
     InvalidCredentials, 
     InvalidGoogleToken,
@@ -146,7 +147,7 @@ def me_router(request):
 @ratelimit(key="ip", rate="5/m", block=True)
 def login_router(request, payload: LoginIn):
     try:
-        tokens = login_user(payload.email, payload.password)
+        tokens = login_user(payload.email, payload.password, user_agent=request.headers.get("User-Agent", ""))
     except EmailNotVerified:
         return 403, {"detail": "E-mail não verificado."}
     except InvalidCredentials:
@@ -171,7 +172,9 @@ def login_router(request, payload: LoginIn):
 @ratelimit(key="ip", rate="10/m", block=True)
 def google_login_router(request, payload: GoogleLoginIn):
     try:
-        tokens, created = login_or_register_client_google(payload.id_token)
+        tokens, created = login_or_register_client_google(
+            payload.id_token, user_agent=request.headers.get("User-Agent", "")
+        )
     except InvalidGoogleToken as e:
         return 401, {"detail": str(e)}
 
@@ -300,7 +303,7 @@ def refresh_router(request):
 @ratelimit(key="ip", rate="5/h", block=True)
 def register_router(request, payload: RegisterIn):
     try:
-        tokens = register_user_default_client(payload)
+        tokens = register_user_default_client(payload, user_agent=request.headers.get("User-Agent", ""))
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
 
@@ -355,6 +358,7 @@ def change_password_router(request, payload: ChangePasswordIn):
             user=request.auth,
             old_password=payload.old_password,
             new_password=payload.new_password,
+            user_agent=request.headers.get("User-Agent", ""),
         )
     except InvalidPassword as e:
         return 400, {"detail": str(e)}
@@ -371,10 +375,12 @@ def change_password_router(request, payload: ChangePasswordIn):
     summary="Exclui a própria conta",
     description=(
         "Exclusão de conta pelo próprio usuário (LGPD — direito de eliminação). "
-        "Exige confirmação de senha. Não é um hard-delete: o registro é mantido "
-        "para preservar vínculos (agendamentos, pagamentos, etc.), mas todo dado "
-        "pessoal do perfil é apagado/anonimizado, a senha se torna inutilizável "
-        "e todas as sessões são revogadas imediatamente."
+        "Exige confirmação de senha. É um hard-delete: o registro do usuário e "
+        "do perfil (cliente/funcionário) é apagado do banco e todas as sessões "
+        "são revogadas imediatamente. Bloqueado se a conta tiver agendamento, "
+        "pagamento, comissão, avaliação ou atribuição de serviço vinculados — "
+        "esses registros continuam protegidos para preservar o histórico "
+        "financeiro/operacional auditável."
     ),
 )
 @ratelimit(key="user", rate="5/h", block=True)
@@ -383,6 +389,8 @@ def delete_account_router(request, payload: DeleteAccountIn):
         delete_own_account(user=request.auth, password=payload.password)
         return 200, {"detail": "Conta excluída com sucesso."}
     except InvalidPassword as e:
+        return 400, {"detail": str(e)}
+    except AccountHasProtectedRecords as e:
         return 400, {"detail": str(e)}
 
 

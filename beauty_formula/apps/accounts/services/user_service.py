@@ -5,6 +5,7 @@ import logging
 import uuid
 
 from django.db import transaction
+from django.db.models import ProtectedError
 from django.utils import timezone
 
 from ninja_jwt.token_blacklist.models import BlacklistedToken, OutstandingToken
@@ -58,6 +59,7 @@ from beauty_formula.apps.accounts.tasks.verification_account import (
 from beauty_formula.apps.core.exceptions.permissions import PermissionDenied
 from beauty_formula.apps.core.exceptions.auth import InvalidGoogleToken, InvalidPassword
 from beauty_formula.apps.core.exceptions.user import UserAlreadyExists
+from beauty_formula.apps.core.exceptions.user import AccountHasProtectedRecords
 
 
 from beauty_formula.apps.core.exceptions.user import UserNotFound
@@ -107,7 +109,7 @@ def update_employee_profile(user_id: uuid.UUID, payload: EmployeeUpdateIn) -> Em
 
 
 @transaction.atomic
-def register_user_default_client(data: RegisterIn) -> dict:
+def register_user_default_client(data: RegisterIn, user_agent: str = "") -> dict:
     """
     Cria o User + Client e dispara e-mail de verificação.
     Retorna os tokens JWT diretamente para o cliente já poder operar.
@@ -120,11 +122,11 @@ def register_user_default_client(data: RegisterIn) -> dict:
         create_client(user)
 
     send_verification_email.delay(user.pk)   
-    return make_tokens(user)
+    return make_tokens(user, user_agent=user_agent)
 
 
 @transaction.atomic
-def login_or_register_client_google(id_token: str) -> tuple[dict, bool]:
+def login_or_register_client_google(id_token: str, user_agent: str = "") -> tuple[dict, bool]:
     """
     Login/Cadastro de Cliente via Google (Sign in with Google).
 
@@ -159,7 +161,7 @@ def login_or_register_client_google(id_token: str) -> tuple[dict, bool]:
     if not user.is_active or not user.is_trusty:
         user = activate_user(user)
 
-    return make_tokens(user), created
+    return make_tokens(user, user_agent=user_agent), created
 
 
 @transaction.atomic
@@ -278,7 +280,10 @@ def delete_own_account(user: User, password: str) -> None:
             profile.photo.delete(save=False)
  
     revoke_all_tokens(user)
-    delete_user(user)
+    try:
+        delete_user(user)
+    except ProtectedError:
+        raise AccountHasProtectedRecords()
  
 
 

@@ -219,6 +219,35 @@ def generate_commissions_for_period(data: CommissionBulkGenerateIn) -> Commissio
     )
 
 
+def sync_missing_commissions(employee_id: Optional[UUID] = None) -> CommissionBulkGenerateOut:
+    """
+    Varre TODO o histórico (sem recorte de período) atrás de atendimentos
+    COMPLETED que ainda não têm comissão e gera a comissão PENDING de
+    cada um. `employee_id=None` cobre todos os funcionários.
+
+    A geração automática (`generate_commission_for_completed_scheduling`,
+    disparada na conclusão do atendimento) já cobre o fluxo normal — esta
+    função existe só pra corrigir o que porventura tenha escapado dela
+    (falha pontual, dado legado). Idempotente: rodar de novo não duplica
+    nada, e atendimento que já tem comissão nem entra na varredura.
+    """
+    schedulings = list(list_completed_schedulings_without_commission(employee_id=employee_id))
+    total = len(schedulings)
+
+    created = []
+    for scheduling in schedulings:
+        result = generate_commission_for_completed_scheduling(scheduling)
+        if result is not None:
+            created.append(result)
+
+    return CommissionBulkGenerateOut(
+        created=created,
+        created_count=len(created),
+        skipped_count=total - len(created),
+        total_completed_schedulings=total,
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Admin — leitura / edição / exclusão individual
 # ═══════════════════════════════════════════════════════════════════════════════
