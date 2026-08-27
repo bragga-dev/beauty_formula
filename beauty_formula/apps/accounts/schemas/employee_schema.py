@@ -127,6 +127,12 @@ class EmployeeTeamOut(Schema):
     Card resumido pra listagem pública "Nosso Time". Deliberadamente NÃO
     inclui `user`/email, telefone nem username — é uma vitrine pública,
     não a mesma coisa que EmployeeOut (usado em telas autenticadas/admin).
+
+    `booking_window_days` é exposto aqui (mesmo sendo uma config
+    administrativa) porque o front do fluxo de agendamento/reagendamento
+    precisa dele pra saber até quantos dias no futuro pode montar o
+    calendário desse funcionário — sem isso, o calendário fica travado
+    numa janela fixa que ignora o valor configurado pelo admin.
     """
     id: uuid.UUID
     first_name: Optional[str] = None
@@ -134,7 +140,8 @@ class EmployeeTeamOut(Schema):
     photo_url: Optional[str] = None
     bio: Optional[str] = None
     instagram: Optional[str] = None
- 
+    booking_window_days: int
+
     @classmethod
     def from_orm(cls, employee: Employee) -> "EmployeeTeamOut":
         return cls(
@@ -144,6 +151,7 @@ class EmployeeTeamOut(Schema):
             photo_url=employee.photo_url,
             bio=employee.bio,
             instagram=employee.instagram,
+            booking_window_days=employee.booking_window_days,
         )
  
     
@@ -193,6 +201,7 @@ class EmployeeTeamDetailOut(EmployeeTeamOut):
             photo_url=employee.photo_url,
             bio=employee.bio,
             instagram=employee.instagram,
+            booking_window_days=employee.booking_window_days,
             # Lista de EmployeeService *crus* (model Django) — não pré-
             # converter pra EmployeeServiceLinkOut aqui. O pydantic/ninja
             # resolve o schema aninhado (e o ServiceOut dentro dele) numa

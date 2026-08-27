@@ -24,6 +24,9 @@ from beauty_formula.apps.core.exceptions.service_exception import InvalidAvailab
 from beauty_formula.apps.services.schemas.employee_calendar_schema import (
     EmployeeCalendarDayOut,
     EmployeeCalendarOut,
+    FreeIntervalOut,
+    PublicEmployeeCalendarDayOut,
+    PublicEmployeeCalendarOut,
     SchedulingSummaryOut,
     TimeOffBlockOut,
     WorkingHoursBlockOut,
@@ -35,14 +38,16 @@ from beauty_formula.apps.services.selectors.employee_working_hours_selector impo
 )
 from beauty_formula.apps.services.selectors.scheduling_selector import get_schedulings_for_employee_calendar_date
 
-# Limite de meses pra trás/frente que dá pra consultar — evita alguém
-# pedir o calendário de 1990 ou de daqui a 50 anos por engano/abuso.
 MAX_MONTHS_RANGE = 24
 
 
-def _build_day(employee_id: UUID, target_date: date_type, booking_window_days: int, today: date_type) -> EmployeeCalendarDayOut:
-    weekday = target_date.weekday()
-
+def _build_working_hours_and_time_off(employee_id: UUID, target_date: date_type, weekday: int):
+    """
+    Parte comum aos dois calendários (admin e público): expediente do dia
+    da semana e bloqueios (recorrentes + pontuais) que caem na data. Nem
+    um nem outro carrega dado de cliente, então dá pra reusar sem
+    restrição entre a view admin e a pública.
+    """
     working_hours = [
         WorkingHoursBlockOut(start_time=wh.start_time, end_time=wh.end_time)
         for wh in get_working_hours_for_employee_weekday(employee_id=employee_id, weekday=weekday)
@@ -58,6 +63,13 @@ def _build_day(employee_id: UUID, target_date: date_type, booking_window_days: i
         )
         for block in get_time_off_for_employee_on_date(employee_id=employee_id, weekday=weekday, target_date=target_date)
     ]
+
+    return working_hours, time_off_blocks
+
+
+def _build_day(employee_id: UUID, target_date: date_type, booking_window_days: int, today: date_type) -> EmployeeCalendarDayOut:
+    weekday = target_date.weekday()
+    working_hours, time_off_blocks = _build_working_hours_and_time_off(employee_id, target_date, weekday)
 
     schedulings = [
         SchedulingSummaryOut(
@@ -113,6 +125,69 @@ def get_employee_calendar(employee_id: UUID, month: date_type) -> EmployeeCalend
     ]
 
     return EmployeeCalendarOut(
+        employee_id=employee.id,
+        employee_name=employee.get_full_name(),
+        month=first_day,
+        booking_window_days=employee.booking_window_days,
+        days=days,
+    )
+
+
+def _build_public_day(
+    employee_id: UUID, target_date: date_type, booking_window_days: int, today: date_type
+) -> PublicEmployeeCalendarDayOut:
+    weekday = target_date.weekday()
+    working_hours, time_off_blocks = _build_working_hours_and_time_off(employee_id, target_date, weekday)
+    free_intervals = (
+        [
+            FreeIntervalOut(start_time=timezone.localtime(interval.start).time(), end_time=timezone.localtime(interval.end).time())
+            for interval in get_free_intervals_for_date(employee_id=employee_id, target_date=target_date)
+        ]
+        if target_date >= today
+        else []
+    )
+    is_within_booking_window = today <= target_date <= today + timedelta(days=booking_window_days)
+
+    return PublicEmployeeCalendarDayOut(
+        date=target_date,
+        weekday=weekday,
+        weekday_label=calendar.day_name[weekday],
+        is_within_booking_window=is_within_booking_window,
+        working_hours=working_hours,
+        time_off_blocks=time_off_blocks,
+        free_intervals=free_intervals,
+        has_open_slots=bool(free_intervals),
+    )
+
+
+def get_public_employee_calendar(employee_id: UUID, month: date_type) -> PublicEmployeeCalendarOut:
+    """
+    Versão pública (sem auth) do calendário mensal: mesmo expediente e
+    bloqueios da view admin, mas troca a lista de agendamentos (que leva
+    `client_name`) pelos intervalos livres já calculados — dá pra ver
+    toda a disponibilidade e todos os bloqueios do funcionário sem
+    expor nenhum dado de cliente.
+    """
+    employee = get_employee_by_id(employee_id=employee_id)
+    if employee is None:
+        raise EmployeeNotFoundError()
+
+    today = timezone.localdate()
+    months_diff = (month.year - today.year) * 12 + (month.month - today.month)
+    if abs(months_diff) > MAX_MONTHS_RANGE:
+        raise InvalidAvailabilityRequest(
+            _("Só é possível consultar o calendário até %(months)s meses de distância de hoje.") % {"months": MAX_MONTHS_RANGE}
+        )
+
+    first_day = month.replace(day=1)
+    _, days_in_month = calendar.monthrange(first_day.year, first_day.month)
+
+    days = [
+        _build_public_day(employee_id, first_day.replace(day=day_number), employee.booking_window_days, today)
+        for day_number in range(1, days_in_month + 1)
+    ]
+
+    return PublicEmployeeCalendarOut(
         employee_id=employee.id,
         employee_name=employee.get_full_name(),
         month=first_day,

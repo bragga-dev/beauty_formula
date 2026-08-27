@@ -24,15 +24,6 @@ class EmployeeCommission(models.Model):
     commission_value = models.DecimalField(_("Valor da comissão"), max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.00"))])
     status = models.CharField(_("Status"), max_length=20, choices=CommissionStatus.choices, default=CommissionStatus.PENDING, db_index=True)
     paid_at = models.DateTimeField( _("Pago em"), null=True, blank=True)
-
-    # ── Competência (mês de referência p/ auditoria e relatórios) ──────────
-    # `competencia_original` é um snapshot imutável, calculado automaticamente
-    # (a partir de scheduling.completed_at, ou scheduled_time como fallback)
-    # no momento da criação — nunca muda depois, é a referência de auditoria.
-    # `competencia` é o valor EFETIVO usado nos relatórios: nasce igual ao
-    # original, mas o admin pode sobrescrever pra corrigir um caso pontual
-    # (ex.: atendimento concluído com atraso já no mês seguinte, correção
-    # retroativa). Sempre um DateField truncado no dia 1 do mês.
     competencia_original = models.DateField(_("Competência original (calculada)"), editable=False, default=date.today)
     competencia = models.DateField(_("Competência (mês de referência)"), db_index=True, default=date.today)
     competencia_changed_by = models.ForeignKey(

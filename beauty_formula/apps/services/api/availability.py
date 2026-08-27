@@ -19,12 +19,18 @@ from beauty_formula.apps.core.exceptions.service_exception import (
 )
 from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
 from beauty_formula.apps.services.schemas.availability_schema import AvailabilitySlotOut
-from beauty_formula.apps.services.schemas.employee_calendar_schema import EmployeeCalendarOut
+from beauty_formula.apps.services.schemas.employee_calendar_schema import (
+    EmployeeCalendarOut,
+    PublicEmployeeCalendarOut,
+)
 from beauty_formula.apps.services.services.availability_service import (
     get_employee_availability,
     list_eligible_employees_for_service,
 )
-from beauty_formula.apps.services.services.employee_calendar_service import get_employee_calendar
+from beauty_formula.apps.services.services.employee_calendar_service import (
+    get_employee_calendar,
+    get_public_employee_calendar,
+)
 
 router = Router()
 
@@ -73,6 +79,32 @@ def employee_availability_router(request, employee_id: UUID, service_id: UUID, d
         return 404, {"detail": str(e)}
     except AssociationNotFound as e:
         return 404, {"detail": str(e)}
+    except EmployeeNotFoundError:
+        return 404, {"detail": "Funcionário não encontrado."}
+    except InvalidAvailabilityRequest as e:
+        return 400, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": str(e)}
+
+
+@router.get(
+    "/employee/{employee_id}/public-calendar",
+    response={200: PublicEmployeeCalendarOut, 400: MessageOut, 404: MessageOut},
+    auth=None,
+    summary="Calendário mensal público de um funcionário (expediente, bloqueios e disponibilidade real, sem dado de cliente)",
+    description=(
+        "Versão pública da tela de calendário: pra cada dia do mês pedido, "
+        "devolve o expediente, os bloqueios (folgas/férias/pausas) e os "
+        "intervalos realmente livres (já descontando expediente, bloqueios "
+        "e agendamentos existentes) — sem login exigido e sem nenhum dado "
+        "de cliente ou agendamento específico."
+    ),
+)
+@ratelimit(key="ip", rate="60/m", block=True)
+def public_employee_calendar_router(request, employee_id: UUID, month: date):
+    try:
+        calendar_data = get_public_employee_calendar(employee_id=employee_id, month=month)
+        return 200, calendar_data
     except EmployeeNotFoundError:
         return 404, {"detail": "Funcionário não encontrado."}
     except InvalidAvailabilityRequest as e:

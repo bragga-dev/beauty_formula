@@ -55,10 +55,47 @@ class EmployeeCalendarOut(Schema):
     days: List[EmployeeCalendarDayOut]
 
 
+class FreeIntervalOut(Schema):
+    """Um intervalo livre real dentro do dia, já descontando expediente, bloqueios e agendamentos existentes."""
+    start_time: time
+    end_time: time
+
+
+class PublicEmployeeCalendarDayOut(Schema):
+    """
+    Um dia do calendário mensal PÚBLICO de um funcionário — mesma base
+    de expediente e bloqueios do dia admin (`EmployeeCalendarDayOut`),
+    mas sem `schedulings`: em vez da lista de agendamentos (que carrega
+    `client_name`), expõe só os intervalos livres já calculados
+    (`free_intervals`), o suficiente pra um visitante ver a disponibilidade
+    real do dia sem nenhum dado de cliente.
+    """
+    date: date
+    weekday: int
+    weekday_label: str
+    is_within_booking_window: bool
+    working_hours: List[WorkingHoursBlockOut]
+    time_off_blocks: List[TimeOffBlockOut]
+    free_intervals: List[FreeIntervalOut]
+    has_open_slots: bool
+
+
+class PublicEmployeeCalendarOut(Schema):
+    """Calendário mensal público de um funcionário — sem auth, sem dado de cliente."""
+    employee_id: UUID
+    employee_name: str
+    month: date
+    booking_window_days: int
+    days: List[PublicEmployeeCalendarDayOut]
+
+
 __all__ = [
     "WorkingHoursBlockOut",
     "TimeOffBlockOut",
     "SchedulingSummaryOut",
     "EmployeeCalendarDayOut",
     "EmployeeCalendarOut",
+    "FreeIntervalOut",
+    "PublicEmployeeCalendarDayOut",
+    "PublicEmployeeCalendarOut",
 ]

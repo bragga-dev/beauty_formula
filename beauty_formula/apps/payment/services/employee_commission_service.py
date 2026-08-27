@@ -18,10 +18,11 @@ Regras de negócio de EmployeeCommission.
   ainda não têm comissão (garantido pelo OneToOneField).
 - Toda comissão nasce com uma `competencia` (mês de referência pra
   relatório/auditoria), calculada automaticamente a partir de
-  `scheduling.completed_at` (fallback: `scheduled_time`, pra cobrir
-  schedulings antigos sem completed_at). Esse valor calculado fica
-  congelado em `competencia_original` pra sempre; o campo `competencia`
-  em si pode ser corrigido manualmente pelo admin
+  `scheduling.scheduled_time` — o mês em que o atendimento de fato
+  aconteceu (regime de competência), não em que foi fechado/concluído
+  no sistema. Esse valor calculado fica congelado em
+  `competencia_original` pra sempre; o campo `competencia` em si pode
+  ser corrigido manualmente pelo admin
   (`update_commission_competencia_by_admin`) a qualquer momento,
   independente do status — é só um rótulo de relatório, não mexe em
   dinheiro.
@@ -103,15 +104,21 @@ def _calculate_commission_value(scheduling: Scheduling) -> Decimal:
 
 def _calculate_reference_month(scheduling: Scheduling) -> date:
     """
-    Mês de competência da comissão: dia 1 do mês de `completed_at`
-    (horário local). Fallback pra `scheduled_time` cobre schedulings
-    concluídos antes deste campo existir — na prática, pra tudo daqui
-    pra frente, é sempre `completed_at`.
+    Mês de competência da comissão: dia 1 do mês de `scheduled_time`
+    (horário local) — a data em que o ATENDIMENTO de fato aconteceu, não
+    a data em que alguém clicou em "concluir" no sistema.
+
+    Antes essa base era `completed_at`, mas isso mistura regime de
+    competência com burocracia operacional: um corte feito de verdade
+    dia 31/07 não deveria virar competência de agosto só porque o
+    fechamento no sistema atrasou. Regime de competência (contábil,
+    folha de pagamento, e a prática do mercado — Trinks/Booksy/Fresha)
+    sempre reconhece o fato no mês em que ele OCORREU, não em que foi
+    processado.
     """
     from django.utils import timezone
 
-    reference_dt = scheduling.completed_at or scheduling.scheduled_time
-    reference_date = timezone.localtime(reference_dt).date()
+    reference_date = timezone.localtime(scheduling.scheduled_time).date()
     return reference_date.replace(day=1)
 
 
@@ -202,8 +209,6 @@ def generate_commissions_for_period(data: CommissionBulkGenerateIn) -> Commissio
             commission = _create_commission_for_completed_scheduling(scheduling)
             created.append(CommissionOut.from_orm(commission))
         except CommissionAlreadyExists:
-            # Corrida rara: outra geração pegou esse scheduling entre a
-            # listagem acima e este create. Só ignora e segue o lote.
             continue
 
     return CommissionBulkGenerateOut(
