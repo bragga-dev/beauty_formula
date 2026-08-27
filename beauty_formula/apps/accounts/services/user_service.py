@@ -60,6 +60,11 @@ from beauty_formula.apps.core.exceptions.permissions import PermissionDenied
 from beauty_formula.apps.core.exceptions.auth import InvalidGoogleToken, InvalidPassword
 from beauty_formula.apps.core.exceptions.user import UserAlreadyExists
 from beauty_formula.apps.core.exceptions.user import AccountHasProtectedRecords
+from django.db.models import ProtectedError
+from beauty_formula.apps.accounts.repositories.client_repository import detach_client_user
+from beauty_formula.apps.core.exceptions.user import ClientHasActiveSchedulings
+from beauty_formula.apps.services.selectors.scheduling_selector import get_schedulings_by_client
+
 
 
 from beauty_formula.apps.core.exceptions.user import UserNotFound
@@ -189,15 +194,8 @@ def register_user_default_employee(data: RegisterEmployeeIn) -> dict:
     send_verification_email_employee.delay(user.pk, password)
     return {"email": user.email}
 
-
 @transaction.atomic
 def promote_client_to_employee(user_id: uuid.UUID, performed_by=None) -> Employee:
-    """
-    Promove um client existente para employee: valida que o usuário
-    existe e é client, muda a role, remove o profile de Client antigo
-    (evita duplicidade/órfão) e cria o profile de Employee.
-    Restrito a admin (AdminOnlyAuth na rota).
-    """
     role = User.UserRole.CLIENT
     user = get_user_confirmed_by_role(user_id=user_id, role=role)
     if not user or user.role != User.UserRole.CLIENT:
@@ -206,7 +204,14 @@ def promote_client_to_employee(user_id: uuid.UUID, performed_by=None) -> Employe
 
     old_client = get_client_by_user_id(user.id)
     if old_client:
-        delete_client(old_client)
+        if get_schedulings_by_client(old_client.id, active_only=True).exists():
+            logger.warning(f"Promoção abortada: cliente {user_id} tem agendamento ativo")
+            raise ClientHasActiveSchedulings()
+
+        try:
+            delete_client(old_client)
+        except ProtectedError:
+            detach_client_user(old_client)
 
     user.role = User.UserRole.EMPLOYEE
     user.save(update_fields=["role"])

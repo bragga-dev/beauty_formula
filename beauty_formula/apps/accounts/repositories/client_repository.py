@@ -81,3 +81,8 @@ def set_client_asaas_customer_id(client: Client, asaas_customer_id: str) -> Clie
     client.asaas_customer_id = asaas_customer_id
     client.save(update_fields=["asaas_customer_id"])
     return client
+
+
+def detach_client_user(client: Client) -> None:
+    client.user = None
+    client.save(update_fields=["user"])

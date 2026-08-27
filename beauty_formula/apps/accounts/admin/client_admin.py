@@ -112,7 +112,7 @@ class ClientAdmin(ExportCsvMixin, admin.ModelAdmin):
 
     @admin.display(description=_("E-mail"), ordering="user__email")
     def user_email(self, obj):
-        return obj.user.email
+        return obj.user.email if obj.user else "—"
 
     @admin.display(description=_("Gênero"))
     def gender_display(self, obj):

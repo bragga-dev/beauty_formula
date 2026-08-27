@@ -79,25 +79,30 @@ from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_ema
 
 from beauty_formula.apps.accounts.tasks.verification_account import send_verification_email
 
-from beauty_formula.apps.core.exceptions import (
-    EmailNotVerified,
+from beauty_formula.apps.core.exceptions.auth import (
     InvalidCredentials,
     InvalidPassword,
     InvalidToken,
-    UserAlreadyExists,
+    InvalidGoogleToken,
+    SessionNotFound,
 )
 
-from beauty_formula.apps.core.exceptions import (
-    AccountHasProtectedRecords,
-    EmailNotVerified,
-    InvalidCredentials, 
-    InvalidGoogleToken,
-    InvalidImageFile,
-    InvalidPassword,
-    InvalidToken, 
-    SessionNotFound,
-    UserAlreadyExists, 
+from beauty_formula.apps.core.exceptions.user import (
+    UserAlreadyExists,
     UserNotFound,
+    EmailNotVerified,
+    AccountHasProtectedRecords,
+    ClientHasActiveSchedulings,
+
+)
+
+from beauty_formula.apps.core.exceptions.media import InvalidImageFile
+from beauty_formula.apps.core.exceptions.permissions import (
+    PermissionDenied,
+    EmployeeNotFoundError,
+    ClientNotFoundError,
+    ClientNotActiveError,
+
 )
 
 from beauty_formula.apps.core.permissions.auth_classes import (
@@ -432,7 +437,12 @@ def register_employee_router(request, payload: RegisterEmployeeIn):
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
 
-@router.post("/promote-client-to-employee/{user_id}", response={201: EmployeeOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Promove Cliente a Funcionário.")
+@router.post(
+    "/promote-client-to-employee/{user_id}",
+    response={201: EmployeeOut, 404: MessageOut, 409: MessageOut, 400: MessageOut},
+    auth=AdminOnlyAuth(),
+    summary="Promove Cliente a Funcionário.",
+)
 @ratelimit(key="ip", rate="20/h", block=True)
 def promote_to_employee_router(request, user_id: uuid.UUID):
     try:
@@ -440,10 +450,8 @@ def promote_to_employee_router(request, user_id: uuid.UUID):
         return 201, EmployeeOut.from_orm(employee=employee)
     except UserNotFound as e:
         return 404, {"detail": str(e)}
-    # Sem `except Exception` genérico aqui: qualquer erro inesperado (fora
-    # de UserNotFound, que é a única exceção de domínio que este service
-    # levanta) deve virar 500 e ser logado pelo handler global — não 400
-    # com a mensagem crua da exceção exposta pro cliente.
+    except ClientHasActiveSchedulings as e:
+        return 409, {"detail": str(e)}
     
 
 @router.post("/deactive-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Desativa Usuário.")
