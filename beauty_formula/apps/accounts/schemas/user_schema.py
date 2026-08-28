@@ -205,6 +205,7 @@ class SessionOut(Schema):
     id:         int
     created_at: Optional[datetime] = None
     expires_at: datetime
+    device:     Optional[str] = None
 
     @classmethod
     def from_orm(cls, token) -> "SessionOut":
@@ -212,6 +213,7 @@ class SessionOut(Schema):
             id=token.id,
             created_at=token.created_at,
             expires_at=token.expires_at,
+            device=getattr(token, "device", None),
         )
 
 

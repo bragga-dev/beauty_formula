@@ -15,3 +15,16 @@ class UserNotFound(Exception):
 
 class EmailNotVerified(Exception):
     pass
+
+
+class AccountHasProtectedRecords(Exception):
+    def __init__(self, message=None):
+        if message is None:
+            message = _("Você tem agendamentos, não é possível excluir a conta.")
+        super().__init__(message)
+
+class ClientHasActiveSchedulings(Exception):
+    def __init__(self, message=None):
+        if message is None:
+            message = _("Cliente possui agendamento ativo. Cancele ou conclua antes de promover.")
+        super().__init__(message)

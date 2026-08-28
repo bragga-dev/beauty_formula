@@ -36,7 +36,8 @@ class Client(models.Model):
     asaas_customer_id = models.CharField(_("ID do cliente na Asaas"), max_length=50, blank=True, null=True, db_index=True)
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.user.email})"
+        email = self.user.email if self.user else "desvinculado"
+        return f"{self.first_name} {self.last_name} ({email})"
     
     class Meta:
         verbose_name = _("Cliente")

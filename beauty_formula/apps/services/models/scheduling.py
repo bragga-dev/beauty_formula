@@ -49,6 +49,17 @@ class Scheduling(models.Model):
     canceled_reason = models.CharField(_("Motivo do cancelamento"), max_length=255, blank=True, null=True)
     canceled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="canceled_schedulings")
     rated_at = models.DateTimeField(_("Avaliado em"), blank=True, null=True)
+    completed_at = models.DateTimeField(
+        _("Concluído em"),
+        blank=True,
+        null=True,
+        help_text=_(
+            "Momento exato em que o status virou COMPLETED. Diferente de "
+            "`updated_at` (que muda a qualquer edição), este campo só é "
+            "preenchido uma vez, dentro de complete() — é a base usada pra "
+            "calcular a competência (mês) da comissão gerada a partir daqui."
+        ),
+    )
     rescheduled_to = models.OneToOneField(
         "self",
         on_delete=models.SET_NULL,
@@ -205,6 +216,7 @@ class Scheduling(models.Model):
         """Conclui o atendimento"""
         self._ensure_transition_allowed(self.SchedulingStatus.COMPLETED)
         self.status = self.SchedulingStatus.COMPLETED
+        self.completed_at = timezone.now()
         self.save()
 
     def mark_as_no_show(self, reason: str = "Cliente não compareceu"):

@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from beauty_formula.apps.core.validators.image_validator import validate_image_file
@@ -29,6 +30,16 @@ class Employee(models.Model):
     gender = models.CharField(_("Gênero"), max_length=10, choices=Gender.CHOICES, default=Gender.OTHER) 
     instagram = models.URLField(_("Instagram"), max_length=255, blank=True, null=True, help_text=_("URL do perfil do Instagram do funcionário."))
     photo = models.ImageField(upload_to=employee_photo_path, default=DEFAULT_EMPLOYEE_PHOTO, blank=True, null=True, validators=[validate_image_file], help_text=_('Formatos aceitos: jpg, jpeg ou png. Máx: 5MB.'))
+    booking_window_days = models.PositiveSmallIntegerField(
+        _("Janela de agendamento (dias)"),
+        default=30,
+        validators=[MinValueValidator(1), MaxValueValidator(365)],
+        help_text=_(
+            "Quantos dias à frente a agenda deste funcionário fica aberta "
+            "pra clientes agendarem. Substitui o valor global padrão "
+            "(30 dias) quando definido individualmente."
+        ),
+    )
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.user.email})"

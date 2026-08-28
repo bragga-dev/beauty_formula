@@ -31,6 +31,7 @@ class EmployeeOut(Schema):
     gender_label: str
     birth_date: Optional[date] = None
     bio: Optional[str] = None
+    booking_window_days: int
       
     
     @classmethod
@@ -48,6 +49,7 @@ class EmployeeOut(Schema):
             birth_date=employee.birth_date,
             bio=employee.bio,
             photo_url=employee.photo_url, 
+            booking_window_days=employee.booking_window_days,
            
         )
 
@@ -125,6 +127,12 @@ class EmployeeTeamOut(Schema):
     Card resumido pra listagem pública "Nosso Time". Deliberadamente NÃO
     inclui `user`/email, telefone nem username — é uma vitrine pública,
     não a mesma coisa que EmployeeOut (usado em telas autenticadas/admin).
+
+    `booking_window_days` é exposto aqui (mesmo sendo uma config
+    administrativa) porque o front do fluxo de agendamento/reagendamento
+    precisa dele pra saber até quantos dias no futuro pode montar o
+    calendário desse funcionário — sem isso, o calendário fica travado
+    numa janela fixa que ignora o valor configurado pelo admin.
     """
     id: uuid.UUID
     first_name: Optional[str] = None
@@ -132,7 +140,8 @@ class EmployeeTeamOut(Schema):
     photo_url: Optional[str] = None
     bio: Optional[str] = None
     instagram: Optional[str] = None
- 
+    booking_window_days: int
+
     @classmethod
     def from_orm(cls, employee: Employee) -> "EmployeeTeamOut":
         return cls(
@@ -142,6 +151,7 @@ class EmployeeTeamOut(Schema):
             photo_url=employee.photo_url,
             bio=employee.bio,
             instagram=employee.instagram,
+            booking_window_days=employee.booking_window_days,
         )
  
     
@@ -191,6 +201,7 @@ class EmployeeTeamDetailOut(EmployeeTeamOut):
             photo_url=employee.photo_url,
             bio=employee.bio,
             instagram=employee.instagram,
+            booking_window_days=employee.booking_window_days,
             # Lista de EmployeeService *crus* (model Django) — não pré-
             # converter pra EmployeeServiceLinkOut aqui. O pydantic/ninja
             # resolve o schema aninhado (e o ServiceOut dentro dele) numa
@@ -206,6 +217,29 @@ class EmployeeTeamPageOut(Schema):
     page: int
     page_size: int
     total_pages: int
+
+
+class EmployeeBookingWindowUpdateIn(Schema):
+    """
+    Admin ajusta a janela de agendamento (`booking_window_days`) de UM
+    funcionário — quantos dias à frente a agenda dele fica aberta pra
+    clientes agendarem. Espelha os mesmos limites do model
+    (`Employee.booking_window_days`: 1 a 365 dias).
+    """
+    booking_window_days: int
+
+    @field_validator("booking_window_days")
+    @classmethod
+    def validate_booking_window(cls, v: int) -> int:
+        if not (1 <= v <= 365):
+            raise ValueError("A janela de agendamento deve ser entre 1 e 365 dias.")
+        return v
+
+
+class EmployeeBookingWindowOut(Schema):
+    """Confirmação da janela de agendamento após o ajuste."""
+    employee_id: uuid.UUID
+    booking_window_days: int
  
  
 class PromoteToEmployeeIn(Schema):
@@ -225,5 +259,7 @@ __all__ = [
     "EmployeeTeamPageOut",
     "EmployeeCreateIn",
     "EmployeeUpdateIn",
+    "EmployeeBookingWindowUpdateIn",
+    "EmployeeBookingWindowOut",
     "PromoteToEmployeeIn",
 ]

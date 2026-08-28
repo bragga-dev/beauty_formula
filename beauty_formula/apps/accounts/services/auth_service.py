@@ -8,6 +8,8 @@ from ninja_jwt.settings import api_settings as jwt_api_settings
 
 from django.utils import timezone
 from ninja_jwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from beauty_formula.apps.accounts.models.session_metadata import SessionMetadata
+from beauty_formula.apps.accounts.services.session_presenter import describe_user_agent
 from beauty_formula.apps.core.tokens.jwt import make_tokens, revoke_all_tokens
 from beauty_formula.apps.core.exceptions import (
     InvalidCredentials,
@@ -29,7 +31,7 @@ from beauty_formula.apps.core.exceptions.auth import InvalidToken
 
 
 
-def login_user(email: str, password: str) -> dict:
+def login_user(email: str, password: str, user_agent: str = "") -> dict:
     user = authenticate(username=email, password=password)
 
     if not user:
@@ -42,7 +44,7 @@ def login_user(email: str, password: str) -> dict:
             pass
         raise InvalidCredentials()
 
-    return make_tokens(user)
+    return make_tokens(user, user_agent=user_agent)
 
 
 def logout_user(refresh_token: str) -> None:
@@ -86,7 +88,7 @@ def refresh_access_token(refresh_token: str) -> dict:
         raise InvalidToken()
 
 
-def change_password(user: User, old_password: str, new_password: str) -> dict:
+def change_password(user: User, old_password: str, new_password: str, user_agent: str = "") -> dict:
     """
     Troca a senha e invalida todos os refresh tokens ativos do usuário.
     Retorna um novo par de tokens para manter a sessão ativa.
@@ -98,7 +100,7 @@ def change_password(user: User, old_password: str, new_password: str) -> dict:
     user.save(update_fields=["password"])
 
     revoke_all_tokens(user)
-    return make_tokens(user)
+    return make_tokens(user, user_agent=user_agent)
 
 
 def request_password_reset(email: str) -> None:
@@ -137,17 +139,32 @@ def logout_all_sessions(user) -> None:
     revoke_all_tokens(user)
 
 
-def list_active_sessions(user) -> QuerySet:
+def list_active_sessions(user) -> list:
     """
     Retorna os refresh tokens ainda válidos (não expirados e não blacklistados)
-    do usuário, do mais recente para o mais antigo.
+    do usuário, do mais recente para o mais antigo. Cada token ganha um
+    atributo `.device` (label legível, ex. "Chrome no Windows") calculado
+    on-the-fly a partir do `SessionMetadata.user_agent` — `None` pra
+    sessões antigas, criadas antes desse rastreamento existir.
     """
-    return (
+    tokens = list(
         OutstandingToken.objects
         .filter(user=user, expires_at__gt=timezone.now())
         .exclude(blacklistedtoken__isnull=False)
         .order_by("-created_at")
     )
+
+    if not tokens:
+        return tokens
+
+    metadata_by_jti = {
+        m.jti: m.user_agent
+        for m in SessionMetadata.objects.filter(jti__in=[t.jti for t in tokens])
+    }
+    for token in tokens:
+        token.device = describe_user_agent(metadata_by_jti.get(token.jti, ""))
+
+    return tokens
 
 
 def revoke_session(user, session_id: int) -> None:
