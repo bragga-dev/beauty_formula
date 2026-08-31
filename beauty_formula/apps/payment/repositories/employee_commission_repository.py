@@ -82,11 +82,15 @@ def update_commission_value(commission: EmployeeCommission, *, commission_value:
 
 
 @transaction.atomic
-def mark_commission_as_paid(commission: EmployeeCommission) -> EmployeeCommission:
-    """Marca a comissão como paga, registrando o momento do repasse."""
+def mark_commission_as_paid(commission: EmployeeCommission, *, paid_by: User | None = None) -> EmployeeCommission:
+    """Marca a comissão como paga, registrando o momento do repasse e, se informado, o admin responsável."""
     commission.status = EmployeeCommission.CommissionStatus.PAID
     commission.paid_at = timezone.now()
-    commission.save(update_fields=["status", "paid_at", "updated_at"])
+    fields = ["status", "paid_at", "updated_at"]
+    if paid_by is not None:
+        commission.paid_by = paid_by
+        fields.append("paid_by")
+    commission.save(update_fields=fields)
     return commission
 
 

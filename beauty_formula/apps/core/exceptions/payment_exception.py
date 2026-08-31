@@ -96,3 +96,17 @@ class CommissionNotPaid(Exception):
             "Só é possível reverter comissões que estejam pagas."
         )
         super().__init__(self.message)
+
+
+class NoCommissionsToPayout(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _(
+            "Não há comissões pendentes para este funcionário no período informado."
+        )
+        super().__init__(self.message)
+
+
+class CommissionPayoutNotFound(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _("Quitação de comissões não encontrada.")
+        super().__init__(self.message)

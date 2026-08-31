@@ -305,14 +305,14 @@ def update_commission_competencia_by_admin(commission_id: UUID, competencia: dat
 
 
 @transaction.atomic
-def mark_commission_as_paid_by_admin(commission_id: UUID) -> CommissionOut:
-    """Admin confirma o repasse de UMA comissão — marca como paga."""
+def mark_commission_as_paid_by_admin(commission_id: UUID, admin_user: Optional[User] = None) -> CommissionOut:
+    """Admin confirma o repasse de UMA comissão — marca como paga e registra quem confirmou."""
     commission = get_commission_by_id(commission_id=commission_id)
     if commission is None:
         raise CommissionNotFound()
 
     _ensure_pending(commission)
-    commission = mark_commission_as_paid_repo(commission)
+    commission = mark_commission_as_paid_repo(commission, paid_by=admin_user)
     return CommissionOut.from_orm(commission)
 
 

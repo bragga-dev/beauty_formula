@@ -72,6 +72,7 @@ LOCAL_APPS = [
     "beauty_formula.apps.services",
     "beauty_formula.apps.payment",
     "beauty_formula.apps.website",
+    "beauty_formula.apps.reports",
    
 ]
 
