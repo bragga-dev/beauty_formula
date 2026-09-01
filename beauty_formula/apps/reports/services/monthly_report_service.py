@@ -14,6 +14,7 @@ Regras do balanço mensal.
 import calendar
 from datetime import date
 from typing import Optional
+from uuid import UUID
 
 from django.db import transaction
 from django.utils import timezone
@@ -22,6 +23,7 @@ from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.reports.models.monthly_report_snapshot import MonthlyReportSnapshot
 from beauty_formula.apps.reports.schemas.monthly_report_schema import AvailablePeriodOut, MonthlyBalanceOut
 from beauty_formula.apps.reports.selectors.monthly_report_selector import (
+    compute_employee_breakdown_data,
     compute_month_balance_data,
     get_snapshot,
     list_snapshots,
@@ -39,7 +41,11 @@ def _resolve_period(year: Optional[int], month: Optional[int]) -> tuple[int, int
 
 
 @transaction.atomic
-def get_or_generate_monthly_balance(year: Optional[int] = None,  month: Optional[int] = None, generated_by: Optional[User] = None,) -> MonthlyBalanceOut:
+def get_or_generate_monthly_balance(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    generated_by: Optional[User] = None,
+) -> MonthlyBalanceOut:
     """Recalcula o balanço do mês resolvido e atualiza (ou cria) o snapshot persistido."""
     resolved_year, resolved_month = _resolve_period(year, month)
     last_day = calendar.monthrange(resolved_year, resolved_month)[1]
@@ -48,6 +54,7 @@ def get_or_generate_monthly_balance(year: Optional[int] = None,  month: Optional
 
     data = compute_month_balance_data(start_date=start_date, end_date=end_date)
     net_profit = data["total_revenue"] - data["total_commissions"]
+    employee_breakdown = compute_employee_breakdown_data(start_date=start_date, end_date=end_date)
 
     snapshot, _created = MonthlyReportSnapshot.objects.update_or_create(
         year=resolved_year,
@@ -60,6 +67,7 @@ def get_or_generate_monthly_balance(year: Optional[int] = None,  month: Optional
             "total_commissions_paid": data["total_commissions_paid"],
             "total_commissions_pending": data["total_commissions_pending"],
             "net_profit": net_profit,
+            "employee_breakdown": employee_breakdown,
             "generated_by": generated_by,
         },
     )

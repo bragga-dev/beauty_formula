@@ -48,8 +48,8 @@ def compute_month_balance_data(*, start_date: date, end_date: date) -> dict:
 
     total_revenue = schedulings.filter(status=Scheduling.SchedulingStatus.COMPLETED).aggregate(total=Coalesce(Sum("price_at_booking"), ZERO))["total"]
 
-    commission_totals = EmployeeCommission.objects.filter(competencia__gte=start_date, competencia__lte=end_date).aggregate  \
-    (
+    commission_totals = EmployeeCommission.objects.filter(competencia__gte=start_date, competencia__lte=end_date
+    ).aggregate(
         total=Coalesce(Sum("commission_value"), ZERO),
         total_paid=Coalesce(Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PAID)), ZERO),
         total_pending=Coalesce(Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PENDING)), ZERO),
@@ -64,3 +64,71 @@ def compute_month_balance_data(*, start_date: date, end_date: date) -> dict:
         "total_commissions_paid": commission_totals["total_paid"],
         "total_commissions_pending": commission_totals["total_pending"],
     }
+
+
+def compute_employee_breakdown_data(*, start_date: date, end_date: date) -> list[dict]:
+    """
+    Balanço por funcionário dentro do mês: quantos atendimentos CONCLUÍDOS
+    cada um fez, quanto faturou (`price_at_booking` dos concluídos) e o
+    total/pago/pendente de comissão (`competencia` dentro do mês — mesma
+    base usada no balanço geral). Um funcionário só aparece se teve pelo
+    menos um atendimento concluído OU alguma comissão com competência no
+    mês (cobre o caso raro de competência ajustada manualmente pra fora
+    do mês do atendimento).
+    """
+    completed = (
+        Scheduling.objects.filter(
+            status=Scheduling.SchedulingStatus.COMPLETED,
+            scheduled_time__date__gte=start_date,
+            scheduled_time__date__lte=end_date,
+        )
+        .values("employee_id", "employee__first_name", "employee__last_name", "employee__username")
+        .annotate(
+            completed_appointments=Count("id"),
+            revenue=Coalesce(Sum("price_at_booking"), ZERO),
+        )
+    )
+
+    by_employee: dict = {}
+    for row in completed:
+        name = (f"{row['employee__first_name'] or ''} {row['employee__last_name'] or ''}").strip() \
+            or row["employee__username"] or str(row["employee_id"])
+        by_employee[row["employee_id"]] = {
+            "employee_id": str(row["employee_id"]),
+            "employee_name": name,
+            "completed_appointments": row["completed_appointments"],
+            "revenue": row["revenue"],
+            "commission_total": Decimal("0.00"),
+            "commission_paid": Decimal("0.00"),
+            "commission_pending": Decimal("0.00"),
+        }
+
+    commissions = (
+        EmployeeCommission.objects.filter(competencia__gte=start_date, competencia__lte=end_date)
+        .values("employee_id", "employee__first_name", "employee__last_name", "employee__username")
+        .annotate(
+            commission_total=Coalesce(Sum("commission_value"), ZERO),
+            commission_paid=Coalesce(Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PAID)), ZERO),
+            commission_pending=Coalesce(Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PENDING)), ZERO),
+        )
+    )
+
+    for row in commissions:
+        entry = by_employee.get(row["employee_id"])
+        if entry is None:
+            name = (f"{row['employee__first_name'] or ''} {row['employee__last_name'] or ''}").strip() \
+                or row["employee__username"] or str(row["employee_id"])
+            entry = by_employee[row["employee_id"]] = {
+                "employee_id": str(row["employee_id"]),
+                "employee_name": name,
+                "completed_appointments": 0,
+                "revenue": Decimal("0.00"),
+                "commission_total": Decimal("0.00"),
+                "commission_paid": Decimal("0.00"),
+                "commission_pending": Decimal("0.00"),
+            }
+        entry["commission_total"] = row["commission_total"]
+        entry["commission_paid"] = row["commission_paid"]
+        entry["commission_pending"] = row["commission_pending"]
+
+    return sorted(by_employee.values(), key=lambda e: e["employee_name"].lower())

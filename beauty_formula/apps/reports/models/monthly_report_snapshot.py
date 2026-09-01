@@ -1,6 +1,7 @@
 import uuid
 from decimal import Decimal
 
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -49,6 +50,17 @@ class MonthlyReportSnapshot(models.Model):
     net_profit = models.DecimalField(
         _("Lucro líquido"), max_digits=12, decimal_places=2, default=Decimal("0.00"),
         help_text=_("Valor total arrecadado − valor total em comissões."),
+    )
+    employee_breakdown = models.JSONField(
+        _("Balanço por funcionário"), default=list, encoder=DjangoJSONEncoder,
+        help_text=_(
+            "Lista por funcionário no mês: id, nome, total de atendimentos "
+            "concluídos, faturamento gerado, comissão total/paga/pendente. "
+            "Ex.: [{\"employee_id\": \"...\", \"employee_name\": \"...\", "
+            "\"completed_appointments\": 12, \"revenue\": \"600.00\", "
+            "\"commission_total\": \"120.00\", \"commission_paid\": \"100.00\", "
+            "\"commission_pending\": \"20.00\"}, ...]"
+        ),
     )
 
     generated_at = models.DateTimeField(_("Gerado/atualizado em"), auto_now=True)

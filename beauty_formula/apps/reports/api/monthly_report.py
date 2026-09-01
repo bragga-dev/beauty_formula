@@ -95,6 +95,7 @@ def get_monthly_balance_pdf_router(request, year: Optional[int] = None, month: O
             "total_commissions_pending": balance.total_commissions_pending,
             "net_profit": balance.net_profit,
             "status_rows": status_rows,
+            "employee_breakdown": balance.employee_breakdown,
         },
     )
 
