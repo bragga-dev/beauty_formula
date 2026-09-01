@@ -25,6 +25,7 @@ from beauty_formula.apps.reports.schemas.monthly_report_schema import AvailableP
 from beauty_formula.apps.reports.selectors.monthly_report_selector import (
     compute_employee_breakdown_data,
     compute_month_balance_data,
+    compute_service_breakdown_data,
     get_snapshot,
     list_snapshots,
 )
@@ -55,6 +56,7 @@ def get_or_generate_monthly_balance(
     data = compute_month_balance_data(start_date=start_date, end_date=end_date)
     net_profit = data["total_revenue"] - data["total_commissions"]
     employee_breakdown = compute_employee_breakdown_data(start_date=start_date, end_date=end_date)
+    service_breakdown = compute_service_breakdown_data(start_date=start_date, end_date=end_date)
 
     snapshot, _created = MonthlyReportSnapshot.objects.update_or_create(
         year=resolved_year,
@@ -68,6 +70,7 @@ def get_or_generate_monthly_balance(
             "total_commissions_pending": data["total_commissions_pending"],
             "net_profit": net_profit,
             "employee_breakdown": employee_breakdown,
+            "service_breakdown": service_breakdown,
             "generated_by": generated_by,
         },
     )

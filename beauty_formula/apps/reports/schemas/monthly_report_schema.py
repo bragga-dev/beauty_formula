@@ -26,6 +26,13 @@ class EmployeeBalanceOut(Schema):
     commission_pending: Decimal
 
 
+class ServiceBalanceOut(Schema):
+    service_id: uuid.UUID
+    service_name: str
+    completed_appointments: int
+    percentage: Decimal
+
+
 class MonthlyBalanceOut(Schema):
     id: uuid.UUID
     year: int
@@ -38,6 +45,7 @@ class MonthlyBalanceOut(Schema):
     total_commissions_pending: Decimal
     net_profit: Decimal
     employee_breakdown: List[EmployeeBalanceOut]
+    service_breakdown: List[ServiceBalanceOut]
     generated_at: datetime
     generated_by_name: Optional[str] = None
 
@@ -55,6 +63,7 @@ class MonthlyBalanceOut(Schema):
             total_commissions_pending=snapshot.total_commissions_pending,
             net_profit=snapshot.net_profit,
             employee_breakdown=snapshot.employee_breakdown,
+            service_breakdown=snapshot.service_breakdown,
             generated_at=snapshot.generated_at,
             generated_by_name=snapshot.generated_by.email if snapshot.generated_by_id else None,
         )

@@ -62,6 +62,15 @@ class MonthlyReportSnapshot(models.Model):
             "\"commission_pending\": \"20.00\"}, ...]"
         ),
     )
+    service_breakdown = models.JSONField(
+        _("Atendimentos por serviço"), default=list, encoder=DjangoJSONEncoder,
+        help_text=_(
+            "Lista por serviço no mês: id, nome, quantidade de atendimentos "
+            "concluídos e percentual sobre o total. Ex.: [{\"service_id\": "
+            "\"...\", \"service_name\": \"...\", \"completed_appointments\": 8, "
+            "\"percentage\": \"33.33\"}, ...]"
+        ),
+    )
 
     generated_at = models.DateTimeField(_("Gerado/atualizado em"), auto_now=True)
     generated_by = models.ForeignKey(

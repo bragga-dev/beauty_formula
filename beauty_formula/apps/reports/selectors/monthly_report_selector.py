@@ -46,17 +46,19 @@ def compute_month_balance_data(*, start_date: date, end_date: date) -> dict:
     appointments_by_status = {row["status"]: row["count"] for row in status_counts}
     total_appointments = schedulings.count()
 
-    total_revenue = schedulings.filter(status=Scheduling.SchedulingStatus.COMPLETED).aggregate(total=Coalesce(Sum("price_at_booking"), ZERO))["total"]
+    total_revenue = schedulings.filter(status=Scheduling.SchedulingStatus.COMPLETED).aggregate(
+        total=Coalesce(Sum("price_at_booking"), ZERO)
+    )["total"]
 
-    commission_totals = EmployeeCommission.objects.filter(competencia__gte=start_date, competencia__lte=end_date
+    commission_totals = EmployeeCommission.objects.filter(
+        competencia__gte=start_date, competencia__lte=end_date
     ).aggregate(
         total=Coalesce(Sum("commission_value"), ZERO),
         total_paid=Coalesce(Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PAID)), ZERO),
         total_pending=Coalesce(Sum("commission_value", filter=Q(status=EmployeeCommission.CommissionStatus.PENDING)), ZERO),
     )
 
-    return \
-    {
+    return {
         "appointments_by_status": appointments_by_status,
         "total_appointments": total_appointments,
         "total_revenue": total_revenue,
@@ -132,3 +134,38 @@ def compute_employee_breakdown_data(*, start_date: date, end_date: date) -> list
         entry["commission_pending"] = row["commission_pending"]
 
     return sorted(by_employee.values(), key=lambda e: e["employee_name"].lower())
+
+
+def compute_service_breakdown_data(*, start_date: date, end_date: date) -> list[dict]:
+    """
+    Quantidade de atendimentos CONCLUÍDOS por serviço dentro do mês, com o
+    percentual de cada um sobre o total de concluídos — base do gráfico de
+    pizza "quais serviços foram feitos" no front. Ordenado do mais pro
+    menos frequente.
+    """
+    completed = (
+        Scheduling.objects.filter(
+            status=Scheduling.SchedulingStatus.COMPLETED,
+            scheduled_time__date__gte=start_date,
+            scheduled_time__date__lte=end_date,
+        )
+        .values("service_id", "service__name")
+        .annotate(completed_appointments=Count("id"))
+        .order_by("-completed_appointments")
+    )
+
+    rows = list(completed)
+    total = sum(row["completed_appointments"] for row in rows)
+
+    breakdown = []
+    for row in rows:
+        percentage = (Decimal(row["completed_appointments"]) / Decimal(total) * Decimal("100")) if total else Decimal("0.00")
+        breakdown.append(
+            {
+                "service_id": str(row["service_id"]),
+                "service_name": row["service__name"],
+                "completed_appointments": row["completed_appointments"],
+                "percentage": percentage.quantize(Decimal("0.01")),
+            }
+        )
+    return breakdown
