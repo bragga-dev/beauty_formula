@@ -14,6 +14,7 @@ from typing import Optional
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 
+from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.payment.models.employee_commission_model import EmployeeCommission
 from beauty_formula.apps.reports.models.monthly_report_snapshot import MonthlyReportSnapshot
 from beauty_formula.apps.services.models.scheduling import Scheduling
@@ -132,6 +133,15 @@ def compute_employee_breakdown_data(*, start_date: date, end_date: date) -> list
         entry["commission_total"] = row["commission_total"]
         entry["commission_paid"] = row["commission_paid"]
         entry["commission_pending"] = row["commission_pending"]
+
+    # `photo_url` é property do model (resolve via storage, com fallback
+    # pro avatar padrão) — não dá pra puxar com `.values()` acima, então
+    # busca os Employee reais só dos IDs que sobraram no breakdown.
+    photo_by_id = {
+        emp.id: emp.photo_url for emp in Employee.objects.filter(id__in=by_employee.keys())
+    }
+    for employee_id, entry in by_employee.items():
+        entry["employee_photo_url"] = photo_by_id.get(employee_id)
 
     return sorted(by_employee.values(), key=lambda e: e["employee_name"].lower())
 

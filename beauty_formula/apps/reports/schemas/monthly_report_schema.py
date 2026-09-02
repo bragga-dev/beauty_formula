@@ -19,6 +19,7 @@ class MonthlyBalanceFilter(Schema):
 class EmployeeBalanceOut(Schema):
     employee_id: uuid.UUID
     employee_name: str
+    employee_photo_url: Optional[str] = None
     completed_appointments: int
     revenue: Decimal
     commission_total: Decimal
