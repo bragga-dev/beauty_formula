@@ -289,8 +289,9 @@ def update_commission_competencia_router(request, commission_id: UUID, payload: 
 )
 @ratelimit(key="user", rate="30/m", block=True)
 def mark_commission_as_paid_router(request, commission_id: UUID):
+    user: User = request.auth
     try:
-        commission = mark_commission_as_paid_by_admin(commission_id=commission_id)
+        commission = mark_commission_as_paid_by_admin(commission_id=commission_id, admin_user=user)
         return 200, commission
     except CommissionNotFound as e:
         return 404, {"detail": str(e)}

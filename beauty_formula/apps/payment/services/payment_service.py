@@ -239,13 +239,21 @@ def _confirm_scheduling_if_paid(payment: Payment) -> None:
     ficar reentregando) — só loga pra reconciliação manual. O caso mais
     provável de falhar aqui é `SchedulingConflict`: o horário foi
     ocupado por outro agendamento confirmado enquanto este esperava
-    pagamento — dinheiro recebido, mas o horário já era. Precisa de
-    estorno manual (endpoint de refund) e contato com o cliente.
+    pagamento — dinheiro recebido, mas o horário já era. Cancela a
+    reserva perdedora automaticamente (não mexe no pagamento) e notifica
+    o admin por e-mail — o estorno em si continua manual
+    (`refund_payment`), de propósito.
     """
     if payment.status not in _PAID_PAYMENT_STATUSES:
         return
 
-    from beauty_formula.apps.services.services.scheduling_service import confirm_scheduling_after_payment
+    from beauty_formula.apps.services.services.scheduling_service import (
+        cancel_scheduling_due_to_payment_conflict,
+        confirm_scheduling_after_payment,
+    )
+    from beauty_formula.apps.payment.tasks.send_scheduling_payment_conflict_admin_notification import (
+        send_scheduling_payment_conflict_admin_notification,
+    )
 
     try:
         confirm_scheduling_after_payment(scheduling_id=payment.scheduling_id)
@@ -256,6 +264,8 @@ def _confirm_scheduling_if_paid(payment: Payment) -> None:
             "reconciliação com o cliente.",
             payment.id, payment.scheduling_id,
         )
+        cancel_scheduling_due_to_payment_conflict(scheduling_id=payment.scheduling_id)
+        send_scheduling_payment_conflict_admin_notification.delay(payment_id=payment.id)
 
 
 def process_asaas_webhook(payload: dict) -> Payment:

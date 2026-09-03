@@ -43,6 +43,7 @@ DJANGO_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
 ]
 
 
@@ -72,6 +73,7 @@ LOCAL_APPS = [
     "beauty_formula.apps.services",
     "beauty_formula.apps.payment",
     "beauty_formula.apps.website",
+    "beauty_formula.apps.reports",
    
 ]
 

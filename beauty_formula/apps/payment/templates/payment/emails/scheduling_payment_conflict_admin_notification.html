@@ -1,0 +1,75 @@
+{% extends "core/emails/base.html" %}
+
+{% block title %}Conflito de horário com pagamento recebido — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}Um pagamento foi recebido mas o horário já tinha sido confirmado por outro cliente.{% endblock %}
+
+{% block content %}
+
+    <span class="section-label">Ação necessária</span>
+    <h1 class="heading">Conflito de horário com pagamento recebido</h1>
+
+    <p class="body-text">
+        Um pagamento caiu para <strong>{{ client_name }}</strong>, mas o horário com
+        <strong>{{ employee_full_name }}</strong> já tinha sido confirmado por outro
+        cliente antes desse pagamento ser identificado. O agendamento foi
+        <strong>cancelado automaticamente</strong> pelo sistema — o dinheiro
+        <strong>não foi estornado</strong>, isso precisa ser feito manualmente.
+    </p>
+
+    <!-- Detalhes -->
+    <div class="info-box">
+        <p class="info-box-title">Detalhes do conflito</p>
+
+        <div class="service-name">{{ service_name }}</div>
+
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="label">Valor pago</span>
+                <span class="value price">R$ {{ payment_value|floatformat:2 }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Horário perdido</span>
+                <span class="value" style="font-size: 14px;">{{ scheduled_time }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Status</span>
+                <span class="status-badge cancelled">Aguardando estorno manual</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Cliente</span>
+                <span class="value" style="font-size: 14px;">{{ client_name }}</span>
+            </div>
+        </div>
+
+        <div class="reason-box">
+            <p><strong>Motivo:</strong><br>
+            Outro cliente confirmou o mesmo horário com {{ employee_full_name }} antes deste pagamento ser identificado.
+            {% if payment_asaas_id %}Cobrança Asaas: {{ payment_asaas_id }}.{% endif %}</p>
+        </div>
+    </div>
+
+    <!-- Ações -->
+    <div class="cta-wrap">
+        <p class="body-text" style="margin-bottom: 16px;">
+            Estorne a cobrança acima e entre em contato com o cliente para reagendar:
+        </p>
+
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ admin_payments_url }}" style="height:50px;v-text-anchor:middle;width:220px;" arcsize="15%" stroke="f" fillcolor="#c6172e">
+            <w:anchorlock/>
+            <center style="color:#faf9f7;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">VER PAGAMENTOS</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ admin_payments_url }}" class="cta-btn">
+            Ver no painel de pagamentos
+        </a>
+        <!--<![endif]-->
+    </div>
+
+    <div class="closing-note">
+        <p class="team">Fórmula da Beleza — Conflitos de Agendamento<br>E-mail automático para a equipe administrativa</p>
+    </div>
+
+{% endblock %}

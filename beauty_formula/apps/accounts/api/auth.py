@@ -1,6 +1,7 @@
 """
 Login endpoint — autenticação de usuários.
 """
+import json
 import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -120,6 +121,28 @@ from beauty_formula.apps.accounts.models.user import User
 
 router = Router()
 
+
+def _login_email_key(group, request):
+    """
+    Extrai o e-mail do corpo da requisição de login (minúsculo, sem
+    espaços) pra servir de chave extra de rate limit — complementa o
+    limite por IP logo abaixo. Só por IP não segura um ataque de força
+    bruta distribuído contra UMA conta específica (atacante rotacionando
+    IP); com essa chave adicional, "5/m" passa a valer por e-mail
+    também, então trocar de IP não reseta a contagem contra a vítima.
+
+    django-ratelimit já faz cache de `request.body` internamente, então
+    ler de novo aqui é seguro e não interfere na leitura que o Django
+    Ninja já fez pra parsear o payload. Corpo inválido/sem e-mail vira
+    chave vazia — nesse caso o rate limit por IP (que roda sempre)
+    continua sendo a proteção real.
+    """
+    try:
+        body = json.loads(request.body or b"{}")
+        return (body.get("email") or "").strip().lower()
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return ""
+
  
 @router.get(
     "/me",
@@ -150,6 +173,7 @@ def me_router(request):
     description="O refresh token vai num cookie httpOnly — não aparece no corpo da resposta nem fica acessível via JS.",
 )
 @ratelimit(key="ip", rate="5/m", block=True)
+@ratelimit(key=_login_email_key, rate="5/m", block=True)
 def login_router(request, payload: LoginIn):
     try:
         tokens = login_user(payload.email, payload.password, user_agent=request.headers.get("User-Agent", ""))
@@ -380,19 +404,29 @@ def change_password_router(request, payload: ChangePasswordIn):
     summary="Exclui a própria conta",
     description=(
         "Exclusão de conta pelo próprio usuário (LGPD — direito de eliminação). "
-        "Exige confirmação de senha. É um hard-delete: o registro do usuário e "
-        "do perfil (cliente/funcionário) é apagado do banco e todas as sessões "
-        "são revogadas imediatamente. Bloqueado se a conta tiver agendamento, "
-        "pagamento, comissão, avaliação ou atribuição de serviço vinculados — "
-        "esses registros continuam protegidos para preservar o histórico "
-        "financeiro/operacional auditável."
+        "Exige confirmação de senha. Tenta hard-delete (registro do usuário e "
+        "do perfil apagados do banco); se a conta tiver agendamento, pagamento, "
+        "comissão, avaliação ou atribuição de serviço vinculados — protegidos "
+        "para preservar o histórico financeiro/operacional auditável exigido "
+        "por lei — cai automaticamente para anonimização: os dados pessoais "
+        "(nome, foto, telefone, data de nascimento, Instagram) são apagados e "
+        "o login é desativado, mas o registro em si é mantido. Em ambos os "
+        "casos, todas as sessões são revogadas imediatamente."
     ),
 )
 @ratelimit(key="user", rate="5/h", block=True)
 def delete_account_router(request, payload: DeleteAccountIn):
     try:
-        delete_own_account(user=request.auth, password=payload.password)
-        return 200, {"detail": "Conta excluída com sucesso."}
+        hard_deleted = delete_own_account(user=request.auth, password=payload.password)
+        if hard_deleted:
+            return 200, {"detail": "Conta excluída com sucesso."}
+        return 200, {
+            "detail": (
+                "Conta desativada e dados pessoais removidos. Alguns registros "
+                "(agendamentos/pagamentos) foram mantidos por obrigação legal, "
+                "mas não seguem mais vinculados aos seus dados pessoais."
+            )
+        }
     except InvalidPassword as e:
         return 400, {"detail": str(e)}
     except AccountHasProtectedRecords as e:
