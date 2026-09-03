@@ -62,7 +62,11 @@ class CommissionOut(Schema):
             client_name=scheduling.client.get_full_name(),
             scheduled_time=scheduling.scheduled_time,
             price_at_booking=scheduling.price_at_booking,
-            commission_percentage=scheduling.service.commission_percentage,
+            commission_percentage=(
+                scheduling.commission_percentage_at_booking
+                if scheduling.commission_percentage_at_booking is not None
+                else scheduling.service.commission_percentage
+            ),
             commission_value=commission.commission_value,
             status=commission.status,
             paid_at=commission.paid_at,

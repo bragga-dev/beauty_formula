@@ -40,6 +40,7 @@ SCHEDULING_RESERVATION_TTL_MINUTES = getattr(settings, "SCHEDULING_RESERVATION_T
 
 
 from beauty_formula.apps.accounts.models.user import User
+from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.selectors.client_selector import get_client_by_user_id
 from beauty_formula.apps.accounts.selectors.employee_selector import get_employee_by_id, get_employee_by_user_id
 from beauty_formula.apps.core.exceptions.permissions import ClientNotFoundError, EmployeeNotFoundError
@@ -144,6 +145,23 @@ def _get_own_employee_scheduling(user_id: UUID, scheduling_id: UUID) -> Scheduli
     return scheduling
 
 
+def _lock_employee_for_scheduling(employee_id: UUID) -> None:
+    """
+    `SELECT ... FOR UPDATE` na linha do funcionário — serializa, no nível
+    do Postgres, qualquer criação/confirmação concorrente de agendamento
+    pro MESMO funcionário dentro da mesma transação atômica. Sem isso,
+    duas transações concorrentes podem checar `_validate_slot_available`
+    (ou o `clean()` do model) ao mesmo tempo, ambas verem "livre" antes
+    de qualquer uma commitar, e as duas passarem — o exclusion constraint
+    do banco (`Scheduling.Meta.constraints`) é a garantia definitiva
+    contra isso, este lock é a primeira linha de defesa, que evita o
+    conflito virar uma exceção de constraint lá na hora do INSERT.
+    Precisa estar dentro de um bloco @transaction.atomic — o lock só
+    existe até o commit/rollback da transação corrente.
+    """
+    Employee.objects.select_for_update().get(pk=employee_id)
+
+
 def _validate_slot_available(
     employee_id: UUID,
     scheduled_time: datetime,
@@ -206,6 +224,7 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
         raise EmployeeNotFoundError()
 
     _validate_employee_offers_service(employee_id=employee.id, service_id=service.id)
+    _lock_employee_for_scheduling(employee.id)
     _validate_slot_available(employee_id=employee.id, scheduled_time=data.scheduled_time, duration=service.duration)
 
     scheduling = create_scheduling_repo(
@@ -264,12 +283,61 @@ def confirm_scheduling_after_payment(scheduling_id: UUID) -> Optional[Scheduling
     ou já não está mais CREATED (já confirmado por uma execução anterior,
     cancelado pelo cliente antes do pagamento cair, etc.), não faz nada —
     evita erro em reentregas de webhook da Asaas.
+
+    Adquire o lock do funcionário (`_lock_employee_for_scheduling`) antes
+    de reler e checar o status — mesma defesa contra corrida usada na
+    criação: se dois pagamentos de reservas concorrentes pro mesmo
+    funcionário/horário chegam quase juntos, essa linha serializa as duas
+    confirmações, garantindo que a segunda enxergue o status já
+    atualizado pela primeira (e, com isso, o conflito de horário real)
+    em vez de duas transações lendo o mesmo estado "livre" em paralelo.
     """
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None:
+        return None
+
+    _lock_employee_for_scheduling(scheduling.employee_id)
+
+    # Relê depois do lock: outra transação pode ter mudado o status
+    # (confirmado, cancelado) enquanto esperávamos o lock do funcionário.
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None or scheduling.status != Scheduling.SchedulingStatus.CREATED:
         return scheduling
 
     return _confirm_scheduling(scheduling)
+
+
+@transaction.atomic
+def cancel_scheduling_due_to_payment_conflict(scheduling_id: UUID) -> Optional[Scheduling]:
+    """
+    Cancela uma reserva (CREATED) cujo pagamento foi recebido mas que
+    perdeu a corrida pelo horário — outro cliente confirmou o mesmo
+    horário primeiro. Chamada só por
+    `payment_service._confirm_scheduling_if_paid` quando
+    `confirm_scheduling_after_payment` estoura `SchedulingConflict`.
+
+    NÃO mexe no pagamento: ele já está RECEIVED/CONFIRMED na Asaas nesse
+    ponto, e devolver dinheiro é sempre uma ação manual do admin
+    (`payment_service.refund_payment`) — só marca o agendamento como
+    CANCELED pra não ficar pendurado em CREATED pra sempre. Também não
+    dispara os e-mails normais de cancelamento (o cliente não pediu isso;
+    quem avisa o cliente é o admin, depois de decidir o que fazer) —
+    quem é notificado aqui é o admin, via
+    `send_scheduling_payment_conflict_admin_notification`.
+    """
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None or scheduling.status != Scheduling.SchedulingStatus.CREATED:
+        return scheduling
+
+    return cancel_scheduling_repo(
+        scheduling,
+        reason=(
+            "Cancelado automaticamente: o horário foi confirmado por outro "
+            "cliente antes deste pagamento ser identificado. Pagamento já "
+            "recebido — aguarda estorno manual pelo admin."
+        ),
+        canceled_by=None,
+    )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Listagem
@@ -362,6 +430,7 @@ def update_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, data: S
     return SchedulingOut.from_orm(scheduling)
 
 
+@transaction.atomic
 def update_scheduling_by_admin(scheduling_id: UUID, data: SchedulingUpdateIn) -> SchedulingPrivateOut:
     """Admin edita qualquer agendamento que ainda não esteja em status final."""
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
@@ -387,6 +456,7 @@ def update_scheduling_by_admin(scheduling_id: UUID, data: SchedulingUpdateIn) ->
         _validate_employee_offers_service(employee_id=employee.id, service_id=service.id)
 
     if data.service_id is not None or data.employee_id is not None or data.scheduled_time is not None:
+        _lock_employee_for_scheduling(employee.id)
         _validate_slot_available(
             employee_id=employee.id,
             scheduled_time=data.scheduled_time or scheduling.scheduled_time,

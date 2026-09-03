@@ -12,7 +12,7 @@ from typing import Optional
 from uuid import UUID
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.models.client import Client
@@ -45,6 +45,18 @@ def create_scheduling(
         scheduling.save()
     except ValidationError as e:
         raise SchedulingConflict("; ".join(e.messages)) from e
+    except IntegrityError as e:
+        # Rede de segurança final: o ExclusionConstraint do Postgres
+        # (`exclude_overlapping_confirmed_slots_per_employee`) pega
+        # sobreposição mesmo quando duas transações concorrentes passaram
+        # pela validação em Python (`clean()`/`_validate_slot_available`)
+        # antes de qualquer uma commitar — o cenário que o lock do
+        # funcionário (`_lock_employee_for_scheduling`, em
+        # scheduling_service.py) reduz mas não elimina 100%, já que o
+        # lock só serializa quem já está dentro da mesma transação
+        # Django, não chamadas concorrentes de workers/processos
+        # diferentes competindo pelo mesmo lock.
+        raise SchedulingConflict("Horário não está mais disponível.") from e
     return scheduling
 
 
@@ -111,8 +123,29 @@ def cancel_scheduling(scheduling: Scheduling, *, reason: str, canceled_by: Optio
 
 @transaction.atomic
 def confirm_scheduling(scheduling: Scheduling) -> Scheduling:
-    """Confirma um atendimento."""
-    scheduling.confirm()
+    """
+    Confirma um atendimento. `scheduling.confirm()` -> `save()` roda o
+    `full_clean()` do model, que reconfere sobreposição com outros
+    agendamentos CONFIRMED — necessário porque, entre a criação (CREATED)
+    e o pagamento cair, outro cliente pode ter confirmado o mesmo horário
+    primeiro (ver docstring de `scheduling_service.py`). Sem este
+    try/except, esse conflito vira `ValidationError` do Django não
+    tratada — que sobe direto pro webhook da Asaas e devolve 500 em vez
+    do 200 esperado. Convertida pra `SchedulingConflict`, que
+    `payment_service._confirm_scheduling_if_paid` já sabe tratar
+    (cancela a reserva perdedora e notifica o admin pra estorno manual).
+
+    O `except IntegrityError` é a mesma rede de segurança do
+    ExclusionConstraint descrita em `create_scheduling` — aqui pega o
+    caso de duas CONFIRMAÇÕES concorrentes (dois pagamentos quase
+    simultâneos pra reservas que conflitam entre si).
+    """
+    try:
+        scheduling.confirm()
+    except ValidationError as e:
+        raise SchedulingConflict("; ".join(e.messages)) from e
+    except IntegrityError as e:
+        raise SchedulingConflict("Horário não está mais disponível.") from e
     return scheduling
 
 @transaction.atomic

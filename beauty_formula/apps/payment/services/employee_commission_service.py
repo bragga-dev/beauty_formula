@@ -9,10 +9,11 @@ Regras de negócio de EmployeeCommission.
 - Uma comissão só existe para um Scheduling COMPLETED; o funcionário é
   sempre `scheduling.employee`, nunca um valor à parte vindo do payload.
 - O valor é sempre calculado automaticamente:
-      price_at_booking * service.commission_percentage / 100
-  (o `commission_percentage` do Service já é 70% por padrão). Só existe
-  edição manual pontual (`update_commission_value_by_admin`) pra
-  corrigir um caso excepcional depois de gerado.
+      price_at_booking * commission_percentage_at_booking / 100
+  (ambos snapshots do Service no momento em que o cliente agendou — não
+  o `commission_percentage` atual do Service). Só existe edição manual
+  pontual (`update_commission_value_by_admin`) pra corrigir um caso
+  excepcional depois de gerado.
 - Geração em lote é idempotente: rodar de novo pro mesmo período/
   funcionário não duplica nada, porque só considera schedulings que
   ainda não têm comissão (garantido pelo OneToOneField).
@@ -98,8 +99,24 @@ def _ensure_paid(commission: EmployeeCommission) -> None:
 
 
 def _calculate_commission_value(scheduling: Scheduling) -> Decimal:
-    """price_at_booking * service.commission_percentage / 100, sempre a partir do snapshot do agendamento."""
-    return (scheduling.price_at_booking * scheduling.service.commission_percentage / Decimal("100")).quantize(Decimal("0.01"))
+    """
+    price_at_booking * commission_percentage_at_booking / 100 — os dois
+    são snapshots do momento do agendamento, não valores atuais do
+    Service. Isso evita que uma mudança de comissão feita pelo admin
+    entre o agendamento e a conclusão altere retroativamente quanto o
+    funcionário recebe por um atendimento que já tinha sido combinado
+    sob a regra antiga.
+
+    `commission_percentage_at_booking` é nulo só em registros criados
+    antes desse campo existir — nesses casos (histórico legado), cai de
+    volta pro valor atual do Service, mesmo comportamento de antes.
+    """
+    percentage = (
+        scheduling.commission_percentage_at_booking
+        if scheduling.commission_percentage_at_booking is not None
+        else scheduling.service.commission_percentage
+    )
+    return (scheduling.price_at_booking * percentage / Decimal("100")).quantize(Decimal("0.01"))
 
 
 def _calculate_reference_month(scheduling: Scheduling) -> date:

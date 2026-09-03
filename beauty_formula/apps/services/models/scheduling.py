@@ -1,8 +1,11 @@
 import uuid
 
 
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import F, Func, Q
 from django.utils.translation import gettext_lazy as _
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.core.exceptions.service_exception import InvalidSchedulingStatusTransition
@@ -44,6 +47,45 @@ class Scheduling(models.Model):
     status = models.CharField(_("Status"), max_length=20, choices=SchedulingStatus.choices, default=SchedulingStatus.CREATED, db_index=True)
     price_at_booking = models.DecimalField(_("Preço no momento do agendamento"), max_digits=10, decimal_places=2, editable=False)
     duration_at_booking = models.DurationField(_("Duração no momento do agendamento"), editable=False)
+    commission_percentage_at_booking = models.DecimalField(
+        _("Comissão (%) no momento do agendamento"), max_digits=5, decimal_places=2, editable=False, null=True,
+        help_text=_(
+            "Snapshot do commission_percentage do Service no momento em que "
+            "o agendamento foi criado. Garante que a comissão gerada na "
+            "conclusão reflita a regra vigente quando o cliente agendou, não "
+            "uma mudança feita pelo admin depois — mesmo racional de "
+            "price_at_booking/duration_at_booking. Nulo só em registros "
+            "criados antes desse campo existir."
+        ),
+    )
+    scheduled_end_time = models.DateTimeField(
+        _("Horário de término (calculado)"), editable=False, null=True,
+        help_text=_(
+            "scheduled_time + duration_at_booking, calculado em save(). "
+            "Existe como coluna persistida (em vez de só a property "
+            "`end_time`) porque `slot_range` (abaixo) precisa referenciar "
+            "duas colunas de timestamp diretamente — `tstzrange()` sobre "
+            "duas colunas é IMMUTABLE, mas `scheduled_time + interval` não "
+            "é (Postgres não garante isso na presença de componente de mês/"
+            "DST no interval), e coluna GENERATED exige expressão IMMUTABLE."
+        ),
+    )
+    slot_range = models.GeneratedField(
+        expression=Func(
+            F("scheduled_time"),
+            F("scheduled_end_time"),
+            function="tstzrange",
+            output_field=DateTimeRangeField(),
+        ),
+        output_field=DateTimeRangeField(),
+        db_persist=True,
+        verbose_name=_("Intervalo do horário (gerado)"),
+        help_text=_(
+            "Coluna calculada pelo próprio Postgres (GENERATED ALWAYS AS) — "
+            "[scheduled_time, scheduled_end_time). Existe só pra sustentar o "
+            "ExclusionConstraint abaixo; não é lida pela aplicação."
+        ),
+    )
     notes = models.TextField(_("Observações"), blank=True, null=True)
     canceled_at = models.DateTimeField(_("Cancelado em"), blank=True, null=True)
     canceled_reason = models.CharField(_("Motivo do cancelamento"), max_length=255, blank=True, null=True)
@@ -92,14 +134,39 @@ class Scheduling(models.Model):
                     models.Q(~models.Q(status__in=['canceled', 'no_show']), canceled_at__isnull=True)
                 ),
                 name="canceled_status_requires_canceled_at"
-            )
+            ),
+            ExclusionConstraint(
+                name="exclude_overlapping_confirmed_slots_per_employee",
+                expressions=[
+                    ("employee", RangeOperators.EQUAL),
+                    ("slot_range", RangeOperators.OVERLAPS),
+                ],
+                condition=Q(status="confirmed", is_active=True),
+                violation_error_message=_(
+                    "Funcionário já possui outro agendamento CONFIRMADO nesse horário."
+                ),
+            ),
         ]
 
     def __str__(self):
         return f"#{self.id} - {self.service.name} - {self.client} - {self.scheduled_time.strftime('%d/%m/%Y %H:%M')}"
 
     def clean(self):
-        """Validações do agendamento"""
+        """
+        Valida sobreposição de horário — só é relevante quando ESTE
+        registro está (ou vai ficar) CONFIRMED. Cancelar, concluir ou
+        marcar não-comparecimento nunca deveria falhar por causa de
+        outro agendamento confirmado no mesmo horário: esses status
+        estão liberando o horário, não disputando ele. Sem essa guarda,
+        `cancel()`/`complete()`/`mark_as_no_show()` de um registro que
+        por acaso se sobrepõe a outro CONFIRMED levantavam
+        ValidationError incorretamente — inclusive travando o
+        cancelamento automático de uma reserva perdedora de conflito de
+        pagamento (`cancel_scheduling_due_to_payment_conflict`), que
+        existe justamente para desfazer esse tipo de sobreposição.
+        """
+        if self.status != self.SchedulingStatus.CONFIRMED:
+            return
 
         if self.duration_at_booking:
             end_time = self.scheduled_time + self.duration_at_booking
@@ -126,6 +193,13 @@ class Scheduling(models.Model):
         if self._state.adding:
             self.price_at_booking = self.service.price
             self.duration_at_booking = self.service.duration
+            self.commission_percentage_at_booking = self.service.commission_percentage
+
+        # Recalculado sempre (não só na criação): `scheduled_end_time`
+        # sustenta a coluna gerada `slot_range` no banco, então nunca pode
+        # ficar desatualizado em relação a scheduled_time/duration_at_booking.
+        if self.scheduled_time and self.duration_at_booking:
+            self.scheduled_end_time = self.scheduled_time + self.duration_at_booking
 
         self.full_clean()
         super().save(*args, **kwargs)

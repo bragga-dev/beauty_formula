@@ -3,6 +3,7 @@ User Services — criação e atualização de usuário base.
 """
 import logging
 import uuid
+from typing import Optional
 
 from django.db import transaction
 from django.db.models import ProtectedError
@@ -259,13 +260,31 @@ def reactivate_user(user_id: uuid.UUID, performed_by=None) -> User:
 
 
 @transaction.atomic
-def delete_own_account(user: User, password: str) -> None:
+def delete_own_account(user: User, password: str) -> bool:
     """
-    Exclusão definitiva da conta pelo próprio usuário (LGPD — direito de eliminação).
- 
-    Hard-delete de verdade: apaga o registro de User do banco (o que remove
-    em cascata o profile de Client/Employee via OneToOne). Contas admin não
-    podem ser excluídas por este endpoint — só via ação administrativa direta.
+    Exclusão da conta pelo próprio usuário (LGPD — direito de eliminação).
+
+    Tenta hard-delete de verdade primeiro: apaga o registro de User do
+    banco (o que remove em cascata o profile de Client/Employee via
+    OneToOne). Contas admin não podem ser excluídas por este endpoint —
+    só via ação administrativa direta.
+
+    Se o hard-delete esbarra em `ProtectedError` (a conta tem
+    agendamentos e/ou pagamentos — `Scheduling.client`/`.employee` e
+    `Payment.scheduling` são `on_delete=PROTECT`, retidos por obrigação
+    fiscal/legal, não por capricho), NÃO deixa o usuário travado sem
+    saída: cai automaticamente pra `_anonymize_user_account`, que apaga
+    os dados pessoais (nome, foto, telefone, data de nascimento,
+    Instagram) e desativa o login, mas preserva o registro em si — só
+    esse preservado é que sustenta os agendamentos/pagamentos que a lei
+    exige manter. Isso cobre, na prática, a esmagadora maioria dos
+    clientes reais (qualquer um que já tenha agendado alguma vez, mesmo
+    cancelado, cai aqui) — sem esse fallback, `DELETE /me` era uma
+    promessa de direito que não se cumpria pra quase ninguém.
+
+    Retorna True se foi hard-delete de verdade, False se caiu pro
+    fallback de anonimização — a rota usa isso pra devolver uma mensagem
+    condizente com o que realmente aconteceu.
     """
     if user.role == User.UserRole.ADMIN:
         raise PermissionDenied("Contas de administrador não podem ser excluídas por este endpoint.")
@@ -287,9 +306,54 @@ def delete_own_account(user: User, password: str) -> None:
     revoke_all_tokens(user)
     try:
         delete_user(user)
+        return True
     except ProtectedError:
-        raise AccountHasProtectedRecords()
- 
+        _anonymize_user_account(user, profile)
+        return False
+
+
+def _anonymize_user_account(user: User, profile: Optional[object]) -> None:
+    """
+    Fallback de `delete_own_account` quando o hard-delete não é possível.
+    Roda dentro da MESMA transação atômica de `delete_own_account` — o
+    `ProtectedError` foi levantado pelo `Collector` do Django antes de
+    qualquer SQL de DELETE ser emitido (ele resolve as relações protegidas
+    antes de tocar no banco), então não há nada pra desfazer aqui, é
+    seguro só continuar gravando.
+
+    Não reaproveita `username`/`email` antigos em lugar nenhum — usa um
+    identificador aleatório (`anon_tag`) só pra manter os campos únicos
+    (`User.email`, `Client.username`, `Employee.username`) satisfeitos
+    sem colidir entre múltiplas contas anonimizadas.
+
+    Deliberadamente NÃO mexe em `asaas_customer_id` (Client): é uma
+    referência a um cadastro no gateway de pagamento ligado aos
+    pagamentos já feitos, não um dado de contato da pessoa — apagá-lo
+    quebraria estornos futuros desses pagamentos protegidos sem
+    necessidade nenhuma do ponto de vista de privacidade.
+    """
+    anon_tag = uuid.uuid4().hex[:12]
+
+    user.email = f"conta-excluida-{anon_tag}@anonimizado.invalid"
+    user.set_unusable_password()
+    user.is_active = False
+    user.is_trusty = False
+    user.save(update_fields=["email", "password", "is_active", "is_trusty"])
+
+    if profile is None:
+        return
+
+    profile.first_name = None
+    profile.last_name = None
+    profile.username = f"excluido-{anon_tag}"
+    profile.birth_date = None
+    profile.instagram = None
+    if hasattr(profile, "phone"):
+        profile.phone = None
+    if hasattr(profile, "bio"):
+        profile.bio = None
+    profile.photo = None
+    profile.save()
 
 
 def export_user_data(user_id: uuid.UUID) -> dict:
