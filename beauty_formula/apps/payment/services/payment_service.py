@@ -1,15 +1,19 @@
 import logging
 from datetime import timedelta
+from decimal import Decimal
 from typing import Optional
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
+from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.selectors.client_selector import (
     get_client_by_user_id,
 
     )
 from beauty_formula.apps.core.exceptions.permissions import ClientNotFoundError
 from beauty_formula.apps.payment.models.payment_model import Payment
+from beauty_formula.apps.payment.models.refund_request_model import RefundRequest, DEFAULT_CANCELLATION_FEE_PERCENTAGE
 from beauty_formula.apps.payment.integrations.asaas_client import AsaasClient
 from beauty_formula.apps.payment.repositories.payment_repository import (
     create_payment,
@@ -19,6 +23,11 @@ from beauty_formula.apps.payment.repositories.payment_repository import (
     delete_payment,
 
 )
+from beauty_formula.apps.payment.repositories.refund_request_repository import (
+    approve_refund_request as approve_refund_request_repo,
+    create_refund_request,
+    reject_refund_request as reject_refund_request_repo,
+)
 from beauty_formula.apps.payment.selectors.payment_selector import (
     get_active_payment_for_scheduling,
     get_payment_by_id,
@@ -27,13 +36,20 @@ from beauty_formula.apps.payment.selectors.payment_selector import (
     get_payments_by_scheduling,
 
     )
+from beauty_formula.apps.payment.selectors.refund_request_selector import (
+    get_pending_refund_request_for_payment,
+    get_refund_request_by_id,
+)
 from beauty_formula.apps.core.exceptions.payment_exception import (
     AsaasAPIError,
     SchedulingAlreadyPaid,
     PaymentNotFound,
     CpfOrCnpjRequired,
     PaymentNotRefundable,
-    
+    RefundRequestAlreadyExists,
+    RefundRequestAlreadyReviewed,
+    RefundRequestNotFound,
+
 )
 from beauty_formula.apps.payment.tasks.send_payment_request import send_payment_request
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound, SchedulingConflict
@@ -176,8 +192,13 @@ def sync_payment_with_asaas(payment_id) -> Payment:
 
 def refund_payment(*, payment_id, value=None, description: str | None = None) -> Payment:
     """
-    Estorno manual, acionado pelo admin (nunca automático — cancelamento
-    de agendamento não estorna sozinho, ver cancel_payment_for_scheduling).
+    Estorno de fato na Asaas — acionado pelo admin, seja direto (endpoint
+    de refund avulso) ou indiretamente ao aprovar um `RefundRequest`
+    (`approve_refund_request_service`, que chama esta função com o valor
+    já líquido da taxa de cancelamento). Nunca é chamado sozinho a partir
+    de um cancelamento de agendamento — ver `cancel_payment_for_scheduling`,
+    que só CRIA o pedido pra fila de análise, não estorna nada sem o
+    admin decidir.
 
     Só cobre Pix e cartão de crédito já RECEIVED/CONFIRMED. Boleto tem
     fluxo próprio na Asaas (exige dados bancários do pagador) — fora de
@@ -236,13 +257,15 @@ def _confirm_scheduling_if_paid(payment: Payment) -> None:
 
     Nunca deixa uma falha de confirmação derrubar o processamento do
     pagamento em si (webhook precisa responder 200 rápido pra Asaas não
-    ficar reentregando) — só loga pra reconciliação manual. O caso mais
+    ficar reentregando) — só loga pra reconciliação. O caso mais
     provável de falhar aqui é `SchedulingConflict`: o horário foi
     ocupado por outro agendamento confirmado enquanto este esperava
-    pagamento — dinheiro recebido, mas o horário já era. Cancela a
-    reserva perdedora automaticamente (não mexe no pagamento) e notifica
-    o admin por e-mail — o estorno em si continua manual
-    (`refund_payment`), de propósito.
+    pagamento — dinheiro recebido, mas o horário já era.
+    `cancel_scheduling_due_to_payment_conflict` cancela a reserva
+    perdedora E cria um `RefundRequest` (reembolso integral, taxa 0% —
+    não é culpa do cliente) na mesma fila que qualquer outro pedido de
+    reembolso — o admin vê e decide na mesma tela, não precisa de um
+    e-mail avulso separado pra esse caso específico.
     """
     if payment.status not in _PAID_PAYMENT_STATUSES:
         return
@@ -250,9 +273,6 @@ def _confirm_scheduling_if_paid(payment: Payment) -> None:
     from beauty_formula.apps.services.services.scheduling_service import (
         cancel_scheduling_due_to_payment_conflict,
         confirm_scheduling_after_payment,
-    )
-    from beauty_formula.apps.payment.tasks.send_scheduling_payment_conflict_admin_notification import (
-        send_scheduling_payment_conflict_admin_notification,
     )
 
     try:
@@ -265,7 +285,6 @@ def _confirm_scheduling_if_paid(payment: Payment) -> None:
             payment.id, payment.scheduling_id,
         )
         cancel_scheduling_due_to_payment_conflict(scheduling_id=payment.scheduling_id)
-        send_scheduling_payment_conflict_admin_notification.delay(payment_id=payment.id)
 
 
 def process_asaas_webhook(payload: dict) -> Payment:
@@ -294,34 +313,136 @@ def process_asaas_webhook(payload: dict) -> Payment:
     return payment
 
 
-def cancel_payment_for_scheduling(scheduling_id) -> None:
+def cancel_payment_for_scheduling(scheduling_id, *, canceled_by: Optional[User] = None, reason: str = "") -> None:
     """
-    Cancela na Asaas a cobrança pendente vinculada ao agendamento, se
-    existir. Chamada pelo scheduling_service sempre que um agendamento é
-    cancelado (cliente, funcionário ou admin) — evita deixar uma cobrança
-    PENDING pendurada pra um serviço que não vai mais acontecer.
+    Chamada pelo scheduling_service sempre que um agendamento é cancelado
+    (cliente, funcionário ou admin) — trata a cobrança vinculada de dois
+    jeitos bem diferentes dependendo do status dela:
 
-    Se a cobrança já foi paga (RECEIVED/CONFIRMED), não mexe nela aqui —
-    a Asaas não permite excluir cobrança já paga; devolver o dinheiro é
-    caso de estorno (endpoint futuro), não de cancelamento.
+    - PENDING (ainda não foi paga): cancela a cobrança na Asaas, mesmo
+      comportamento de sempre. Não tem dinheiro envolvido, não precisa de
+      análise de ninguém.
 
-    Falha de comunicação com a Asaas NÃO impede o cancelamento do
-    agendamento: só loga o erro. Travar o cancelamento do cliente por
-    causa de uma chamada externa instável seria pior que deixar uma
-    cobrança órfã pra resolver depois manualmente.
+    - RECEIVED/CONFIRMED (já foi paga): NÃO estorna sozinho. Cria um
+      `RefundRequest` na fila de análise do admin — é o admin quem decide
+      acionar o estorno de verdade na Asaas (`approve_refund_request`),
+      nunca automático. A taxa de cancelamento (10% por padrão) só se
+      aplica quando é o próprio CLIENTE quem decide cancelar
+      (`canceled_by.role == CLIENT`); cancelamento feito pelo salão
+      (funcionário ou admin) gera pedido com taxa 0% — não é justo cobrar
+      o cliente por uma decisão que não foi dele.
+
+    Falha de comunicação com a Asaas (no caminho PENDING) NÃO impede o
+    cancelamento do agendamento: só loga o erro. Travar o cancelamento do
+    cliente por causa de uma chamada externa instável seria pior que
+    deixar uma cobrança órfã pra resolver depois manualmente.
     """
     payment = get_active_payment_for_scheduling(scheduling_id)
-    if payment is None or payment.status != Payment.PaymentStatus.PENDING:
+    if payment is None:
         return
 
-    try:
-        AsaasClient().cancel_payment(payment.asaas_payment_id)
-    except AsaasAPIError:
-        logger.exception(
-            "Falha ao cancelar cobrança %s na Asaas (agendamento %s) — "
-            "agendamento foi cancelado normalmente mesmo assim.",
-            payment.asaas_payment_id, scheduling_id,
+    if payment.status == Payment.PaymentStatus.PENDING:
+        try:
+            AsaasClient().cancel_payment(payment.asaas_payment_id)
+        except AsaasAPIError:
+            logger.exception(
+                "Falha ao cancelar cobrança %s na Asaas (agendamento %s) — "
+                "agendamento foi cancelado normalmente mesmo assim.",
+                payment.asaas_payment_id, scheduling_id,
+            )
+            return
+        update_payment_status(payment, status=Payment.PaymentStatus.CANCELLED)
+        return
+
+    if payment.status in _PAID_PAYMENT_STATUSES:
+        _request_refund_for_paid_scheduling(payment, canceled_by=canceled_by, reason=reason)
+
+
+def _request_refund_for_paid_scheduling(payment: Payment, *, canceled_by: Optional[User], reason: str) -> None:
+    """
+    Cria o RefundRequest e notifica o admin. Nunca deixa uma falha aqui
+    (e-mail fora do ar, corrida rara de duplo cancelamento) derrubar o
+    cancelamento do agendamento em si — o agendamento já foi cancelado
+    antes desta função ser chamada, isso é só o rastro financeiro.
+    """
+    from beauty_formula.apps.payment.tasks.send_refund_request_admin_notification import (
+        send_refund_request_admin_notification,
+    )
+
+    if get_pending_refund_request_for_payment(payment.id) is not None:
+        logger.warning(
+            "Já existe um RefundRequest pendente para o pagamento %s — não criou outro.", payment.id
         )
         return
 
-    update_payment_status(payment, status=Payment.PaymentStatus.CANCELLED)
+    fee_percentage = (
+        DEFAULT_CANCELLATION_FEE_PERCENTAGE
+        if canceled_by is not None and canceled_by.role == User.UserRole.CLIENT
+        else Decimal("0.00")
+    )
+    original_value = payment.value
+    fee_value = (original_value * fee_percentage / Decimal("100")).quantize(Decimal("0.01"))
+    refund_value = original_value - fee_value
+
+    try:
+        refund_request = create_refund_request(
+            payment=payment,
+            client=payment.client,
+            requested_by=canceled_by or payment.client.user,
+            reason=reason,
+            original_value=original_value,
+            fee_percentage=fee_percentage,
+            fee_value=fee_value,
+            refund_value=refund_value,
+        )
+    except RefundRequestAlreadyExists:
+        logger.warning(
+            "RefundRequest duplicado para o pagamento %s (corrida entre chamadas concorrentes) — ignorado.",
+            payment.id,
+        )
+        return
+
+    logger.info(
+        "RefundRequest %s criado para pagamento %s: original=%s taxa=%s%% valor_a_devolver=%s",
+        refund_request.id, payment.id, original_value, fee_percentage, refund_value,
+    )
+    send_refund_request_admin_notification.delay(refund_request_id=refund_request.id)
+
+
+@transaction.atomic
+def approve_refund_request_service(*, refund_request_id, reviewed_by: User, admin_notes: str = "") -> RefundRequest:
+    """
+    Aprovação do admin: aciona o estorno de verdade na Asaas
+    (`refund_payment`, valor parcial = `refund_value`, já com a taxa
+    descontada) e SÓ marca o pedido como APPROVED se a chamada à Asaas
+    for bem-sucedida — se falhar, a exceção sobe (`PaymentNotRefundable`/
+    `AsaasAPIError`) e o pedido continua PENDING, pronto pra tentar de
+    novo, em vez de ficar com um status "aprovado" que não corresponde
+    ao que realmente aconteceu no gateway de pagamento.
+    """
+    refund_request = get_refund_request_by_id(refund_request_id)
+    if refund_request is None:
+        raise RefundRequestNotFound()
+
+    if refund_request.status != RefundRequest.RefundRequestStatus.PENDING:
+        raise RefundRequestAlreadyReviewed()
+
+    refund_payment(
+        payment_id=refund_request.payment_id,
+        value=refund_request.refund_value,
+        description=f"Estorno aprovado (pedido {refund_request.id}) — taxa de {refund_request.fee_percentage}% retida.",
+    )
+
+    return approve_refund_request_repo(refund_request, reviewed_by=reviewed_by, admin_notes=admin_notes)
+
+
+def reject_refund_request_service(*, refund_request_id, reviewed_by: User, admin_notes: str) -> RefundRequest:
+    """Rejeição do admin — nenhum dinheiro é movimentado, o pagamento permanece como está."""
+    refund_request = get_refund_request_by_id(refund_request_id)
+    if refund_request is None:
+        raise RefundRequestNotFound()
+
+    if refund_request.status != RefundRequest.RefundRequestStatus.PENDING:
+        raise RefundRequestAlreadyReviewed()
+
+    return reject_refund_request_repo(refund_request, reviewed_by=reviewed_by, admin_notes=admin_notes)

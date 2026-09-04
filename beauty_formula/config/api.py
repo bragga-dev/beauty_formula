@@ -19,6 +19,7 @@ from beauty_formula.apps.website.api.product import router as product_router
 from beauty_formula.apps.website.api.contact import router as contact_router
 from beauty_formula.apps.payment.api.payment import router as payment_router
 from beauty_formula.apps.payment.api.employee_commission import router as commission_router
+from beauty_formula.apps.payment.api.refund_request import router as refund_request_router
 from beauty_formula.apps.reports.api.monthly_report import router as reports_router
 
 
@@ -63,6 +64,7 @@ api.add_router("/products/", product_router, tags=["Products"])
 api.add_router("/contacts/", contact_router, tags=["Contacts"])
 api.add_router("/payments/", payment_router, tags=["Payments"])
 api.add_router("/commissions/", commission_router, tags=["Commissions"])
+api.add_router("/payments/refund-requests/", refund_request_router, tags=["Refund Requests"])
 api.add_router("/reports/", reports_router, tags=["Reports"])
 
 # ── Handlers de erro globais ──────────────────────────────────────────────────

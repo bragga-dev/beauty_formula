@@ -316,28 +316,28 @@ def cancel_scheduling_due_to_payment_conflict(scheduling_id: UUID) -> Optional[S
     `payment_service._confirm_scheduling_if_paid` quando
     `confirm_scheduling_after_payment` estoura `SchedulingConflict`.
 
-    NÃO mexe no pagamento: ele já está RECEIVED/CONFIRMED na Asaas nesse
-    ponto, e devolver dinheiro é sempre uma ação manual do admin
-    (`payment_service.refund_payment`) — só marca o agendamento como
-    CANCELED pra não ficar pendurado em CREATED pra sempre. Também não
-    dispara os e-mails normais de cancelamento (o cliente não pediu isso;
-    quem avisa o cliente é o admin, depois de decidir o que fazer) —
-    quem é notificado aqui é o admin, via
-    `send_scheduling_payment_conflict_admin_notification`.
+    Também aciona `cancel_payment_for_scheduling` com `canceled_by=None`
+    — que, pra um pagamento já RECEIVED/CONFIRMED, cria um `RefundRequest`
+    na mesma fila de análise usada pra qualquer outro cancelamento (ver
+    `payment_service.cancel_payment_for_scheduling`). `canceled_by=None`
+    garante taxa de cancelamento 0% (reembolso integral): a culpa aqui é
+    de uma limitação do sistema, não do cliente — não faz sentido reter
+    10% dele por isso. Não dispara os e-mails normais de cancelamento (o
+    cliente não pediu isso; quem decide como avisar o cliente é o admin,
+    ao analisar o pedido) — o motivo registrado no `RefundRequest` já
+    deixa claro pro admin que não é um cancelamento comum.
     """
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None or scheduling.status != Scheduling.SchedulingStatus.CREATED:
         return scheduling
 
-    return cancel_scheduling_repo(
-        scheduling,
-        reason=(
-            "Cancelado automaticamente: o horário foi confirmado por outro "
-            "cliente antes deste pagamento ser identificado. Pagamento já "
-            "recebido — aguarda estorno manual pelo admin."
-        ),
-        canceled_by=None,
+    reason = (
+        "Cancelado automaticamente: o horário foi confirmado por outro "
+        "cliente antes deste pagamento ser identificado."
     )
+    scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=None)
+    cancel_payment_for_scheduling(scheduling.id, canceled_by=None, reason=reason)
+    return scheduling
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Listagem
@@ -489,7 +489,7 @@ def cancel_own_scheduling_as_client(user_id: UUID, scheduling_id: UUID, reason: 
 
     user = User.objects.get(pk=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
-    cancel_payment_for_scheduling(scheduling.id)
+    cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
@@ -503,7 +503,7 @@ def cancel_scheduling_as_employee(user_id: UUID, scheduling_id: UUID, reason: st
 
     user = User.objects.get(pk=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
-    cancel_payment_for_scheduling(scheduling.id)
+    cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
     return SchedulingOut.from_orm(scheduling)
 
@@ -518,7 +518,7 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
         raise SchedulingCannotBeCanceled()
 
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
-    cancel_payment_for_scheduling(scheduling.id)
+    cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
     return SchedulingPrivateOut.from_orm(scheduling)
 

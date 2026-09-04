@@ -110,3 +110,26 @@ class CommissionPayoutNotFound(Exception):
     def __init__(self, message: str | None = None):
         self.message = message or _("Quitação de comissões não encontrada.")
         super().__init__(self.message)
+
+
+class RefundRequestNotFound(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _("Pedido de reembolso não encontrado.")
+        super().__init__(self.message)
+
+
+class RefundRequestAlreadyReviewed(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _(
+            "Este pedido de reembolso já foi analisado — só pedidos "
+            "pendentes podem ser aprovados ou rejeitados."
+        )
+        super().__init__(self.message)
+
+
+class RefundRequestAlreadyExists(Exception):
+    def __init__(self, message: str | None = None):
+        self.message = message or _(
+            "Já existe um pedido de reembolso em análise para este pagamento."
+        )
+        super().__init__(self.message)
