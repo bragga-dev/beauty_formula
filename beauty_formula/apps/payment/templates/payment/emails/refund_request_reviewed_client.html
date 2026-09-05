@@ -1,0 +1,76 @@
+{% extends "core/emails/base.html" %}
+
+{% block title %}{% if was_approved %}Reembolso aprovado{% else %}Sobre seu pedido de reembolso{% endif %} — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}{% if was_approved %}Seu reembolso foi aprovado e o estorno já foi solicitado.{% else %}Seu pedido de reembolso foi analisado.{% endif %}{% endblock %}
+
+{% block content %}
+
+    <span class="section-label">{% if was_approved %}Reembolso aprovado{% else %}Reembolso analisado{% endif %}</span>
+    <h1 class="heading">
+        {% if was_approved %}Seu reembolso foi aprovado{% else %}Seu pedido de reembolso foi analisado{% endif %}
+    </h1>
+
+    <p class="greeting">
+        Olá, <strong>{{ client_name }}</strong>!
+    </p>
+
+    {% if was_approved %}
+    <p class="body-text">
+        Boas notícias: analisamos o pedido de reembolso do seu agendamento{% if service_name %} de <strong>{{ service_name }}</strong>{% endif %}
+        e ele foi <strong>aprovado</strong>. O estorno já foi solicitado ao meio de pagamento — o prazo pra cair na
+        sua conta ou fatura depende do seu banco/operadora do cartão, geralmente alguns dias úteis.
+    </p>
+    {% else %}
+    <p class="body-text">
+        Analisamos o pedido de reembolso do seu agendamento{% if service_name %} de <strong>{{ service_name }}</strong>{% endif %}
+        e, infelizmente, ele <strong>não foi aprovado</strong> desta vez. Veja o motivo abaixo — se tiver dúvidas,
+        responda este e-mail que te ajudamos.
+    </p>
+    {% endif %}
+
+    <!-- Detalhes -->
+    <div class="info-box">
+        <p class="info-box-title">Detalhes</p>
+
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="label">Valor pago</span>
+                <span class="value price">R$ {{ original_value|floatformat:2 }}</span>
+            </div>
+            {% if has_fee %}
+            <div class="detail-item">
+                <span class="label">Taxa de cancelamento</span>
+                <span class="value" style="font-size: 14px;">{{ fee_percentage|floatformat:0 }}% (R$ {{ fee_value|floatformat:2 }})</span>
+            </div>
+            {% endif %}
+            <div class="detail-item">
+                <span class="label">{% if was_approved %}Valor devolvido{% else %}Valor que seria devolvido{% endif %}</span>
+                <span class="value price">R$ {{ refund_value|floatformat:2 }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Status</span>
+                <span class="status-badge {% if was_approved %}success{% else %}cancelled{% endif %}">
+                    {% if was_approved %}Aprovado{% else %}Não aprovado{% endif %}
+                </span>
+            </div>
+        </div>
+
+        {% if admin_notes %}
+        <div class="reason-box">
+            <p><strong>{% if was_approved %}Observação:{% else %}Motivo:{% endif %}</strong><br>{{ admin_notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Mensagem final -->
+    <div class="closing-note">
+        {% if was_approved %}
+        <p class="script">"Obrigado pela paciência! Esperamos te ver de novo em breve."</p>
+        {% else %}
+        <p class="script">"Qualquer dúvida sobre essa decisão, é só responder este e-mail."</p>
+        {% endif %}
+        <p class="team">Equipe Fórmula da Beleza</p>
+    </div>
+
+{% endblock %}

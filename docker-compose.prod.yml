@@ -1,4 +1,9 @@
 services:
+
+  # =========================================================
+  # DJANGO (gunicorn) — não expõe mais porta pro host,
+  # quem fala com ele agora é o nginx via rede interna
+  # =========================================================
   web:
     build: .
     command: >
@@ -7,8 +12,9 @@ services:
              gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
     volumes:
       - .:/app
-    ports:
-      - "8000:8000"
+      - static_volume:/app/staticfiles
+    expose:
+      - "8000"
     env_file: .env
     restart: always
     depends_on:
@@ -19,6 +25,9 @@ services:
       minio:
         condition: service_healthy
 
+  # =========================================================
+  # POSTGRES
+  # =========================================================
   db:
     image: postgres:16
     environment:
@@ -34,10 +43,16 @@ services:
       timeout: 5s
       retries: 5
 
+  # =========================================================
+  # REDIS
+  # =========================================================
   redis:
     image: redis:7-alpine
     restart: always
 
+  # =========================================================
+  # CELERY WORKER
+  # =========================================================
   celery:
     build: .
     command: celery -A config worker -l info --concurrency 4
@@ -51,6 +66,9 @@ services:
       minio:
         condition: service_healthy
 
+  # =========================================================
+  # CELERY BEAT
+  # =========================================================
   celery-beat:
     build: .
     command: celery -A config beat -l info
@@ -59,6 +77,9 @@ services:
     depends_on:
       - redis
 
+  # =========================================================
+  # MINIO
+  # =========================================================
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -92,6 +113,33 @@ services:
       "
     env_file: .env
 
+  # =========================================================
+  # NGINX + FRONTEND
+  # Builda a SPA (formula-da-beleza) e a serve, além de
+  # fazer proxy para /api, /admin e /static do Django.
+  # Assume que os repos estão lado a lado:
+  #   /srv/formula-da-beleza/beauty-formula/        (aqui está este compose)
+  #   /srv/formula-da-beleza/formula-da-beleza/      (repo do frontend)
+  # =========================================================
+  nginx:
+    build:
+      context: ../formula-da-beleza
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - static_volume:/app/staticfiles:ro
+    depends_on:
+      - web
+    restart: always
+
+# =========================================================
+# VOLUMES
+# =========================================================
 volumes:
   postgres_data:
   minio_data:
+  static_volume:

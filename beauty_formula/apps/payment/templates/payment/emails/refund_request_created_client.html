@@ -1,0 +1,64 @@
+{% extends "core/emails/base.html" %}
+
+{% block title %}Pedido de reembolso recebido — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}Seu agendamento foi cancelado e seu pedido de reembolso está em análise.{% endblock %}
+
+{% block content %}
+
+    <span class="section-label">Reembolso em análise</span>
+    <h1 class="heading">Recebemos seu pedido de reembolso</h1>
+
+    <p class="greeting">
+        Olá, <strong>{{ client_name }}</strong>!
+    </p>
+
+    <p class="body-text">
+        Seu agendamento{% if service_name %} de <strong>{{ service_name }}</strong>{% endif %} foi cancelado e,
+        como o pagamento já tinha sido recebido, seu pedido de reembolso foi registrado e está
+        <strong>em análise pela nossa equipe</strong>. Assim que for avaliado, você recebe um novo e-mail com o resultado.
+    </p>
+
+    <!-- Detalhes -->
+    <div class="info-box">
+        <p class="info-box-title">Valores do reembolso</p>
+
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="label">Valor pago</span>
+                <span class="value price">R$ {{ original_value|floatformat:2 }}</span>
+            </div>
+            {% if has_fee %}
+            <div class="detail-item">
+                <span class="label">Taxa de cancelamento</span>
+                <span class="value" style="font-size: 14px;">{{ fee_percentage|floatformat:0 }}% (R$ {{ fee_value|floatformat:2 }})</span>
+            </div>
+            {% endif %}
+            <div class="detail-item">
+                <span class="label">Valor a ser devolvido</span>
+                <span class="value price">R$ {{ refund_value|floatformat:2 }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Status</span>
+                <span class="status-badge">Em análise</span>
+            </div>
+        </div>
+
+        {% if has_fee %}
+        <div class="reason-box">
+            <p>
+                Cancelamentos feitos pelo cliente estão sujeitos a uma taxa de {{ fee_percentage|floatformat:0 }}%
+                sobre o valor do serviço, retida como custo de cancelamento. O valor acima já é o valor líquido
+                que você vai receber de volta, caso o pedido seja aprovado.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Mensagem final -->
+    <div class="closing-note">
+        <p class="script">"Assim que analisarmos seu pedido, avisamos por aqui. Obrigado pela paciência!"</p>
+        <p class="team">Equipe Fórmula da Beleza</p>
+    </div>
+
+{% endblock %}
