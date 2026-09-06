@@ -52,6 +52,15 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
 
 )
 from beauty_formula.apps.payment.tasks.send_payment_request import send_payment_request
+from beauty_formula.apps.payment.tasks.send_refund_request_admin_notification import (
+    send_refund_request_admin_notification,
+)
+from beauty_formula.apps.payment.tasks.send_refund_request_created_client_notification import (
+    send_refund_request_created_client_notification,
+)
+from beauty_formula.apps.payment.tasks.send_refund_request_reviewed_client_notification import (
+    send_refund_request_reviewed_client_notification,
+)
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound, SchedulingConflict
 from beauty_formula.apps.services.models.scheduling import Scheduling
 from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
@@ -365,13 +374,6 @@ def _request_refund_for_paid_scheduling(payment: Payment, *, canceled_by: Option
     cancelamento do agendamento em si — o agendamento já foi cancelado
     antes desta função ser chamada, isso é só o rastro financeiro.
     """
-    from beauty_formula.apps.payment.tasks.send_refund_request_admin_notification import (
-        send_refund_request_admin_notification,
-    )
-    from beauty_formula.apps.payment.tasks.send_refund_request_created_client_notification import (
-        send_refund_request_created_client_notification,
-    )
-
     if get_pending_refund_request_for_payment(payment.id) is not None:
         logger.warning(
             "Já existe um RefundRequest pendente para o pagamento %s — não criou outro.", payment.id
@@ -439,9 +441,6 @@ def approve_refund_request_service(*, refund_request_id, reviewed_by: User, admi
 
     result = approve_refund_request_repo(refund_request, reviewed_by=reviewed_by, admin_notes=admin_notes)
 
-    from beauty_formula.apps.payment.tasks.send_refund_request_reviewed_client_notification import (
-        send_refund_request_reviewed_client_notification,
-    )
     send_refund_request_reviewed_client_notification.delay(refund_request_id=result.id)
 
     return result
@@ -458,9 +457,6 @@ def reject_refund_request_service(*, refund_request_id, reviewed_by: User, admin
 
     result = reject_refund_request_repo(refund_request, reviewed_by=reviewed_by, admin_notes=admin_notes)
 
-    from beauty_formula.apps.payment.tasks.send_refund_request_reviewed_client_notification import (
-        send_refund_request_reviewed_client_notification,
-    )
     send_refund_request_reviewed_client_notification.delay(refund_request_id=result.id)
 
     return result
