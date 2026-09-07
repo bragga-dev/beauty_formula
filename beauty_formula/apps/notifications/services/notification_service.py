@@ -40,6 +40,16 @@ from beauty_formula.apps.notifications.selectors.notification_selector import (
 
 logger = logging.getLogger(__name__)
 
+# ── URLs de ação por rota do front ──────────────────────────────────────────
+# Cada `action_url` precisa apontar pra uma rota que EXISTE pro papel do
+# `recipient`, senão o clique cai em 404 (rotas do front são segregadas por
+# role — ver `AppRouter.tsx`: cliente, funcionário e admin têm páginas
+# diferentes até pro mesmo agendamento). Centralizado aqui pra não espalhar
+# strings de rota do front pelos helpers `notify_*`.
+CLIENT_APPOINTMENT_URL = "/painel/meus-agendamentos/{id}"
+EMPLOYEE_RATINGS_URL = "/painel/avaliacoes"
+DASHBOARD_HOME_URL = "/painel"
+
 
 def notify(
     *,
@@ -95,7 +105,7 @@ def notify_scheduling_confirmed(scheduling_id: UUID, *, actor: Optional[User] = 
         recipient=scheduling.client.user,
         title="Agendamento confirmado",
         body=f"Seu horário de {scheduling.service.name} foi confirmado.",
-        action_url=f"/appointments/{scheduling.id}",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
     )
@@ -113,7 +123,7 @@ def notify_scheduling_cancelled(scheduling_id: UUID, *, actor: Optional[User] = 
         recipient=scheduling.client.user,
         title="Agendamento cancelado",
         body=f"Seu horário de {scheduling.service.name} foi cancelado.",
-        action_url=f"/appointments/{scheduling.id}",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
     )
@@ -131,7 +141,7 @@ def notify_scheduling_rescheduled(scheduling_id: UUID, *, actor: Optional[User] 
         recipient=scheduling.client.user,
         title="Agendamento reagendado",
         body=f"Seu horário de {scheduling.service.name} foi reagendado.",
-        action_url=f"/appointments/{scheduling.id}",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
     )
@@ -149,7 +159,7 @@ def notify_scheduling_reminder(scheduling_id: UUID) -> Optional[Notification]:
         recipient=scheduling.client.user,
         title="Lembrete de agendamento",
         body=f"Seu atendimento de {scheduling.service.name} está próximo.",
-        action_url=f"/appointments/{scheduling.id}",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         target=scheduling,
     )
 
@@ -166,7 +176,7 @@ def notify_scheduling_complete(scheduling_id: UUID) -> Optional[Notification]:
         recipient=scheduling.client.user,
         title="Agendamento concluído",
         body=f"Seu horário de {scheduling.service.name} foi concluído.",
-        action_url=f"/appointments/{scheduling.id}",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         target=scheduling,
     )
 
@@ -188,7 +198,7 @@ def notify_request_rating(scheduling_id: UUID) -> Optional[Notification]:
         recipient=scheduling.client.user,
         title="Avalie seu atendimento",
         body=f"Conte pra gente como foi seu atendimento de {scheduling.service.name}.",
-        action_url=f"/appointments/{scheduling.id}/rate",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         target=scheduling,
     )
 
@@ -206,7 +216,7 @@ def notify_new_rating(rating_id: UUID) -> Optional[Notification]:
         recipient=rating.employee.user,
         title="Nova avaliação recebida",
         body=f"Você recebeu uma avaliação de {rating.rating} estrela(s) para {rating.service.name}.",
-        action_url=f"/dashboard/ratings/{rating.id}",
+        action_url=EMPLOYEE_RATINGS_URL,
         actor=rating.client.user,
         target=rating,
     )
@@ -228,7 +238,7 @@ def notify_payment_received(payment_id: UUID) -> Optional[Notification]:
         recipient=payment.client.user,
         title="Pagamento recebido",
         body=f"Seu pagamento para {payment.scheduling.service.name} foi recebido com sucesso.",
-        action_url=f"/payments/{payment.id}",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=payment.scheduling.id),
         target=payment,
     )
 
@@ -248,7 +258,7 @@ def notify_refund_requested(refund_request_id: UUID, *, actor: Optional[User] = 
             f"Seu pedido de reembolso de {refund_request.payment.scheduling.service.name} "
             f"foi registrado e está em análise."
         ),
-        action_url=f"/refunds/{refund_request.id}",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=refund_request.payment.scheduling.id),
         actor=actor,
         target=refund_request,
     )
@@ -276,7 +286,7 @@ def notify_refund_reviewed(refund_request_id: UUID, *, actor: Optional[User] = N
         recipient=refund_request.client.user,
         title=title,
         body=body,
-        action_url=f"/refunds/{refund_request.id}",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=refund_request.payment.scheduling.id),
         actor=actor or refund_request.reviewed_by,
         target=refund_request,
     )
@@ -296,7 +306,7 @@ def notify_employee_promoted(user_id: UUID, *, actor: Optional[User] = None) -> 
         recipient=user,
         title="Você agora é um profissional",
         body="Seu cadastro foi promovido para funcionário. Bem-vindo(a) ao time!",
-        action_url="/dashboard",
+        action_url=DASHBOARD_HOME_URL,
         actor=actor,
         target=None,
     )
