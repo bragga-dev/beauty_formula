@@ -101,6 +101,7 @@ from beauty_formula.apps.payment.services.employee_commission_service import (
     generate_commission_for_completed_scheduling,
 )
 
+from beauty_formula.apps.notifications.services.notification_service import notify_scheduling_confirmed
 
 
 
@@ -261,6 +262,7 @@ def _confirm_scheduling(scheduling: Scheduling) -> Scheduling:
         user_id=scheduling_confirmed.client.user.id, scheduling_id=scheduling_confirmed.id
     )
     send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling_confirmed.id)
+    notify_scheduling_confirmed(scheduling_confirmed)
     return scheduling_confirmed
 
 
