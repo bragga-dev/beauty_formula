@@ -12,6 +12,7 @@ from ninja import Router
 
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.schemas.user_schema import MessageOut
+from beauty_formula.apps.core.exceptions import NotificationNotFound
 from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth, AllRolesAuth
 from beauty_formula.apps.core.schemas.deafult_schema import PageOut
 from beauty_formula.apps.core.utils.pagination import paginate_queryset
@@ -22,6 +23,7 @@ from beauty_formula.apps.notifications.schemas.notification_schema import (
 )
 from beauty_formula.apps.notifications.services.notification_service import (
     delete_notification,
+    list_all_notifications_for_admin,
     list_notifications_for_user,
     mark_all_notifications_as_read,
     mark_notification_as_read,
@@ -62,7 +64,7 @@ def unread_count(request):
 
 @router.post(
     "/{notification_id}/read/",
-    response={200: NotificationOut, 404: MessageOut, 401: MessageOut},
+    response={200: NotificationOut, 404: MessageOut, 403: MessageOut, 401: MessageOut},
     auth=AllRolesAuth(),
     summary="Usuário marca uma notificação como lida",
 )
@@ -70,10 +72,10 @@ def unread_count(request):
 def mark_as_read_router(request, notification_id: UUID):
     user: User = request.auth
     try:
-        n = mark_notification_as_read(user_id=user.id, notification_id=notification_id)
-        return 200, NotificationOut.from_orm(n)
-    except Exception as e:
+        notify = mark_notification_as_read(user_id=user.id, notification_id=notification_id)
+    except NotificationNotFound as e:
         return 404, {"detail": str(e)}
+    return 200, NotificationOut.from_orm(notify)
 
 
 @router.post(
@@ -90,7 +92,7 @@ def mark_all_as_read_router(request):
 
 @router.delete(
     "/{notification_id}/",
-    response={200: dict, 404: MessageOut, 401: MessageOut},
+    response={200: MessageOut, 404: MessageOut, 403: MessageOut, 401: MessageOut},
     auth=AllRolesAuth(),
     summary="Usuário exclui uma notificação",
 )
@@ -99,13 +101,13 @@ def delete_notification_router(request, notification_id: UUID):
     user: User = request.auth
     try:
         delete_notification(user_id=user.id, notification_id=notification_id)
-        return 200, {"success": True}
-    except Exception as e:
+    except NotificationNotFound as e:
         return 404, {"detail": str(e)}
+    return 200, {"detail": "Notificação excluída."}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Admin (visão total) — se necessário
+# Admin (visão total, com filtros)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
@@ -122,13 +124,7 @@ def list_all_notifications_router(
     page: int = 1,
     page_size: int = 20,
 ):
-    """
-    Admin visualiza todas as notificações, com opção de filtrar por usuário e status de leitura.
-    """
-    from beauty_formula.apps.notifications.selectors.notification_selector import filter_notifications
-
-    qs = filter_notifications(
-        user_id=user_id,
-        read=read,
-    )
+    """Admin visualiza todas as notificações, com opção de filtrar por usuário e status de leitura."""
+    admin: User = request.auth
+    qs = list_all_notifications_for_admin(admin_user_id=admin.id, target_user_id=user_id, read=read)
     return 200, paginate_queryset(qs, page, page_size, NotificationOut.from_orm)

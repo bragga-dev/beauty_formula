@@ -44,7 +44,6 @@ DJANGO_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
-    "django.contrib.notifications",
 ]
 
 
@@ -75,6 +74,7 @@ LOCAL_APPS = [
     "beauty_formula.apps.payment",
     "beauty_formula.apps.website",
     "beauty_formula.apps.reports",
+    "beauty_formula.apps.notifications",
    
 ]
 
