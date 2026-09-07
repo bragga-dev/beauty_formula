@@ -17,6 +17,7 @@ class Notification(models.Model):
     """
 
     class NotificationType(models.TextChoices):
+        SCHEDULING_COMPLETE = "scheduling_complete", _("Agendamento concluído")
         SCHEDULING_CONFIRMED = "scheduling_confirmed", _("Agendamento confirmado")
         SCHEDULING_CANCELLED = "scheduling_cancelled", _("Agendamento cancelado")
         SCHEDULING_RESCHEDULED = "scheduling_rescheduled", _("Agendamento remarcado")
@@ -24,6 +25,7 @@ class Notification(models.Model):
         PAYMENT_RECEIVED = "payment_received", _("Pagamento recebido")
         REFUND_REQUESTED = "refund_requested", _("Reembolso solicitado")
         REFUND_REVIEWED = "refund_reviewed", _("Reembolso avaliado")
+        REQUEST_RATING = "request_rating", _("Solicitação para avaliação")
         NEW_RATING = "new_rating", _("Nova avaliação recebida")
         EMPLOYEE_PROMOTED = "employee_promoted", _("Funcionário promovido")
         SYSTEM = "system", _("Aviso do sistema")

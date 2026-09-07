@@ -23,3 +23,8 @@ def get_unread_count(recipient_id: UUID) -> int:
     return Notification.objects.filter(recipient_id=recipient_id, is_read=False).count()
 
 
+def list_all_notification(unread_only: bool = False) -> QuerySet[Notification]:
+    qs = Notification.objects.select_related(*DEFAULT_RELATED).all()
+    if unread_only:
+        qs = qs.filter(is_read=False)
+    return qs.order_by("-created_at")

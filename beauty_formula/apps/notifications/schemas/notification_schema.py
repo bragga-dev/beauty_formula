@@ -30,3 +30,7 @@ class UnreadCountOut(Schema):
 
 class MarkAllReadOut(Schema):
     updated: int
+
+
+class NotificationListOut(Schema):
+    items: list[NotificationOut]

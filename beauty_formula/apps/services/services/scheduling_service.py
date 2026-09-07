@@ -101,7 +101,13 @@ from beauty_formula.apps.payment.services.employee_commission_service import (
     generate_commission_for_completed_scheduling,
 )
 
-from beauty_formula.apps.notifications.services.notification_service import notify_scheduling_confirmed
+from beauty_formula.apps.notifications.services.notification_service import (
+    notify_scheduling_confirmed,
+    notify_scheduling_cancelled,
+    notify_scheduling_rescheduled,
+    notify_scheduling_complete,
+    notify_scheduling_reminder,
+    )
 
 
 
@@ -262,7 +268,7 @@ def _confirm_scheduling(scheduling: Scheduling) -> Scheduling:
         user_id=scheduling_confirmed.client.user.id, scheduling_id=scheduling_confirmed.id
     )
     send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling_confirmed.id)
-    notify_scheduling_confirmed(scheduling_confirmed)
+    notify_scheduling_confirmed(scheduling_id=scheduling_confirmed.id)
     return scheduling_confirmed
 
 
@@ -339,6 +345,7 @@ def cancel_scheduling_due_to_payment_conflict(scheduling_id: UUID) -> Optional[S
     )
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=None)
     cancel_payment_for_scheduling(scheduling.id, canceled_by=None, reason=reason)
+    notify_scheduling_cancelled(scheduling_id=scheduling.id)
     return scheduling
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -493,6 +500,7 @@ def cancel_own_scheduling_as_client(user_id: UUID, scheduling_id: UUID, reason: 
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
     cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
+    notify_scheduling_cancelled(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 @transaction.atomic
@@ -507,6 +515,7 @@ def cancel_scheduling_as_employee(user_id: UUID, scheduling_id: UUID, reason: st
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
     cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
+    notify_scheduling_cancelled(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 @transaction.atomic
@@ -522,6 +531,7 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
     cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
+    notify_scheduling_cancelled(scheduling_id=scheduling.id)
     return SchedulingPrivateOut.from_orm(scheduling)
 
 
@@ -555,6 +565,7 @@ def complete_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> Sche
     rating_exist =  get_rating_for_client_service_employee(client_id=scheduling.client.id, service_id=scheduling.service.id, employee_id=scheduling.employee.id)
     if not rating_exist:
         send_scheduling_completed_thanks.delay(scheduling_id=scheduling.id)
+    notify_scheduling_complete(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 @transaction.atomic
@@ -588,6 +599,7 @@ def auto_complete_overdue_scheduling(scheduling_id: UUID) -> Optional[Scheduling
     generate_commission_for_completed_scheduling(scheduling)
 
     logger.info("Agendamento %s concluído automaticamente (horário vencido).", scheduling.id)
+    notify_scheduling_complete(scheduling_id=scheduling.id)
     return scheduling
 
 
@@ -650,6 +662,7 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
     )
     service.increment_bookings()
     _confirm_rescheduling(scheduling=new_scheduling)
+    notify_scheduling_rescheduled(scheduling_id=new_scheduling.id)
     return SchedulingOut.from_orm(new_scheduling)
 
 # ═══════════════════════════════════════════════════════════════════════════════
