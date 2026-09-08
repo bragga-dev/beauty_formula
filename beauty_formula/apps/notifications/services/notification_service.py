@@ -97,6 +97,7 @@ def _safe_notify(notification_type: str, **kwargs) -> Optional[Notification]:
 
 def notify_scheduling_confirmed(scheduling_id: UUID, *, actor: Optional[User] = None) -> Optional[Notification]:
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br, resolve_employee_display_name
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -106,7 +107,10 @@ def notify_scheduling_confirmed(scheduling_id: UUID, *, actor: Optional[User] = 
         Notification.NotificationType.SCHEDULING_CONFIRMED,
         recipient=scheduling.client.user,
         title="Agendamento confirmado",
-        body=f"Seu horário de {scheduling.service.name} foi confirmado.",
+        body=(
+            f"{scheduling.service.name} com {resolve_employee_display_name(scheduling.employee)} "
+            f"confirmado para {format_datetime_br(scheduling.scheduled_time)}."
+        ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
@@ -116,6 +120,7 @@ def notify_scheduling_confirmed(scheduling_id: UUID, *, actor: Optional[User] = 
 def notify_scheduling_confirmed_employee(scheduling_id: UUID) -> Optional[Notification]:
     """Avisa o funcionário que um cliente pagou e confirmou um horário na agenda dele."""
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br, resolve_client_display_name
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -125,7 +130,10 @@ def notify_scheduling_confirmed_employee(scheduling_id: UUID) -> Optional[Notifi
         Notification.NotificationType.SCHEDULING_CONFIRMED,
         recipient=scheduling.employee.user,
         title="Novo agendamento confirmado",
-        body=f"{scheduling.client.get_full_name() or scheduling.client.user.email} agendou {scheduling.service.name}.",
+        body=(
+            f"{scheduling.service.name} — {resolve_client_display_name(scheduling.client.user)} agendou para "
+            f"{format_datetime_br(scheduling.scheduled_time)}."
+        ),
         action_url=EMPLOYEE_APPOINTMENT_URL.format(id=scheduling.id),
         actor=scheduling.client.user,
         target=scheduling,
@@ -134,6 +142,7 @@ def notify_scheduling_confirmed_employee(scheduling_id: UUID) -> Optional[Notifi
 
 def notify_scheduling_cancelled(scheduling_id: UUID, *, actor: Optional[User] = None) -> Optional[Notification]:
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -143,7 +152,10 @@ def notify_scheduling_cancelled(scheduling_id: UUID, *, actor: Optional[User] = 
         Notification.NotificationType.SCHEDULING_CANCELLED,
         recipient=scheduling.client.user,
         title="Agendamento cancelado",
-        body=f"Seu horário de {scheduling.service.name} foi cancelado.",
+        body=(
+            f"Seu horário de {scheduling.service.name}, marcado para "
+            f"{format_datetime_br(scheduling.scheduled_time)}, foi cancelado."
+        ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
@@ -158,6 +170,7 @@ def notify_scheduling_cancelled_employee(scheduling_id: UUID, *, actor: Optional
     que ele mesmo acabou de fazer.
     """
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br, resolve_client_display_name
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -167,7 +180,10 @@ def notify_scheduling_cancelled_employee(scheduling_id: UUID, *, actor: Optional
         Notification.NotificationType.SCHEDULING_CANCELLED,
         recipient=scheduling.employee.user,
         title="Agendamento cancelado",
-        body=f"O horário de {scheduling.service.name} com {scheduling.client.get_full_name() or scheduling.client.user.email} foi cancelado.",
+        body=(
+            f"{scheduling.service.name} com {resolve_client_display_name(scheduling.client.user)}, marcado para "
+            f"{format_datetime_br(scheduling.scheduled_time)}, foi cancelado."
+        ),
         action_url=EMPLOYEE_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
@@ -176,6 +192,7 @@ def notify_scheduling_cancelled_employee(scheduling_id: UUID, *, actor: Optional
 
 def notify_scheduling_rescheduled(scheduling_id: UUID, *, actor: Optional[User] = None) -> Optional[Notification]:
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -185,7 +202,10 @@ def notify_scheduling_rescheduled(scheduling_id: UUID, *, actor: Optional[User] 
         Notification.NotificationType.SCHEDULING_RESCHEDULED,
         recipient=scheduling.client.user,
         title="Agendamento reagendado",
-        body=f"Seu horário de {scheduling.service.name} foi reagendado.",
+        body=(
+            f"Seu horário de {scheduling.service.name} foi remarcado para "
+            f"{format_datetime_br(scheduling.scheduled_time)}."
+        ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
@@ -195,6 +215,7 @@ def notify_scheduling_rescheduled(scheduling_id: UUID, *, actor: Optional[User] 
 def notify_scheduling_rescheduled_employee(scheduling_id: UUID) -> Optional[Notification]:
     """Avisa o funcionário que um cliente reagendou um horário na agenda dele."""
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br, resolve_client_display_name
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -204,7 +225,10 @@ def notify_scheduling_rescheduled_employee(scheduling_id: UUID) -> Optional[Noti
         Notification.NotificationType.SCHEDULING_RESCHEDULED,
         recipient=scheduling.employee.user,
         title="Agendamento reagendado",
-        body=f"{scheduling.client.get_full_name() or scheduling.client.user.email} reagendou {scheduling.service.name}.",
+        body=(
+            f"{scheduling.service.name} — {resolve_client_display_name(scheduling.client.user)} remarcou para "
+            f"{format_datetime_br(scheduling.scheduled_time)}."
+        ),
         action_url=EMPLOYEE_APPOINTMENT_URL.format(id=scheduling.id),
         actor=scheduling.client.user,
         target=scheduling,
@@ -213,6 +237,7 @@ def notify_scheduling_rescheduled_employee(scheduling_id: UUID) -> Optional[Noti
 
 def notify_scheduling_reminder(scheduling_id: UUID) -> Optional[Notification]:
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br, resolve_employee_display_name
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -222,7 +247,10 @@ def notify_scheduling_reminder(scheduling_id: UUID) -> Optional[Notification]:
         Notification.NotificationType.SCHEDULING_REMINDER,
         recipient=scheduling.client.user,
         title="Lembrete de agendamento",
-        body=f"Seu atendimento de {scheduling.service.name} está próximo.",
+        body=(
+            f"Seu atendimento de {scheduling.service.name} com {resolve_employee_display_name(scheduling.employee)} "
+            f"é em breve: {format_datetime_br(scheduling.scheduled_time)}."
+        ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         target=scheduling,
     )
@@ -230,6 +258,7 @@ def notify_scheduling_reminder(scheduling_id: UUID) -> Optional[Notification]:
 
 def notify_scheduling_complete(scheduling_id: UUID) -> Optional[Notification]:
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br, resolve_employee_display_name
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -239,7 +268,10 @@ def notify_scheduling_complete(scheduling_id: UUID) -> Optional[Notification]:
         Notification.NotificationType.SCHEDULING_COMPLETE,
         recipient=scheduling.client.user,
         title="Agendamento concluído",
-        body=f"Seu horário de {scheduling.service.name} foi concluído.",
+        body=(
+            f"Seu horário de {scheduling.service.name} com {resolve_employee_display_name(scheduling.employee)} "
+            f"({format_datetime_br(scheduling.scheduled_time)}) foi concluído."
+        ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         target=scheduling,
     )
@@ -253,6 +285,7 @@ def notify_scheduling_complete_employee(scheduling_id: UUID) -> Optional[Notific
     — aí ele já sabe, foi ele quem fez.
     """
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br, resolve_client_display_name
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -262,7 +295,10 @@ def notify_scheduling_complete_employee(scheduling_id: UUID) -> Optional[Notific
         Notification.NotificationType.SCHEDULING_COMPLETE,
         recipient=scheduling.employee.user,
         title="Atendimento concluído automaticamente",
-        body=f"O horário de {scheduling.service.name} venceu e foi concluído automaticamente.",
+        body=(
+            f"{scheduling.service.name} com {resolve_client_display_name(scheduling.client.user)}, marcado para "
+            f"{format_datetime_br(scheduling.scheduled_time)}, venceu e foi concluído automaticamente."
+        ),
         action_url=EMPLOYEE_APPOINTMENT_URL.format(id=scheduling.id),
         target=scheduling,
     )
@@ -271,6 +307,7 @@ def notify_scheduling_complete_employee(scheduling_id: UUID) -> Optional[Notific
 def notify_scheduling_no_show(scheduling_id: UUID, *, actor: Optional[User] = None) -> Optional[Notification]:
     """Avisa o cliente que ele foi marcado como não comparecido pelo funcionário."""
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -280,7 +317,10 @@ def notify_scheduling_no_show(scheduling_id: UUID, *, actor: Optional[User] = No
         Notification.NotificationType.SCHEDULING_NO_SHOW,
         recipient=scheduling.client.user,
         title="Não comparecimento registrado",
-        body=f"Você foi marcado como não comparecido no horário de {scheduling.service.name}.",
+        body=(
+            f"Você foi marcado como não comparecido no horário de {scheduling.service.name} "
+            f"({format_datetime_br(scheduling.scheduled_time)})."
+        ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
@@ -294,6 +334,7 @@ def notify_scheduling_no_show(scheduling_id: UUID, *, actor: Optional[User] = No
 def notify_request_rating(scheduling_id: UUID) -> Optional[Notification]:
     """Convida o cliente a avaliar um agendamento recém-concluído (ainda sem avaliação)."""
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import resolve_employee_display_name
 
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None:
@@ -303,7 +344,10 @@ def notify_request_rating(scheduling_id: UUID) -> Optional[Notification]:
         Notification.NotificationType.REQUEST_RATING,
         recipient=scheduling.client.user,
         title="Avalie seu atendimento",
-        body=f"Conte pra gente como foi seu atendimento de {scheduling.service.name}.",
+        body=(
+            f"Conte pra gente como foi seu atendimento de {scheduling.service.name} "
+            f"com {resolve_employee_display_name(scheduling.employee)}."
+        ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         target=scheduling,
     )
@@ -312,6 +356,7 @@ def notify_request_rating(scheduling_id: UUID) -> Optional[Notification]:
 def notify_new_rating(rating_id: UUID) -> Optional[Notification]:
     """Avisa o profissional que ele recebeu uma nova avaliação do cliente."""
     from beauty_formula.apps.services.selectors.average_rating_selector import get_average_rating_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import resolve_client_display_name
 
     rating = get_average_rating_by_id(rating_id=rating_id)
     if rating is None:
@@ -321,7 +366,10 @@ def notify_new_rating(rating_id: UUID) -> Optional[Notification]:
         Notification.NotificationType.NEW_RATING,
         recipient=rating.employee.user,
         title="Nova avaliação recebida",
-        body=f"Você recebeu uma avaliação de {rating.rating} estrela(s) para {rating.service.name}.",
+        body=(
+            f"{rating.service.name} — {resolve_client_display_name(rating.client.user)} avaliou com "
+            f"{rating.rating} estrela(s)."
+        ),
         action_url=EMPLOYEE_RATINGS_URL,
         actor=rating.client.user,
         target=rating,
@@ -334,6 +382,7 @@ def notify_new_rating(rating_id: UUID) -> Optional[Notification]:
 
 def notify_payment_received(payment_id: UUID) -> Optional[Notification]:
     from beauty_formula.apps.payment.selectors.payment_selector import get_payment_by_id
+    from beauty_formula.apps.services.emails.scheduling_context import format_datetime_br
 
     payment = get_payment_by_id(payment_id=payment_id)
     if payment is None:
@@ -343,7 +392,10 @@ def notify_payment_received(payment_id: UUID) -> Optional[Notification]:
         Notification.NotificationType.PAYMENT_RECEIVED,
         recipient=payment.client.user,
         title="Pagamento recebido",
-        body=f"Seu pagamento para {payment.scheduling.service.name} foi recebido com sucesso.",
+        body=(
+            f"Pagamento de R$ {payment.value} para {payment.scheduling.service.name} "
+            f"({format_datetime_br(payment.scheduling.scheduled_time)}) foi recebido com sucesso."
+        ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=payment.scheduling.id),
         target=payment,
     )
@@ -362,7 +414,7 @@ def notify_refund_requested(refund_request_id: UUID, *, actor: Optional[User] = 
         title="Reembolso solicitado",
         body=(
             f"Seu pedido de reembolso de {refund_request.payment.scheduling.service.name} "
-            f"foi registrado e está em análise."
+            f"(R$ {refund_request.refund_value} a devolver) foi registrado e está em análise."
         ),
         action_url=CLIENT_APPOINTMENT_URL.format(id=refund_request.payment.scheduling.id),
         actor=actor,
