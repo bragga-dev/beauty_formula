@@ -47,8 +47,10 @@ logger = logging.getLogger(__name__)
 # diferentes até pro mesmo agendamento). Centralizado aqui pra não espalhar
 # strings de rota do front pelos helpers `notify_*`.
 CLIENT_APPOINTMENT_URL = "/painel/meus-agendamentos/{id}"
+EMPLOYEE_APPOINTMENT_URL = "/painel/meus-atendimentos/{id}"
 EMPLOYEE_RATINGS_URL = "/painel/avaliacoes"
 DASHBOARD_HOME_URL = "/painel"
+PROFILE_URL = "/painel/perfil"
 
 
 def notify(
@@ -111,6 +113,25 @@ def notify_scheduling_confirmed(scheduling_id: UUID, *, actor: Optional[User] = 
     )
 
 
+def notify_scheduling_confirmed_employee(scheduling_id: UUID) -> Optional[Notification]:
+    """Avisa o funcionário que um cliente pagou e confirmou um horário na agenda dele."""
+    from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None:
+        logger.warning("notify_scheduling_confirmed_employee: agendamento %s não encontrado.", scheduling_id)
+        return None
+    return _safe_notify(
+        Notification.NotificationType.SCHEDULING_CONFIRMED,
+        recipient=scheduling.employee.user,
+        title="Novo agendamento confirmado",
+        body=f"{scheduling.client.get_full_name() or scheduling.client.user.email} agendou {scheduling.service.name}.",
+        action_url=EMPLOYEE_APPOINTMENT_URL.format(id=scheduling.id),
+        actor=scheduling.client.user,
+        target=scheduling,
+    )
+
+
 def notify_scheduling_cancelled(scheduling_id: UUID, *, actor: Optional[User] = None) -> Optional[Notification]:
     from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
 
@@ -124,6 +145,30 @@ def notify_scheduling_cancelled(scheduling_id: UUID, *, actor: Optional[User] = 
         title="Agendamento cancelado",
         body=f"Seu horário de {scheduling.service.name} foi cancelado.",
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
+        actor=actor,
+        target=scheduling,
+    )
+
+
+def notify_scheduling_cancelled_employee(scheduling_id: UUID, *, actor: Optional[User] = None) -> Optional[Notification]:
+    """
+    Avisa o funcionário que um horário saiu da agenda dele.
+    Só chame isso quando o cancelamento NÃO partiu do próprio funcionário
+    (cliente ou admin cancelando) — senão ele recebe notificação de algo
+    que ele mesmo acabou de fazer.
+    """
+    from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None:
+        logger.warning("notify_scheduling_cancelled_employee: agendamento %s não encontrado.", scheduling_id)
+        return None
+    return _safe_notify(
+        Notification.NotificationType.SCHEDULING_CANCELLED,
+        recipient=scheduling.employee.user,
+        title="Agendamento cancelado",
+        body=f"O horário de {scheduling.service.name} com {scheduling.client.get_full_name() or scheduling.client.user.email} foi cancelado.",
+        action_url=EMPLOYEE_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
         target=scheduling,
     )
@@ -143,6 +188,25 @@ def notify_scheduling_rescheduled(scheduling_id: UUID, *, actor: Optional[User] 
         body=f"Seu horário de {scheduling.service.name} foi reagendado.",
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
         actor=actor,
+        target=scheduling,
+    )
+
+
+def notify_scheduling_rescheduled_employee(scheduling_id: UUID) -> Optional[Notification]:
+    """Avisa o funcionário que um cliente reagendou um horário na agenda dele."""
+    from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None:
+        logger.warning("notify_scheduling_rescheduled_employee: agendamento %s não encontrado.", scheduling_id)
+        return None
+    return _safe_notify(
+        Notification.NotificationType.SCHEDULING_RESCHEDULED,
+        recipient=scheduling.employee.user,
+        title="Agendamento reagendado",
+        body=f"{scheduling.client.get_full_name() or scheduling.client.user.email} reagendou {scheduling.service.name}.",
+        action_url=EMPLOYEE_APPOINTMENT_URL.format(id=scheduling.id),
+        actor=scheduling.client.user,
         target=scheduling,
     )
 
@@ -177,6 +241,48 @@ def notify_scheduling_complete(scheduling_id: UUID) -> Optional[Notification]:
         title="Agendamento concluído",
         body=f"Seu horário de {scheduling.service.name} foi concluído.",
         action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
+        target=scheduling,
+    )
+
+
+def notify_scheduling_complete_employee(scheduling_id: UUID) -> Optional[Notification]:
+    """
+    Avisa o funcionário que um atendimento dele foi concluído automaticamente
+    (horário vencido sem ninguém fechar manualmente). Não chame isso quando
+    for o próprio funcionário concluindo (`complete_scheduling_for_employee`)
+    — aí ele já sabe, foi ele quem fez.
+    """
+    from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None:
+        logger.warning("notify_scheduling_complete_employee: agendamento %s não encontrado.", scheduling_id)
+        return None
+    return _safe_notify(
+        Notification.NotificationType.SCHEDULING_COMPLETE,
+        recipient=scheduling.employee.user,
+        title="Atendimento concluído automaticamente",
+        body=f"O horário de {scheduling.service.name} venceu e foi concluído automaticamente.",
+        action_url=EMPLOYEE_APPOINTMENT_URL.format(id=scheduling.id),
+        target=scheduling,
+    )
+
+
+def notify_scheduling_no_show(scheduling_id: UUID, *, actor: Optional[User] = None) -> Optional[Notification]:
+    """Avisa o cliente que ele foi marcado como não comparecido pelo funcionário."""
+    from beauty_formula.apps.services.selectors.scheduling_selector import get_scheduling_by_id
+
+    scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
+    if scheduling is None:
+        logger.warning("notify_scheduling_no_show: agendamento %s não encontrado.", scheduling_id)
+        return None
+    return _safe_notify(
+        Notification.NotificationType.SCHEDULING_NO_SHOW,
+        recipient=scheduling.client.user,
+        title="Não comparecimento registrado",
+        body=f"Você foi marcado como não comparecido no horário de {scheduling.service.name}.",
+        action_url=CLIENT_APPOINTMENT_URL.format(id=scheduling.id),
+        actor=actor,
         target=scheduling,
     )
 
@@ -295,6 +401,22 @@ def notify_refund_reviewed(refund_request_id: UUID, *, actor: Optional[User] = N
 # ===========================================================================
 # Contas (Accounts)
 # ===========================================================================
+
+def notify_complete_profile(user_id: UUID) -> Optional[Notification]:
+    """Convida o usuário recém-confirmado a completar o perfil. Chamada uma única vez, logo após a verificação de e-mail."""
+    user = get_user_by_id(user_id=user_id)
+    if user is None:
+        logger.warning("notify_complete_profile: usuário %s não encontrado.", user_id)
+        return None
+    return _safe_notify(
+        Notification.NotificationType.PROFILE_INCOMPLETE,
+        recipient=user,
+        title="Complete seu perfil",
+        body="Finalize seu cadastro para aproveitar tudo o que oferecemos.",
+        action_url=PROFILE_URL,
+        target=None,
+    )
+
 
 def notify_employee_promoted(user_id: UUID, *, actor: Optional[User] = None) -> Optional[Notification]:
     user = get_user_by_id(user_id=user_id)
