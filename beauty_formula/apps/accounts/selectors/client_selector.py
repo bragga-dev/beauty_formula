@@ -15,6 +15,7 @@ from beauty_formula.apps.accounts.models import Client
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.core.constants.gender import Gender
 
+from phonenumbers import NumberParseException
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Buscas Básicas por ID
@@ -246,13 +247,11 @@ def get_client_by_phone(phone: str) -> Optional[Client]:
     import re
     clean_phone = re.sub(r'[^\d+]', '', phone)
     
-    # Tenta buscar no formato E.164
     try:
         parsed = parse(clean_phone, "BR")
         e164 = format_number(parsed, PhoneNumberFormat.E164)
         return Client.objects.filter(phone=e164).first()
-    except:
-        # Se falhar, busca por contém
+    except NumberParseException:
         return Client.objects.filter(phone__contains=clean_phone).first()
 
 
@@ -628,10 +627,11 @@ def normalize_phone_for_search(phone: str) -> str:
     clean = re.sub(r'[^\d+]', '', phone)
     
     try:
-        parsed = parse(clean, "BR")
-        return format_number(parsed, PhoneNumberFormat.E164)
-    except:
-        return clean
+        parsed = parse(clean_phone, "BR")
+        e164 = format_number(parsed, PhoneNumberFormat.E164)
+        return Client.objects.filter(phone=e164).first()
+    except NumberParseException:
+        return Client.objects.filter(phone__contains=clean_phone).first()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
