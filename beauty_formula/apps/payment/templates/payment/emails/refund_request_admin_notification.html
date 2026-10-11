@@ -1,0 +1,71 @@
+{% extends "core/emails/base.html" %}
+
+{% block title %}Novo pedido de reembolso — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}Um pedido de reembolso está aguardando sua análise.{% endblock %}
+
+{% block content %}
+
+    <span class="section-label">Ação necessária</span>
+    <h1 class="heading">Novo pedido de reembolso</h1>
+
+    <p class="body-text">
+        <strong>{{ client_name }}</strong> teve um agendamento{% if service_name %} de <strong>{{ service_name }}</strong>{% endif %}
+        cancelado e o pagamento já estava recebido. O pedido foi pra fila de análise — nenhum
+        estorno foi feito ainda, é você quem decide aprovar ou rejeitar.
+    </p>
+
+    <!-- Detalhes -->
+    <div class="info-box">
+        <p class="info-box-title">Detalhes do pedido</p>
+
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="label">Valor original</span>
+                <span class="value price">R$ {{ original_value|floatformat:2 }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Taxa retida</span>
+                <span class="value" style="font-size: 14px;">{{ fee_percentage|floatformat:0 }}% (R$ {{ fee_value|floatformat:2 }})</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Valor a devolver</span>
+                <span class="value price">R$ {{ refund_value|floatformat:2 }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Solicitado por</span>
+                <span class="value" style="font-size: 14px;">{{ requested_by_name }}</span>
+            </div>
+        </div>
+
+        {% if reason %}
+        <div class="reason-box">
+            <p><strong>Motivo do cancelamento:</strong><br>{{ reason }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Ação -->
+    <div class="cta-wrap">
+        <p class="body-text" style="margin-bottom: 16px;">
+            Analise e aprove ou rejeite o pedido no painel:
+        </p>
+
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ admin_refunds_url }}" style="height:50px;v-text-anchor:middle;width:220px;" arcsize="15%" stroke="f" fillcolor="#c6172e">
+            <w:anchorlock/>
+            <center style="color:#faf9f7;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">VER PEDIDO</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ admin_refunds_url }}" class="cta-btn">
+            Ver pedido de reembolso
+        </a>
+        <!--<![endif]-->
+    </div>
+
+    <div class="closing-note">
+        <p class="team">Fórmula da Beleza — Reembolsos<br>E-mail automático para a equipe administrativa</p>
+    </div>
+
+{% endblock %}

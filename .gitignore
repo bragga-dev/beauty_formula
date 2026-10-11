@@ -27,4 +27,4 @@ staticfiles/
 .coverage
 venv/
 .coverage
-venv/
+venv/cliente.json

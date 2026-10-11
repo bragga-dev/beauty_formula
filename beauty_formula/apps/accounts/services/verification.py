@@ -10,6 +10,7 @@ from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.core.exceptions import InvalidToken
 from beauty_formula.apps.accounts.repositories.user_repository import activate_user
 from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
+from beauty_formula.apps.notifications.services.notification_service import notify_complete_profile
 
 
 def build_verification_url(user) -> str:
@@ -36,4 +37,6 @@ def verify_email(uidb64: str, token: str) -> User:
 
     if not default_token_generator.check_token(user, token):
         raise InvalidToken("Token inválido ou expirado.")
-    return activate_user(user)
+    user = activate_user(user)
+    notify_complete_profile(user_id=user.id)
+    return user

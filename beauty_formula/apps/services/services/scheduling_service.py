@@ -101,6 +101,18 @@ from beauty_formula.apps.payment.services.employee_commission_service import (
     generate_commission_for_completed_scheduling,
 )
 
+from beauty_formula.apps.notifications.services.notification_service import (
+    notify_scheduling_confirmed,
+    notify_scheduling_confirmed_employee,
+    notify_scheduling_cancelled,
+    notify_scheduling_cancelled_employee,
+    notify_scheduling_rescheduled,
+    notify_scheduling_rescheduled_employee,
+    notify_scheduling_complete,
+    notify_scheduling_complete_employee,
+    notify_scheduling_no_show,
+    notify_scheduling_reminder,
+    )
 
 
 
@@ -261,6 +273,8 @@ def _confirm_scheduling(scheduling: Scheduling) -> Scheduling:
         user_id=scheduling_confirmed.client.user.id, scheduling_id=scheduling_confirmed.id
     )
     send_confirm_scheduling_to_employee.delay(scheduling_id=scheduling_confirmed.id)
+    notify_scheduling_confirmed(scheduling_id=scheduling_confirmed.id)
+    notify_scheduling_confirmed_employee(scheduling_id=scheduling_confirmed.id)
     return scheduling_confirmed
 
 
@@ -316,28 +330,29 @@ def cancel_scheduling_due_to_payment_conflict(scheduling_id: UUID) -> Optional[S
     `payment_service._confirm_scheduling_if_paid` quando
     `confirm_scheduling_after_payment` estoura `SchedulingConflict`.
 
-    NÃO mexe no pagamento: ele já está RECEIVED/CONFIRMED na Asaas nesse
-    ponto, e devolver dinheiro é sempre uma ação manual do admin
-    (`payment_service.refund_payment`) — só marca o agendamento como
-    CANCELED pra não ficar pendurado em CREATED pra sempre. Também não
-    dispara os e-mails normais de cancelamento (o cliente não pediu isso;
-    quem avisa o cliente é o admin, depois de decidir o que fazer) —
-    quem é notificado aqui é o admin, via
-    `send_scheduling_payment_conflict_admin_notification`.
+    Também aciona `cancel_payment_for_scheduling` com `canceled_by=None`
+    — que, pra um pagamento já RECEIVED/CONFIRMED, cria um `RefundRequest`
+    na mesma fila de análise usada pra qualquer outro cancelamento (ver
+    `payment_service.cancel_payment_for_scheduling`). `canceled_by=None`
+    garante taxa de cancelamento 0% (reembolso integral): a culpa aqui é
+    de uma limitação do sistema, não do cliente — não faz sentido reter
+    10% dele por isso. Não dispara os e-mails normais de cancelamento (o
+    cliente não pediu isso; quem decide como avisar o cliente é o admin,
+    ao analisar o pedido) — o motivo registrado no `RefundRequest` já
+    deixa claro pro admin que não é um cancelamento comum.
     """
     scheduling = get_scheduling_by_id(scheduling_id=scheduling_id)
     if scheduling is None or scheduling.status != Scheduling.SchedulingStatus.CREATED:
         return scheduling
 
-    return cancel_scheduling_repo(
-        scheduling,
-        reason=(
-            "Cancelado automaticamente: o horário foi confirmado por outro "
-            "cliente antes deste pagamento ser identificado. Pagamento já "
-            "recebido — aguarda estorno manual pelo admin."
-        ),
-        canceled_by=None,
+    reason = (
+        "Cancelado automaticamente: o horário foi confirmado por outro "
+        "cliente antes deste pagamento ser identificado."
     )
+    scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=None)
+    cancel_payment_for_scheduling(scheduling.id, canceled_by=None, reason=reason)
+    notify_scheduling_cancelled(scheduling_id=scheduling.id)
+    return scheduling
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Listagem
@@ -489,8 +504,10 @@ def cancel_own_scheduling_as_client(user_id: UUID, scheduling_id: UUID, reason: 
 
     user = User.objects.get(pk=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
-    cancel_payment_for_scheduling(scheduling.id)
+    cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
+    notify_scheduling_cancelled(scheduling_id=scheduling.id)
+    notify_scheduling_cancelled_employee(scheduling_id=scheduling.id, actor=user)
     return SchedulingOut.from_orm(scheduling)
 
 @transaction.atomic
@@ -503,8 +520,9 @@ def cancel_scheduling_as_employee(user_id: UUID, scheduling_id: UUID, reason: st
 
     user = User.objects.get(pk=user_id)
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
-    cancel_payment_for_scheduling(scheduling.id)
+    cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
+    notify_scheduling_cancelled(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 @transaction.atomic
@@ -518,8 +536,10 @@ def cancel_scheduling_as_admin(user: User, scheduling_id: UUID, reason: str) -> 
         raise SchedulingCannotBeCanceled()
 
     scheduling = cancel_scheduling_repo(scheduling, reason=reason, canceled_by=user)
-    cancel_payment_for_scheduling(scheduling.id)
+    cancel_payment_for_scheduling(scheduling.id, canceled_by=user, reason=reason)
     _dispatch_cancellation_emails(scheduling)
+    notify_scheduling_cancelled(scheduling_id=scheduling.id)
+    notify_scheduling_cancelled_employee(scheduling_id=scheduling.id, actor=user)
     return SchedulingPrivateOut.from_orm(scheduling)
 
 
@@ -553,6 +573,7 @@ def complete_scheduling_for_employee(user_id: UUID, scheduling_id: UUID) -> Sche
     rating_exist =  get_rating_for_client_service_employee(client_id=scheduling.client.id, service_id=scheduling.service.id, employee_id=scheduling.employee.id)
     if not rating_exist:
         send_scheduling_completed_thanks.delay(scheduling_id=scheduling.id)
+    notify_scheduling_complete(scheduling_id=scheduling.id)
     return SchedulingOut.from_orm(scheduling)
 
 @transaction.atomic
@@ -586,6 +607,8 @@ def auto_complete_overdue_scheduling(scheduling_id: UUID) -> Optional[Scheduling
     generate_commission_for_completed_scheduling(scheduling)
 
     logger.info("Agendamento %s concluído automaticamente (horário vencido).", scheduling.id)
+    notify_scheduling_complete(scheduling_id=scheduling.id)
+    notify_scheduling_complete_employee(scheduling_id=scheduling.id)
     return scheduling
 
 
@@ -596,6 +619,8 @@ def mark_scheduling_as_no_show_for_employee(user_id: UUID, scheduling_id: UUID) 
     if not scheduling.can_transition_to(Scheduling.SchedulingStatus.NO_SHOW):
         raise InvalidSchedulingStatusTransition(_("Só é possível marcar não comparecimento em agendamentos confirmados."))
     scheduling = mark_no_show_repo(scheduling)
+    user = User.objects.get(pk=user_id)
+    notify_scheduling_no_show(scheduling_id=scheduling.id, actor=user)
     return SchedulingOut.from_orm(scheduling)
 
 
@@ -648,6 +673,8 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
     )
     service.increment_bookings()
     _confirm_rescheduling(scheduling=new_scheduling)
+    notify_scheduling_rescheduled(scheduling_id=new_scheduling.id)
+    notify_scheduling_rescheduled_employee(scheduling_id=new_scheduling.id)
     return SchedulingOut.from_orm(new_scheduling)
 
 # ═══════════════════════════════════════════════════════════════════════════════
