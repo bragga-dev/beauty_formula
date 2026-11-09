@@ -107,7 +107,7 @@ def get_user_with_related(user_id: uuid.UUID) -> Optional[User]:
     """
     return (
         User.objects
-        .select_related("employee_profile", "client_profile")
+        .select_related("employee_profile", "client_profile", "manager_profile")
         .filter(pk=user_id)
         .first()
     )

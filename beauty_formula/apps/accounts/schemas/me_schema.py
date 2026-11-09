@@ -7,6 +7,7 @@ from ninja import Schema
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.models.client import Client
 from beauty_formula.apps.accounts.models.employee import Employee
+from beauty_formula.apps.accounts.models.manager import Manager
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 from beauty_formula.apps.accounts.schemas.client_schema import GenderEnum
 
@@ -72,6 +73,23 @@ class EmployeeProfileOut(Schema):
         )
 
 
+class ManagerProfileOut(Schema):
+    """Igual ao ManagerOut, mas sem o `user` aninhado (evita duplicação dentro de MeOut)."""
+    id: uuid.UUID
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    photo_url: Optional[str] = None
+
+    @classmethod
+    def from_orm(cls, manager: Manager) -> "ManagerProfileOut":
+        return cls(
+            id=manager.id,
+            first_name=manager.first_name,
+            last_name=manager.last_name,
+            photo_url=manager.photo_url,
+        )
+
+
 class MeOut(Schema):
     """
     Resposta de GET /auth/me.
@@ -81,16 +99,19 @@ class MeOut(Schema):
     user:     UserOut
     client:   Optional[ClientProfileOut]   = None
     employee: Optional[EmployeeProfileOut] = None
+    manager:  Optional[ManagerProfileOut]  = None
 
     @classmethod
     def from_user(cls, user: User) -> "MeOut":
         client   = getattr(user, "client_profile", None)
         employee = getattr(user, "employee_profile", None)
+        manager  = getattr(user, "manager_profile", None)
 
         return cls(
             user=UserOut.from_orm(user),
             client=ClientProfileOut.from_orm(client) if client else None,
             employee=EmployeeProfileOut.from_orm(employee) if employee else None,
+            manager=ManagerProfileOut.from_orm(manager) if manager else None,
         )
 
 
@@ -99,5 +120,6 @@ __all__ = [
     "MeOut", 
     "ClientProfileOut", 
     "EmployeeProfileOut",
+    "ManagerProfileOut",
 
     ]

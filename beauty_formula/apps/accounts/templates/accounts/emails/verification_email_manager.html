@@ -1,0 +1,85 @@
+{% extends "core/emails/base.html" %}
+
+{% block title %}Bem-vindo à Equipe — Fórmula da Beleza{% endblock %}
+
+{% block preheader %}Sua conta de gerente foi criada. Confirme seu e-mail para começar.{% endblock %}
+
+{% block content %}
+
+    <span class="section-label gold">Você foi designado(a) gerente</span>
+    <h1 class="heading">Bem-vindo à equipe Fórmula da Beleza</h1>
+
+    <p class="greeting">
+        Olá, <strong>{{ user_email }}</strong>!
+    </p>
+
+    <p class="body-text">
+        É com grande satisfação que damos as boas-vindas ao nosso time!
+        Você foi cadastrado(a) como <strong>gerente</strong> e agora faz parte da
+        família <strong>Fórmula da Beleza</strong>.
+    </p>
+
+    <p class="body-text">
+        Para começar a utilizar todos os recursos da sua conta e
+        <strong>acessar o painel de gestão</strong>, confirme seu e-mail
+        clicando no botão abaixo e depois complete seu perfil.
+    </p>
+
+    <!-- Info box com senha -->
+    <div class="info-box gold">
+        <p class="info-box-title">Sua senha de acesso</p>
+        <p class="info-box-text">
+            Sua conta já foi criada pela administração. Utilize a senha
+            abaixo para acessar sua conta após confirmar o e-mail:
+        </p>
+        <div style="text-align: center; margin: 14px 0 6px;">
+            <span class="password-highlight">{{ temporary_password }}</span>
+        </div>
+        <p class="info-box-text" style="font-size: 12px; margin-top: 10px;">
+            <strong>Dica:</strong> você poderá alterar sua senha após o primeiro acesso.
+        </p>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-wrap">
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ verify_url }}" style="height:50px;v-text-anchor:middle;width:220px;" arcsize="15%" stroke="f" fillcolor="#c6172e">
+            <w:anchorlock/>
+            <center style="color:#faf9f7;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:1px;">CONFIRMAR E-MAIL</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ verify_url }}" class="cta-btn">
+            Confirmar e-mail
+        </a>
+        <!--<![endif]-->
+    </div>
+
+    <!-- Fallback link -->
+    <div class="link-fallback">
+        <p>Caso o botão não funcione, copie o link abaixo:</p>
+        <a href="{{ verify_url }}">{{ verify_url }}</a>
+    </div>
+
+    <!-- Próximos passos -->
+    <div class="info-box plain">
+        <p class="info-box-title">Próximos passos</p>
+        <p class="info-box-text">
+            Após confirmar seu e-mail:
+            <br>1. Acesse o sistema com seu e-mail e a senha fornecida
+            <br>2. Altere sua senha temporária
+            <br>3. Acesse o painel de gestão do salão
+        </p>
+    </div>
+
+    <!-- Warning -->
+    <div class="warning-box">
+        <p>
+            <strong>Importante:</strong>
+            Este link de confirmação é válido por <strong>24 horas</strong>.
+            Caso você não tenha solicitado este cadastro ou tenha dúvidas,
+            entre em contato com o administrador da <strong>Fórmula da Beleza</strong>.
+        </p>
+    </div>
+
+{% endblock %}

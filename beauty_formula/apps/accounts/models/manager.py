@@ -51,13 +51,6 @@ class Manager(models.Model):
         full_name = " ".join(filter(None, [self.first_name, self.last_name])).strip()
         return full_name or f"Client {self.id}"
     
-  
-    def clean(self):
-        if self.birth_date and self.birth_date > timezone.now().date():
-            raise ValidationError(
-                {'birth_date': _('Data de nascimento não pode ser no futuro.')}
-            )
-
     def save(self, *args, **kwargs):
         self.full_clean()
         if not self.photo:
