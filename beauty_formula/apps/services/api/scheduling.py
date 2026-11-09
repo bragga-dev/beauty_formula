@@ -31,7 +31,7 @@ from beauty_formula.apps.core.exceptions.service_exception import (
     ServiceNotFound,
 )
 from beauty_formula.apps.core.permissions.auth_classes import (
-    AdminOnlyAuth,
+    AdminOrManagerAuth,
     ClientOnlyAuth,
     EmployeeOnlyAuth,
 )
@@ -328,7 +328,7 @@ def cancel_employee_scheduling_router(request, scheduling_id: UUID, payload: Sch
 @router.get(
     "/list-all",
     response={200: PageOut[SchedulingPrivateOut], 400: MessageOut, 403: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin lista todos os agendamentos, com filtros combináveis",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -363,7 +363,7 @@ def list_all_schedulings_router(
 @router.get(
     "/{scheduling_id}",
     response={200: SchedulingPrivateOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin vê o detalhe completo de qualquer agendamento",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -380,7 +380,7 @@ def get_scheduling_router(request, scheduling_id: UUID):
 @router.patch(
     "/update/{scheduling_id}",
     response={200: SchedulingPrivateOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin edita qualquer agendamento que não esteja em status final",
 )
 @ratelimit(key="user", rate="20/m", block=True)
@@ -407,7 +407,7 @@ def update_scheduling_router(request, scheduling_id: UUID, payload: SchedulingUp
 @router.patch(
     "/cancel/{scheduling_id}",
     response={200: SchedulingPrivateOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin cancela qualquer agendamento",
 )
 @ratelimit(key="user", rate="20/m", block=True)
@@ -427,7 +427,7 @@ def cancel_scheduling_router(request, scheduling_id: UUID, payload: SchedulingCa
 @router.delete(
     "/{scheduling_id}",
     response={200: MessageOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin exclui permanentemente um agendamento",
 )
 @ratelimit(key="user", rate="10/m", block=True)

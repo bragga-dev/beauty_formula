@@ -1,4 +1,3 @@
-
 from collections.abc import Iterable
 from uuid import UUID
 
@@ -18,6 +17,10 @@ def is_admin(user: User) -> bool:
 
 def is_manager(user: User) -> bool:
     return user.role == User.UserRole.MANAGER
+
+
+def is_admin_or_manager(user: User) -> bool:
+    return is_admin(user) or is_manager(user)
 
 
 def is_employee(user: User) -> bool:

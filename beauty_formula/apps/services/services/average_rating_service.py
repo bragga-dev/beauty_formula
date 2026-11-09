@@ -73,7 +73,7 @@ from beauty_formula.apps.services.tasks.send_new_rating_admin_notification impor
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.selectors.employee_selector import get_employee_by_user_id
 from beauty_formula.apps.core.exceptions import PermissionDenied
-from beauty_formula.apps.core.permissions.roles import is_admin
+from beauty_formula.apps.core.permissions.roles import is_admin_or_manager
 from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers internos
@@ -263,7 +263,7 @@ def list_all_average_ratings_admin(filters: AverageRatingFilter, user_id: UUID):
     """
     user = get_user_by_id(user_id=user_id)
     employee_id = filters.employee_id
-    if not is_admin(user):
+    if not is_admin_or_manager(user):
         employee = get_employee_by_user_id(user_id=user_id)
         if employee is None:
             raise PermissionDenied("Apenas administradores ou funcionários podem acessar este recurso.")
@@ -284,7 +284,7 @@ def get_average_rating_detail_admin(rating_id: UUID, user_id: UUID) -> AverageRa
     if rating is None:
         raise AverageRatingNotFound()
     user = get_user_by_id(user_id=user_id)
-    if not is_admin(user):
+    if not is_admin_or_manager(user):
         employee = get_employee_by_user_id(user_id=user_id)
         if employee is None or rating.employee_id != employee.id:
             raise PermissionDenied("Você só pode ver avaliações sobre você mesmo.")
@@ -302,7 +302,7 @@ def authorize_average_rating_admin(user_id:UUID, rating_id: UUID) -> AverageRati
         raise AverageRatingNotFound()
     
     user = get_user_by_id(user_id=user_id)
-    if not is_admin(user):
+    if not is_admin_or_manager(user):
         employee = get_employee_by_user_id(user_id=user_id)
         if employee is None or rating.employee_id != employee.id:
             raise PermissionDenied("Você só pode autorizar avaliações sobre você mesmo.")

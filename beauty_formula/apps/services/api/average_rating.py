@@ -27,9 +27,9 @@ from beauty_formula.apps.core.exceptions.service_exception import (
     ServiceNotFound,
 )
 from beauty_formula.apps.core.permissions.auth_classes import (
-    AdminOnlyAuth, 
+    AdminOrManagerAuth, 
     ClientOnlyAuth, 
-    AdminOrEmployeeAuth,
+    AdminOrEmployeeOrManagerAuth,
 
 )
 from beauty_formula.apps.core.utils.pagination import PAGE_SIZE_DEFAULT, PageOut, paginate_queryset
@@ -271,7 +271,7 @@ def get_employee_rating_summary_router(request, employee_id: UUID):
 @router.get(
     "/admin/list",
     response={200: PageOut[AverageRatingPrivateOut], 400: MessageOut, 403: MessageOut},
-    auth=AdminOrEmployeeAuth(),
+    auth=AdminOrEmployeeOrManagerAuth(),
     summary="Admin lista todas as avaliações; funcionário lista só as que são sobre ele",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -306,7 +306,7 @@ def list_all_average_ratings_router(
 @router.get(
     "/admin/{rating_id}",
     response={200: AverageRatingPrivateOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOrEmployeeAuth(),
+    auth=AdminOrEmployeeOrManagerAuth(),
     summary="Admin vê o detalhe de qualquer avaliação; funcionário só das suas",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -326,7 +326,7 @@ def get_average_rating_detail_router(request, rating_id: UUID):
 @router.patch(
     "/admin/{rating_id}/authorize",
     response={200: AverageRatingPrivateOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOrEmployeeAuth(),
+    auth=AdminOrEmployeeOrManagerAuth(),
     summary="Admin ou o próprio funcionário autorizam a avaliação a aparecer publicamente",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -346,7 +346,7 @@ def authorize_average_rating_router(request, rating_id: UUID):
 @router.patch(
     "/admin/{rating_id}/revoke",
     response={200: AverageRatingPrivateOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin revoga a autorização de uma avaliação",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -363,7 +363,7 @@ def revoke_average_rating_router(request, rating_id: UUID):
 @router.delete(
     "/admin/{rating_id}",
     response={200: MessageOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin exclui permanentemente uma avaliação",
 )
 @ratelimit(key="user", rate="20/m", block=True)

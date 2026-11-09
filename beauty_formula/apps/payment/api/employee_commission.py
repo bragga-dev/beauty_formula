@@ -29,7 +29,7 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
 )
 from beauty_formula.apps.core.exceptions.permissions import EmployeeNotFoundError
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth, EmployeeOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth, EmployeeOnlyAuth
 from beauty_formula.apps.core.utils.pagination import PAGE_SIZE_DEFAULT, PageOut, paginate_queryset
 from beauty_formula.apps.payment.schemas.employee_commission_schema import (
     CommissionBulkGenerateIn,
@@ -75,7 +75,7 @@ router = Router()
 @router.post(
     "/create",
     response={201: CommissionOut, 400: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin gera a comissão de UM atendimento concluído (valor calculado automaticamente)",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -96,7 +96,7 @@ def create_commission_router(request, payload: CommissionCreateIn):
 @router.post(
     "/generate-period",
     response={201: CommissionBulkGenerateOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin gera as comissões de um período inteiro (todo COMPLETED sem comissão ainda)",
 )
 @ratelimit(key="user", rate="10/m", block=True)
@@ -111,7 +111,7 @@ def generate_commissions_for_period_router(request, payload: CommissionBulkGener
 @router.post(
     "/sync",
     response={201: CommissionBulkGenerateOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin varre TODO o histórico (sem recorte de período) e gera a comissão de todo COMPLETED que ainda não tem",
 )
 @ratelimit(key="user", rate="10/m", block=True)
@@ -130,7 +130,7 @@ def sync_missing_commissions_router(request, employee_id: Optional[UUID] = None)
 @router.get(
     "/list-all",
     response={200: PageOut[CommissionOut], 400: MessageOut, 403: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin lista todas as comissões, com filtros por funcionário/status/período",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -161,7 +161,7 @@ def list_all_commissions_router(
 @router.get(
     "/summary",
     response={200: CommissionTotalsOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin vê a soma das comissões por status (pendente/paga/cancelada), com os mesmos filtros da listagem",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -184,7 +184,7 @@ def get_commission_totals_router(
 @router.get(
     "/competencias",
     response={200: List[date], 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin vê os meses de competência que realmente têm comissão (pra popular o filtro dinamicamente)",
     description=(
         "Lista, mais recente primeiro, os meses (dia 1) em que existe ao "
@@ -216,7 +216,7 @@ def get_available_competencias_router(request, employee_id: Optional[UUID] = Non
     # tipo tem que vir primeiro, igual a sintaxe nativa do Django.)
     "/{uuid:commission_id}",
     response={200: CommissionOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin vê o detalhe de uma comissão",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -233,7 +233,7 @@ def get_commission_router(request, commission_id: UUID):
 @router.patch(
     "/update-value/{uuid:commission_id}",
     response={200: CommissionOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin corrige manualmente o valor de uma comissão pendente (exceção à regra automática)",
 )
 @ratelimit(key="user", rate="20/m", block=True)
@@ -252,7 +252,7 @@ def update_commission_value_router(request, commission_id: UUID, payload: Commis
 @router.patch(
     "/update-competencia/{uuid:commission_id}",
     response={200: CommissionOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin corrige manualmente o mês de competência de uma comissão (qualquer status)",
     description=(
         "Reclassifica em qual mês a comissão entra nos relatórios de "
@@ -284,7 +284,7 @@ def update_commission_competencia_router(request, commission_id: UUID, payload: 
 @router.patch(
     "/mark-as-paid/{uuid:commission_id}",
     response={200: CommissionOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin confirma o repasse de UMA comissão",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -304,7 +304,7 @@ def mark_commission_as_paid_router(request, commission_id: UUID):
 @router.patch(
     "/mark-as-paid-bulk",
     response={200: CommissionBulkMarkPaidOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin marca como pagas VÁRIAS comissões escolhidas manualmente (seleção na tabela)",
 )
 @ratelimit(key="user", rate="15/m", block=True)
@@ -319,7 +319,7 @@ def mark_commissions_as_paid_bulk_router(request, payload: CommissionBulkMarkPai
 @router.patch(
     "/revert-to-pending/{uuid:commission_id}",
     response={200: CommissionOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin reverte UMA comissão paga por engano de volta pra pendente",
 )
 @ratelimit(key="user", rate="20/m", block=True)
@@ -338,7 +338,7 @@ def revert_commission_to_pending_router(request, commission_id: UUID):
 @router.patch(
     "/cancel/{uuid:commission_id}",
     response={200: CommissionOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin cancela UMA comissão pendente",
 )
 @ratelimit(key="user", rate="20/m", block=True)
@@ -357,7 +357,7 @@ def cancel_commission_router(request, commission_id: UUID):
 @router.patch(
     "/update-status-period",
     response={200: CommissionBulkStatusOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin paga ou cancela de uma vez todas as comissões PENDING de um período",
 )
 @ratelimit(key="user", rate="10/m", block=True)

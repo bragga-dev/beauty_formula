@@ -19,7 +19,7 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
 )
 from beauty_formula.apps.accounts.selectors.user_selector import get_user_with_related
 from beauty_formula.apps.accounts.services.user_service import list_users_admin
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth
 from beauty_formula.apps.core.schemas.deafult_schema import PageOut
 from beauty_formula.apps.core.utils.pagination import PAGE_SIZE_DEFAULT, paginate_queryset
 
@@ -29,7 +29,7 @@ router = Router()
 @router.get(
     "/list-users",
     response={200: PageOut[UserAdminOut]},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Lista usuários com filtros (busca, role, status)",
     description=(
         "Busca por e-mail ou nome do profile (client/employee). "
@@ -52,7 +52,7 @@ def list_users_router(
 @router.get(
     "/detail-user/{user_id}",
     response={200: UserAdminOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Detalhe de um usuário",
 )
 @ratelimit(key="user", rate="60/m", block=True)

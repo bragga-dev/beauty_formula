@@ -148,9 +148,15 @@ class _CombinedRoleAuth(JWTAuth):
 
 
 class AllRolesAuth(_CombinedRoleAuth):
-    """Libera acesso para qualquer usuário autenticado e verificado: admin, client ou employee."""
-    allowed_roles = [User.UserRole.ADMIN, User.UserRole.CLIENT, User.UserRole.EMPLOYEE]
+    """Libera acesso para qualquer usuário autenticado e verificado: admin, manager, client ou employee."""
+    allowed_roles = [User.UserRole.ADMIN, User.UserRole.MANAGER, User.UserRole.CLIENT, User.UserRole.EMPLOYEE]
     denied_message = "Acesso não permitido para este tipo de usuário."
+
+
+class AdminOrManagerAuth(_CombinedRoleAuth):
+    """Libera acesso apenas para administradores e gerentes (clientes e funcionários NÃO passam)."""
+    allowed_roles = [User.UserRole.ADMIN, User.UserRole.MANAGER]
+    denied_message = "Apenas administradores ou gerentes podem acessar este recurso."
 
 
 class AdminOrClientAuth(_CombinedRoleAuth):
@@ -163,6 +169,12 @@ class AdminOrEmployeeAuth(_CombinedRoleAuth):
     """Libera acesso apenas para administradores e funcionários (clientes NÃO passam)."""
     allowed_roles = [User.UserRole.ADMIN, User.UserRole.EMPLOYEE]
     denied_message = "Apenas administradores ou funcionários podem acessar este recurso."
+
+
+class AdminOrEmployeeOrManagerAuth(_CombinedRoleAuth):
+    """Libera acesso para administradores, funcionários e gerentes (clientes NÃO passam)."""
+    allowed_roles = [User.UserRole.ADMIN, User.UserRole.EMPLOYEE, User.UserRole.MANAGER]
+    denied_message = "Apenas administradores, gerentes ou funcionários podem acessar este recurso."
 
 
 class EmployeeOrClientAuth(_CombinedRoleAuth):

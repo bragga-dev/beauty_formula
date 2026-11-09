@@ -17,6 +17,7 @@ from beauty_formula.apps.accounts.models.user import User
 
 class UserRoleEnum(str, Enum):
     ADMIN = User.UserRole.ADMIN
+    MANAGER = User.UserRole.MANAGER
     CLIENT = User.UserRole.CLIENT
     EMPLOYEE = User.UserRole.EMPLOYEE
 

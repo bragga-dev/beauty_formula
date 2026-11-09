@@ -25,7 +25,7 @@ from beauty_formula.apps.core.exceptions.contact_exception import (
     ContactNotFound,
     ContactNameAlreadyExists,
 )
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth
 from beauty_formula.apps.accounts.schemas.user_schema import MessageOut
 from beauty_formula.apps.core.exceptions.permissions import PermissionDenied
 from beauty_formula.apps.core.utils.pagination import paginate_queryset, PageOut
@@ -60,7 +60,7 @@ def create_contact_router(request, payload: ContactCreateIn):
         400: MessageOut,
         403: MessageOut,
     },
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Retorna todos os Contatos, com filtros opcionais. Apenas Admins podem acessar esse recurso",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -90,7 +90,7 @@ def list_contacts_router(
         403: MessageOut,
         404: MessageOut,
     },
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Retorna um Contato específico pelo ID. Apenas Admins podem acessar esse recurso",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -109,7 +109,7 @@ def detail_contact_router(request, contact_id: uuid.UUID):
 @router.patch(
     "/update-contact-status/{contact_id}",
     response={200: ContactOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Atualiza o status de um contato existente, apenas Admins podem acessar esse recurso",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -128,7 +128,7 @@ def update_contact_status_router(request, contact_id: uuid.UUID, payload: Contac
 @router.delete(
     "/delete-contact/{contact_id}",
     response={200: None, 400: MessageOut, 403: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Deleta um contato existente, apenas Admins podem acessar esse recurso",
 )
 @ratelimit(key="user", rate="30/m", block=True)

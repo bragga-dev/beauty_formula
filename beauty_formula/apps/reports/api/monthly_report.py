@@ -17,7 +17,7 @@ from django_ratelimit.decorators import ratelimit
 from ninja import Query, Router
 
 from beauty_formula.apps.accounts.schemas.user_schema import MessageOut
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth
 from beauty_formula.apps.core.services.pdf_service import render_pdf_from_template
 from beauty_formula.apps.reports.schemas.monthly_report_schema import (
     AvailablePeriodOut,
@@ -42,7 +42,7 @@ MONTH_LABELS = [
 @router.get(
     "/monthly-balance",
     response={200: MonthlyBalanceOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Balanço geral do mês — agendamentos por status, faturamento, comissões e lucro líquido",
     description="Sem parâmetros, devolve (e atualiza) o balanço do mês corrente automaticamente. Informe `year`+`month` para um mês específico.",
 )
@@ -58,7 +58,7 @@ def get_monthly_balance_router(request, filters: Query[MonthlyBalanceFilter]):
 @router.get(
     "/monthly-balance/history",
     response={200: list[AvailablePeriodOut]},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Meses que já têm balanço gerado (filtro dinâmico do front)",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -68,7 +68,7 @@ def get_monthly_balance_history_router(request):
 
 @router.get(
     "/monthly-balance/pdf",
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Exporta o balanço do mês em PDF",
     description="Sem parâmetros, exporta o mês corrente. Se o mês ainda não tiver balanço gerado, gera na hora.",
 )

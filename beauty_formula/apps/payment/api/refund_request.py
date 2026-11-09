@@ -21,7 +21,7 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
     RefundRequestAlreadyReviewed,
     RefundRequestNotFound,
 )
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth, ClientOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth, ClientOnlyAuth
 from beauty_formula.apps.core.utils.pagination import PAGE_SIZE_DEFAULT, PageOut, paginate_queryset
 from beauty_formula.apps.payment.schemas.refund_request_schema import (
     RefundRequestOut,
@@ -49,7 +49,7 @@ router = Router()
 @router.get(
     "/",
     response={200: PageOut[RefundRequestOut]},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin lista a fila de pedidos de reembolso",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -81,7 +81,7 @@ def list_my_refund_requests_router(request, page: int = 1, page_size: int = PAGE
 @router.get(
     "/{refund_request_id}",
     response={200: RefundRequestOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin vê o detalhe de um pedido de reembolso",
 )
 @ratelimit(key="user", rate="30/m", block=True)
@@ -95,7 +95,7 @@ def get_refund_request_router(request, refund_request_id: UUID):
 @router.post(
     "/{refund_request_id}/approve",
     response={200: RefundRequestOut, 400: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin aprova o pedido — aciona o estorno de verdade na Asaas",
 )
 @ratelimit(key="user", rate="20/m", block=True)
@@ -120,7 +120,7 @@ def approve_refund_request_router(request, refund_request_id: UUID, payload: Ref
 @router.post(
     "/{refund_request_id}/reject",
     response={200: RefundRequestOut, 400: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin rejeita o pedido — nenhum dinheiro é movimentado",
 )
 @ratelimit(key="user", rate="20/m", block=True)

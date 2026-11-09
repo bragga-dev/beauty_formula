@@ -107,13 +107,13 @@ from beauty_formula.apps.core.exceptions.permissions import (
 )
 
 from beauty_formula.apps.core.permissions.auth_classes import (
-    AdminOnlyAuth, 
+    AdminOrManagerAuth, 
     EmployeeOnlyAuth, 
     ClientOnlyAuth,
     EmployeeOrClientAuth,
     AllRolesAuth,
     AdminOrClientAuth,
-    AdminOrEmployeeAuth,
+    AdminOrEmployeeOrManagerAuth,
     )
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 from beauty_formula.apps.accounts.models.user import User
@@ -453,7 +453,7 @@ def export_my_data_router(request):
 @router.post(
     "/register-employee",
     response={201: EmployeeCreatedOut, 409: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Cadastro de Funcionário",
     description=(
         "Cria o funcionário e envia a senha temporária por e-mail. Não retorna "
@@ -474,7 +474,7 @@ def register_employee_router(request, payload: RegisterEmployeeIn):
 @router.post(
     "/promote-client-to-employee/{user_id}",
     response={201: EmployeeOut, 404: MessageOut, 409: MessageOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Promove Cliente a Funcionário.",
 )
 @ratelimit(key="ip", rate="20/h", block=True)
@@ -488,7 +488,7 @@ def promote_to_employee_router(request, user_id: uuid.UUID):
         return 409, {"detail": str(e)}
     
 
-@router.post("/deactive-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Desativa Usuário.")
+@router.post("/deactive-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOrManagerAuth(), summary="Desativa Usuário.")
 @ratelimit(key="ip", rate="20/h", block=True)
 def deactivate_account_router(request, user_id: uuid.UUID):
     try:
@@ -498,7 +498,7 @@ def deactivate_account_router(request, user_id: uuid.UUID):
         return 404, {"detail": str(e)}
 
 
-@router.post("/reactivate-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOnlyAuth(), summary="Reativa Usuário.")
+@router.post("/reactivate-user/{user_id}", response={201: UserOut, 404: MessageOut, 400: MessageOut}, auth=AdminOrManagerAuth(), summary="Reativa Usuário.")
 @ratelimit(key="ip", rate="20/h", block=True)
 def reactivate_user_router(request, user_id: uuid.UUID):
     try:

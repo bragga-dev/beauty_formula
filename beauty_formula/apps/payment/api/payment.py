@@ -25,7 +25,7 @@ from beauty_formula.apps.core.exceptions.payment_exception import (
 )
 from beauty_formula.apps.core.exceptions.permissions import ClientNotFoundError
 from beauty_formula.apps.core.exceptions.service_exception import SchedulingNotFound
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth, ClientOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth, ClientOnlyAuth
 from beauty_formula.apps.core.utils.pagination import PAGE_SIZE_DEFAULT, PageOut, paginate_queryset
 from beauty_formula.apps.payment.schemas.payment_schema import (
     PaymentCreateSchema,
@@ -117,7 +117,7 @@ def get_my_payment_router(request, payment_id: UUID):
 @router.get(
     "/list-all",
     response={200: PageOut[PaymentResponseSchema]},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin lista todas as cobranças, com filtros",
 )
 def list_all_payments_router(request, filters: PaymentFilterSchema = Query(...), page: int = 1, page_size: int = PAGE_SIZE_DEFAULT):
@@ -161,7 +161,7 @@ def asaas_webhook_router(request: HttpRequest):
 @router.post(
     "/{payment_id}/sync",
     response={200: PaymentResponseSchema, 404: MessageOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin força a sincronização do status com a Asaas (fallback se o webhook atrasar/falhar)",
 )
 def sync_payment_router(request, payment_id: UUID):
@@ -177,7 +177,7 @@ def sync_payment_router(request, payment_id: UUID):
 @router.post(
     "/{payment_id}/refund",
     response={200: PaymentResponseSchema, 404: MessageOut, 400: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin estorna uma cobrança paga (total ou parcial) — nunca automático",
 )
 def refund_payment_router(request, payment_id: UUID, payload: PaymentRefundSchema):

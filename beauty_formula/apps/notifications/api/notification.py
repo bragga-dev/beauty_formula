@@ -13,7 +13,7 @@ from ninja import Router
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.schemas.user_schema import MessageOut
 from beauty_formula.apps.core.exceptions import NotificationNotFound
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth, AllRolesAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth, AllRolesAuth
 from beauty_formula.apps.core.schemas.deafult_schema import PageOut
 from beauty_formula.apps.core.utils.pagination import paginate_queryset
 from beauty_formula.apps.notifications.schemas.notification_schema import (
@@ -113,7 +113,7 @@ def delete_notification_router(request, notification_id: UUID):
 @router.get(
     "/admin/list-all",
     response={200: PageOut[NotificationOut], 401: MessageOut, 403: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin lista todas as notificações com filtros",
 )
 @ratelimit(key="user", rate="30/m", block=True)

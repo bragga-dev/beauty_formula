@@ -18,6 +18,7 @@ from beauty_formula.apps.accounts.selectors.user_selector import (
 )
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.core.exceptions.permissions import PermissionDenied
+from beauty_formula.apps.core.permissions.roles import is_admin_or_manager
 from  beauty_formula.apps.services.repositories.service_repository import(
     create_service,
     update_service,
@@ -43,8 +44,8 @@ from beauty_formula.apps.core.exceptions.service_exception import (
 
 def create_service_for_admin(user_id: uuid.UUID, data: ServiceCreateIn, image: Optional[UploadedFile] = None) -> ServiceOut:
     user = get_user_by_id(user_id=user_id)
-    if not user.role == User.UserRole.ADMIN:
-        raise PermissionDenied("Apenas Administradores podem executar essa ação")
+    if not is_admin_or_manager(user):
+        raise PermissionDenied("Apenas Administradores ou Gerentes podem executar essa ação")
 
     service = create_service(
                    name=data.name,
@@ -59,8 +60,8 @@ def create_service_for_admin(user_id: uuid.UUID, data: ServiceCreateIn, image: O
 
 def update_service_for_admin(user_id: uuid.UUID, service_id: uuid.UUID, payload: ServiceUpdateIn) -> ServiceOut:
     user = get_user_by_id(user_id=user_id)
-    if not user.role == User.UserRole.ADMIN:
-        raise PermissionDenied("Apenas Administradores podem executar essa ação")
+    if not is_admin_or_manager(user):
+        raise PermissionDenied("Apenas Administradores ou Gerentes podem executar essa ação")
 
     service = get_service_by_id(service_id=service_id)
     if service is None:
@@ -82,8 +83,8 @@ def list_all_public_services() -> QuerySet[Service]:
 def list_all_private_services(user_id: uuid.UUID) -> QuerySet[Service]:
     """Lista todos os serviços ativos e inativos, apenas Admins podem acessar esse recurso"""
     user = get_user_by_id(user_id=user_id)
-    if not user.role == User.UserRole.ADMIN:
-        raise PermissionDenied("Apenas Administradores podem executar essa ação")    
+    if not is_admin_or_manager(user):
+        raise PermissionDenied("Apenas Administradores ou Gerentes podem executar essa ação")    
     return get_all_services()
 
 def detail_service(service_id: uuid.UUID) -> ServiceOut:
@@ -97,8 +98,8 @@ def detail_service(service_id: uuid.UUID) -> ServiceOut:
 def delete_service_for_admin(user_id: uuid.UUID, service_id:uuid.UUID) -> None:
     """Deleta serviços, apenas admins podem fazer essa ação"""
     user = get_user_by_id(user_id=user_id)
-    if not user.role == User.UserRole.ADMIN:
-        raise PermissionDenied("Apenas Administradores podem executar essa ação")
+    if not is_admin_or_manager(user):
+        raise PermissionDenied("Apenas Administradores ou Gerentes podem executar essa ação")
     service = get_service_by_id(service_id=service_id)
     if service is None:
         raise ServiceNotFound()
@@ -108,8 +109,8 @@ def delete_service_for_admin(user_id: uuid.UUID, service_id:uuid.UUID) -> None:
 def deactivate_service_for_admin(user_id: uuid.UUID, service_id: uuid.UUID) -> ServiceOut:
     """Desativa um serviço, apenas Admin pode fazer essa ação"""
     user = get_user_by_id(user_id=user_id)
-    if not user.role == User.UserRole.ADMIN:
-        raise PermissionDenied("Apenas Administradores podem executar essa ação")
+    if not is_admin_or_manager(user):
+        raise PermissionDenied("Apenas Administradores ou Gerentes podem executar essa ação")
 
     service = get_service_by_id(service_id=service_id)
     if service is None:
@@ -122,8 +123,8 @@ def deactivate_service_for_admin(user_id: uuid.UUID, service_id: uuid.UUID) -> S
 def activate_service_for_admin(user_id: uuid.UUID, service_id: uuid.UUID) -> ServiceOut:
     """Ativa Serviço, apenas Admins podem fazer essa ação"""
     user = get_user_by_id(user_id=user_id)
-    if not user.role == User.UserRole.ADMIN:
-        raise PermissionDenied("Apenas Administradores podem executar essa ação")
+    if not is_admin_or_manager(user):
+        raise PermissionDenied("Apenas Administradores ou Gerentes podem executar essa ação")
 
     service = get_service_by_id_inactivate(service_id=service_id)
     if service is None:
@@ -134,8 +135,8 @@ def activate_service_for_admin(user_id: uuid.UUID, service_id: uuid.UUID) -> Ser
 
 def update_image_service_for_admin(user_id: uuid.UUID, service_id: uuid.UUID, image: UploadedFile) -> ServiceOut:
     user = get_user_by_id(user_id=user_id)
-    if not user.role == User.UserRole.ADMIN:
-        raise PermissionDenied("Apenas Administradores podem executar essa ação")
+    if not is_admin_or_manager(user):
+        raise PermissionDenied("Apenas Administradores ou Gerentes podem executar essa ação")
 
     service = get_service_by_id(service_id=service_id)
     if service is None:

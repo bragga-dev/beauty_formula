@@ -30,7 +30,7 @@ from beauty_formula.apps.services.selectors.employee_service_selector import (
 )
 from beauty_formula.apps.core.exceptions.media import InvalidImageFile
 from beauty_formula.apps.core.exceptions.permissions import EmployeeNotFoundError
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth
 from beauty_formula.apps.core.utils.pagination import paginate_queryset
 from beauty_formula.apps.core.schemas.deafult_schema import PageOut
 
@@ -73,7 +73,7 @@ def team_detail_router(request, employee_id: uuid.UUID):
 @router.get(
     "/team/{employee_id}/admin",
     response={200: EmployeeOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin: detalhe completo de um funcionário",
     description=(
         "Mesmo funcionário do endpoint público, mas incluindo username, "
@@ -92,7 +92,7 @@ def team_detail_admin_router(request, employee_id: uuid.UUID):
 @router.patch(
     "/team/{employee_id}/booking-window",
     response={200: EmployeeBookingWindowOut, 400: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin ajusta a janela de agendamento (dias à frente) de um funcionário",
     description=(
         "Quantos dias à frente a agenda deste funcionário fica aberta pra "
@@ -114,7 +114,7 @@ def update_employee_booking_window_router(request, employee_id: uuid.UUID, paylo
 @router.patch(
     "/team/{employee_id}/profile",
     response={200: EmployeeOut, 400: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin atualiza os dados de perfil de um funcionário",
     description="Atualiza nome, sobrenome, username, gênero, telefone, data de nascimento, instagram e bio.",
 )
@@ -132,7 +132,7 @@ def update_employee_profile_for_admin_router(request, employee_id: uuid.UUID, pa
 @router.post(
     "/team/{employee_id}/photo",
     response={200: EmployeeOut, 400: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin substitui a foto de um funcionário",
 )
 @ratelimit(key="user", rate="10/h", block=True)
