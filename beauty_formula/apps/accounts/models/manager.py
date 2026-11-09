@@ -18,7 +18,7 @@ DEFAULT_MANAGER_PHOTO = "default/manager_img.jpg"
 
 
 class Manager(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="client_profile")
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="manager_profile")
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     first_name = models.CharField(_("Nome"), max_length=255, blank=True, null=True)
     last_name = models.CharField(_("Sobrenome"), max_length=255, blank=True, null=True)
