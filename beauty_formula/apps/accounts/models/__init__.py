@@ -1,4 +1,5 @@
 from beauty_formula.apps.accounts.models.client import  Client
+from beauty_formula.apps.accounts.models.manager import Manager
 from beauty_formula.apps.accounts.models.employee import  Employee
 from beauty_formula.apps.accounts.models.user import  User
 from beauty_formula.apps.accounts.models.user_manage import  UserManager
@@ -9,6 +10,8 @@ from beauty_formula.apps.accounts.models.session_metadata import SessionMetadata
 
 
 __all__ = [
+    
+        'Manager',
         'Client',
         'Employee',
         'User',

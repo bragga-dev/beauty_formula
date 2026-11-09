@@ -6,7 +6,7 @@ from django.core.mail import send_mail
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from beauty_formula.apps.accounts.models.constants import ROLE_ADMIN, ROLE_CLIENT, ROLE_EMPLOYEE
+from beauty_formula.apps.accounts.models.constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_CLIENT, ROLE_EMPLOYEE
 from beauty_formula.apps.accounts.models.user_manage import UserManager
 
 
@@ -14,6 +14,7 @@ from beauty_formula.apps.accounts.models.user_manage import UserManager
 class User(AbstractBaseUser, PermissionsMixin):
     class UserRole(models.TextChoices):
         ADMIN  = ROLE_ADMIN,  "Administrador Root"
+        MANAGER  = ROLE_MANAGER,  "Gerente"
         CLIENT = ROLE_CLIENT, "Cliente"
         EMPLOYEE = ROLE_EMPLOYEE, "Funcionário"
 
@@ -40,7 +41,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name        = _('Usuário')
         verbose_name_plural = _('Usuários')
 
-    # ── Helpers básicos ───────────────────────────────────────────────────────
 
     def email_user(self, subject, message, from_email=None):
         send_mail(subject, message, from_email, [self.email])
@@ -48,7 +48,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
 
-    # ── Properties ───────────────────────────────────────────────────────────
+
+    @property
+    def is_manager(self):
+        return self.role == self.UserRole.MANAGER
 
     @property
     def is_client(self):
