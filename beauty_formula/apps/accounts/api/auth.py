@@ -3,6 +3,7 @@ Login endpoint — autenticação de usuários.
 """
 import json
 import uuid
+from urllib.parse import urlencode
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import HttpResponseRedirect, JsonResponse
@@ -349,10 +350,10 @@ def verify_email_endpoint_router(request, uidb64: str, token: str):
     """
     try:
         user = verify_email(uidb64, token)
-        redirect_url = f"{settings.FRONTEND_URL}/verificacao-concluida?status=success&email={user.email}"
+        redirect_url = f"{settings.FRONTEND_URL}/verificacao-concluida?" + urlencode({"status": "success", "email": user.email})
         return HttpResponseRedirect(redirect_url)
     except InvalidToken as e:
-        redirect_url = f"{settings.FRONTEND_URL}/verificacao-concluida?status=error&message={str(e)}"
+        redirect_url = f"{settings.FRONTEND_URL}/verificacao-concluida?" + urlencode({"status": "error", "message": "Token inválido ou expirado."})
         return HttpResponseRedirect(redirect_url)
     
 @router.post("/resend-verification", response={200: MessageOut, 404: MessageOut}, summary="Reenviar email de verificação", auth=None, )

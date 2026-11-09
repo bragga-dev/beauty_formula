@@ -174,6 +174,19 @@ def _lock_employee_for_scheduling(employee_id: UUID) -> None:
     Employee.objects.select_for_update().get(pk=employee_id)
 
 
+def _validate_within_booking_window(employee: Employee, scheduled_time: datetime) -> None:
+    """
+    Respeita `employee.booking_window_days` também na CRIAÇÃO/REAGENDAMENTO.
+    Antes só a consulta de disponibilidade aplicava a janela; quem chamasse
+    a API direto conseguia reservar qualquer data futura.
+    """
+    window = employee.booking_window_days or 30
+    if timezone.localdate(scheduled_time) > timezone.localdate() + timedelta(days=window):
+        raise SchedulingConflict(
+            _("Agendamentos só podem ser feitos até %(days)s dias à frente para este funcionário.") % {"days": window}
+        )
+
+
 def _validate_slot_available(
     employee_id: UUID,
     scheduled_time: datetime,
@@ -237,6 +250,7 @@ def create_scheduling_for_client(user_id: UUID, data: SchedulingCreateIn) -> Sch
 
     _validate_employee_offers_service(employee_id=employee.id, service_id=service.id)
     _lock_employee_for_scheduling(employee.id)
+    _validate_within_booking_window(employee, data.scheduled_time)
     _validate_slot_available(employee_id=employee.id, scheduled_time=data.scheduled_time, duration=service.duration)
 
     scheduling = create_scheduling_repo(
@@ -657,6 +671,7 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
     if data.service_id is not None or data.employee_id is not None:
         _validate_employee_offers_service(employee_id=employee.id, service_id=service.id)
 
+    _validate_within_booking_window(employee, data.scheduled_time)
     _validate_slot_available(
         employee_id=employee.id,
         scheduled_time=data.scheduled_time,

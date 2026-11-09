@@ -127,6 +127,17 @@ class PasswordResetConfirmIn(Schema):
     new_password:  str = Field(..., min_length=8)
     new_password2: str
 
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        # Mesmas regras do cadastro e da troca de senha — sem isso o reset
+        # aceitava "12345678".
+        try:
+            validate_password(v)
+        except DjangoValidationError as e:
+            raise ValueError(", ".join(e.messages))
+        return v
+
     @model_validator(mode="after")
     def passwords_match(self) -> "PasswordResetConfirmIn":
         if self.new_password != self.new_password2:

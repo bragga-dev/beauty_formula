@@ -71,6 +71,7 @@ from beauty_formula.apps.core.validators.validate_cpf_cnpj import validate_cpf_o
 
 _REFUNDABLE_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
 _PAID_PAYMENT_STATUSES = {Payment.PaymentStatus.RECEIVED, Payment.PaymentStatus.CONFIRMED}
+_REGRESSIVE_PAYMENT_STATUSES = {Payment.PaymentStatus.PENDING, Payment.PaymentStatus.OVERDUE}
 
 logger = logging.getLogger(__name__)
 
@@ -316,6 +317,18 @@ def process_asaas_webhook(payload: dict) -> Payment:
     payment = get_payment_by_asaas_id(asaas_payment_id=asaas_payment_id)
     if payment is None:
         raise PaymentNotFound()
+
+    # Status que o enum local não conhece: ignora (e loga) em vez de gravar
+    # lixo no registro — o Asaas pode ganhar status novos sem aviso.
+    if status not in Payment.PaymentStatus.values:
+        logger.warning("Webhook Asaas com status desconhecido %r (payment %s) — ignorado.", status, asaas_payment_id)
+        return payment
+
+    # Webhooks podem chegar fora de ordem. Um PENDING/OVERDUE atrasado não
+    # pode "desfazer" um pagamento que já foi recebido.
+    if payment.status in _PAID_PAYMENT_STATUSES and status in _REGRESSIVE_PAYMENT_STATUSES:
+        logger.info("Webhook Asaas %s ignorado: %s -> %s seria regressão (payment %s).", status, payment.status, status, asaas_payment_id)
+        return payment
 
     payment = update_payment_status(payment=payment, status=status)
     _confirm_scheduling_if_paid(payment)

@@ -6,8 +6,10 @@ from django.db.models import QuerySet
 from ninja_jwt.tokens import RefreshToken
 from ninja_jwt.settings import api_settings as jwt_api_settings
 
+from django.db import transaction
 from django.utils import timezone
 from ninja_jwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from ninja_jwt.utils import datetime_from_epoch
 from beauty_formula.apps.accounts.models.session_metadata import SessionMetadata
 from beauty_formula.apps.accounts.services.session_presenter import describe_user_agent
 from beauty_formula.apps.core.tokens.jwt import make_tokens, revoke_all_tokens
@@ -60,30 +62,60 @@ def refresh_access_token(refresh_token: str) -> dict:
     """
     Gera um novo access token a partir do refresh.
 
-    Também aplica ROTATE_REFRESH_TOKENS/BLACKLIST_AFTER_ROTATION (configurados
-    em NINJA_JWT mas que não tinham efeito nenhum aqui — essa função só
-    lia o access token e devolvia, nunca rotacionava nem blacklistava o
-    refresh antigo). Sem isso, um refresh token vazado continuava válido
-    pelo resto do prazo dele (dias) mesmo depois de usado — a rotação é
-    justamente o que fecha essa janela: cada uso invalida o token anterior.
+    Aplica ROTATE_REFRESH_TOKENS/BLACKLIST_AFTER_ROTATION: cada uso invalida
+    o refresh anterior e emite um novo.
+
+    Pontos que NÃO podem regredir (cobertos em test_auth_flow.py):
+    - o refresh novo é registrado em OutstandingToken. Sem isso ele fica
+      invisível para `revoke_all_tokens` (logout-all, troca/reset de senha,
+      desativação de conta) e para a listagem de sessões — só o primeiro
+      refresh de cada login seria revogável;
+    - usuário inativo/removido não renova sessão;
+    - o rótulo de dispositivo (SessionMetadata) acompanha o token novo.
     """
     try:
-        token = RefreshToken(refresh_token)
-        data = {"access": str(token.access_token)}
+        with transaction.atomic():
+            token = RefreshToken(refresh_token)
 
-        if jwt_api_settings.ROTATE_REFRESH_TOKENS:
-            if jwt_api_settings.BLACKLIST_AFTER_ROTATION:
-                try:
-                    token.blacklist()
-                except AttributeError:
-                    pass
+            user = User.objects.filter(
+                pk=token[jwt_api_settings.USER_ID_CLAIM], is_active=True,
+            ).first()
+            if user is None:
+                raise InvalidToken()
 
-            token.set_jti()
-            token.set_exp()
-            token.set_iat()
-            data["refresh"] = str(token)
+            data = {"access": str(token.access_token)}
 
-        return data
+            if jwt_api_settings.ROTATE_REFRESH_TOKENS:
+                old_jti = token[jwt_api_settings.JTI_CLAIM]
+
+                if jwt_api_settings.BLACKLIST_AFTER_ROTATION:
+                    try:
+                        token.blacklist()
+                    except AttributeError:
+                        pass
+
+                token.set_jti()
+                token.set_exp()
+                token.set_iat()
+
+                OutstandingToken.objects.create(
+                    user=user,
+                    jti=token[jwt_api_settings.JTI_CLAIM],
+                    token=str(token),
+                    created_at=timezone.now(),
+                    expires_at=datetime_from_epoch(token["exp"]),
+                )
+
+                old_meta = SessionMetadata.objects.filter(jti=old_jti).first()
+                if old_meta:
+                    SessionMetadata.objects.create(
+                        jti=token[jwt_api_settings.JTI_CLAIM],
+                        user_agent=old_meta.user_agent,
+                    )
+
+                data["refresh"] = str(token)
+
+            return data
     except Exception:
         raise InvalidToken()
 
@@ -132,6 +164,9 @@ def confirm_password_reset(uidb64: str, token: str, new_password: str) -> None:
     user.set_password(new_password)
     user.save(update_fields=["password"])
 
+    # Quem redefine a senha normalmente perdeu o controle da conta: derruba
+    # qualquer sessão (refresh) que já estivesse aberta.
+    revoke_all_tokens(user)
 
 
 def logout_all_sessions(user) -> None:

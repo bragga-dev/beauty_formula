@@ -224,6 +224,24 @@ def promote_client_to_employee(user_id: uuid.UUID, performed_by=None) -> Employe
 
 
 
+def _ensure_can_manage_account(performed_by, target: User) -> None:
+    """
+    Quem pode (des)ativar a conta de quem.
+
+    - ninguém desativa uma conta ADMIN por esta rota (só pelo Django admin);
+    - GERENTE só gerencia cliente/funcionário — nunca admin nem outro gerente;
+    - ninguém desativa a si mesmo por aqui (existe /account/deactivate com
+      confirmação de senha pra isso).
+    """
+    if target.role == User.UserRole.ADMIN or target.is_superuser:
+        raise PermissionDenied("Contas de administrador não podem ser alteradas por esta rota.")
+    if performed_by is not None:
+        if performed_by.pk == target.pk:
+            raise PermissionDenied("Você não pode alterar o status da sua própria conta por esta rota.")
+        if performed_by.role == User.UserRole.MANAGER and target.role == User.UserRole.MANAGER:
+            raise PermissionDenied("Gerentes não podem alterar a conta de outro gerente.")
+
+
 @transaction.atomic
 def deactivate_account(user_id: uuid.UUID, performed_by=None, reason="Desativação de conta"):
     """ Desativa usuário, revoga todos os tokens ativos e cria log de auditoria"""
@@ -231,6 +249,8 @@ def deactivate_account(user_id: uuid.UUID, performed_by=None, reason="Desativaç
     if not user:
         logger.warning(f"Desativação abortada: usuário {user_id} não encontrado")
         raise UserNotFound("Usuário não encontrado.")
+
+    _ensure_can_manage_account(performed_by, user)
  
     if not user.is_active:
         logger.warning(f"Desativação abortada: usuário {user_id} já está inativo")
@@ -251,6 +271,8 @@ def reactivate_user(user_id: uuid.UUID, performed_by=None) -> User:
     if not user:
         logger.warning(f"Reativação abortada: usuário {user_id} não encontrado")
         raise UserNotFound("Usuário não encontrado.")
+
+    _ensure_can_manage_account(performed_by, user)
 
     if user.is_active:
         logger.warning(f"Reativação abortada: usuário {user_id} já está ativo")

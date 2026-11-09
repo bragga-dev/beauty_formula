@@ -17,7 +17,7 @@ from beauty_formula.apps.core.exceptions.service_exception import (
     InvalidAvailabilityRequest,
     ServiceNotFound,
 )
-from beauty_formula.apps.core.permissions.auth_classes import AdminOnlyAuth
+from beauty_formula.apps.core.permissions.auth_classes import AdminOrManagerAuth
 from beauty_formula.apps.services.schemas.availability_schema import AvailabilitySlotOut
 from beauty_formula.apps.services.schemas.employee_calendar_schema import (
     EmployeeCalendarOut,
@@ -116,7 +116,7 @@ def public_employee_calendar_router(request, employee_id: UUID, month: date):
 @router.get(
     "/employee/{employee_id}/calendar",
     response={200: EmployeeCalendarOut, 400: MessageOut, 404: MessageOut},
-    auth=AdminOnlyAuth(),
+    auth=AdminOrManagerAuth(),
     summary="Admin vê o calendário mensal de um funcionário (expediente, bloqueios e agendamentos, dia a dia)",
     description=(
         "Alimenta a tela de calendário do painel: pra cada dia do mês "

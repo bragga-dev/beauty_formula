@@ -41,8 +41,9 @@ class TestUserModel:
         assert user.is_employee is True
         assert user.is_staff is False
         assert user.is_superuser is False
-        assert user.is_active is False
-        assert user.is_trusty is False
+        # funcionário nasce ativo/confiável: é cadastrado pelo admin/gerente
+        assert user.is_active is True
+        assert user.is_trusty is True
 
     def test_create_superuser(self):
         """Testa criação de superuser (ADMIN)"""

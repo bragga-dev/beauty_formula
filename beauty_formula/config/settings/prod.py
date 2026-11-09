@@ -202,8 +202,11 @@ MINIO_URL_PROTOCOL = "https:"
 # =========================================================
 # JWT
 # =========================================================
+# Parte do NINJA_JWT de base.py (rotação + blacklist do refresh, SIGNING_KEY,
+# USER_ID_*). Antes este bloco SUBSTITUÍA o dict inteiro e, em produção, o
+# refresh deixava de rotacionar/blacklistar.
 NINJA_JWT = {
+    **NINJA_JWT,
     "ACCESS_TOKEN_LIFETIME":  timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-
 }

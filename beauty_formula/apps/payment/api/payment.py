@@ -138,7 +138,7 @@ def list_all_payments_router(request, filters: PaymentFilterSchema = Query(...),
 # Webhook Asaas — SEM JWT. Autenticado pelo token do header, não por usuário.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.post("/webhook", response={200: dict, 401: dict}, auth=None, summary="Webhook do Asaas")
+@router.post("/webhook", response={200: dict, 400: dict, 401: dict}, auth=None, summary="Webhook do Asaas")
 @ratelimit(key="ip", rate="60/m", block=True)
 def asaas_webhook_router(request: HttpRequest):
     received_token = request.headers.get("asaas-access-token", "")
@@ -148,7 +148,12 @@ def asaas_webhook_router(request: HttpRequest):
         return 401, {"detail": "Token de webhook inválido."}
 
     import json
-    payload = json.loads(request.body)
+    try:
+        payload = json.loads(request.body)
+    except (ValueError, UnicodeDecodeError):
+        return 400, {"detail": "Corpo inválido."}
+    if not isinstance(payload, dict):
+        return 400, {"detail": "Corpo inválido."}
 
     try:
         process_asaas_webhook(payload=payload)
