@@ -1,0 +1,128 @@
+<!-- ============================================================
+     FILE: base.src.html  (fonte — NÃO edite o base.html gerado)
+     Rode `npm run build` para gerar o base.html com Tailwind compilado
+     e estilos inline. As tags Jinja (blocks e variáveis) são preservadas.
+
+     Variáveis opcionais:
+       logo_url  → URL ABSOLUTA da logo "FB" (ex.: https://seusite.com/logo.png).
+                   Sem ela, aparece um monograma "FB".
+     ============================================================ -->
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="color-scheme" content="dark">
+    <meta name="supported-color-schemes" content="dark">
+    <title>{% block title %}Fórmula da Beleza{% endblock %}</title>
+
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+
+    <!--[if !mso]><!-->
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Inter:wght@400;500;600&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+    <!--<![endif]-->
+
+    <!-- @tailwind-css -->
+
+    {% block extra_styles %}{% endblock %}
+</head>
+
+<body class="m-0 p-0 w-full bg-ink-950 font-sans">
+
+<div class="preheader">{% block preheader %}Fórmula da Beleza{% endblock %}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0b" class="email-wrapper w-full bg-ink-950">
+  <tr>
+    <td align="center" class="px-4 py-12 mobile:!px-2 mobile:!py-5">
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f0f11"
+             class="email-card w-full max-w-card bg-ink-900 border border-solid border-ink-700 rounded-lg overflow-hidden">
+
+        <!-- ── HEADER ─────────────────────────────────────────── -->
+        <tr>
+          <td class="px-10 pt-8 pb-6 bg-ink-950 mobile:!px-5" bgcolor="#0a0a0b">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td valign="middle" width="64" class="w-16">
+                  {% if logo_url %}
+                  <img src="{{ logo_url }}" width="48" height="48" alt="Fórmula da Beleza"
+                       class="block w-12 h-12 rounded-md border border-solid border-ink-700">
+                  {% else %}
+                  <table role="presentation" width="48" height="48" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center" valign="middle" width="48" height="48"
+                          class="w-12 h-12 bg-ink-800 border border-solid border-crimson-600 rounded-md font-display italic font-semibold text-lg text-crimson-500">FB</td>
+                    </tr>
+                  </table>
+                  {% endif %}
+                </td>
+                <td valign="middle">
+                  <p class="m-0 font-display text-xl font-semibold text-bone-50 tracking-brand leading-none">Fórmula da Beleza</p>
+                  <p class="m-0 mt-1 font-serif italic text-sm text-gold-400">Mais que um corte, uma experiência.</p>
+                </td>
+                <td valign="middle" align="right" class="mobile:!hidden">
+                  <span class="inline-block px-3 py-2 rounded-full border border-solid border-line-gold font-display text-xs font-medium uppercase tracking-badge text-gold-400">&#9986;&nbsp; Salão &amp; Barbearia</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td class="stripe" height="2" bgcolor="#c6172e">&nbsp;</td></tr>
+
+        <!-- ── BODY (template filho) ──────────────────────────── -->
+        <tr>
+          <td class="px-10 pt-10 pb-10 bg-ink-900 mobile:!px-5 mobile:!pt-8 mobile:!pb-8" bgcolor="#0f0f11">
+            {% block content %}{% endblock %}
+          </td>
+        </tr>
+
+        <!-- ── DIFERENCIAIS (mesma faixa do site) ─────────────── -->
+        <tr>
+          <td class="px-10 py-6 bg-ink-950 border-t border-solid border-ink-700 mobile:!px-5" bgcolor="#0a0a0b">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="33%" valign="top" class="pr-3 mobile:!block mobile:!w-full mobile:!pr-0 mobile:!pb-4">
+                  <p class="m-0 font-display text-xs font-medium uppercase tracking-widest text-bone-100"><span class="text-gold-400">&#10022;</span>&nbsp; Atendimento premium</p>
+                  <p class="m-0 mt-1 text-xs text-bone-500">Experiência feita para você, do início ao fim.</p>
+                </td>
+                <td width="33%" valign="top" class="px-3 mobile:!block mobile:!w-full mobile:!px-0 mobile:!pb-4">
+                  <p class="m-0 font-display text-xs font-medium uppercase tracking-widest text-bone-100"><span class="text-gold-400">&#9986;</span>&nbsp; Profissionais experts</p>
+                  <p class="m-0 mt-1 text-xs text-bone-500">Especialistas em realçar o seu estilo.</p>
+                </td>
+                <td width="33%" valign="top" class="pl-3 mobile:!block mobile:!w-full mobile:!pl-0">
+                  <p class="m-0 font-display text-xs font-medium uppercase tracking-widest text-bone-100"><span class="text-gold-400">&#9719;</span>&nbsp; Agendamento fácil</p>
+                  <p class="m-0 mt-1 text-xs text-bone-500">Escolha o serviço, o profissional e o horário.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ── FOOTER ─────────────────────────────────────────── -->
+        <tr>
+          <td align="center" class="px-10 pt-6 pb-8 bg-ink-950 border-t border-solid border-ink-700 text-center mobile:!px-5" bgcolor="#0a0a0b">
+            <p class="m-0 font-display text-sm font-semibold uppercase tracking-widest text-bone-50">Fórmula <span class="text-gold-400">da Beleza</span></p>
+            <p class="m-0 mt-2 font-serif italic text-base text-gold-400">Onde seu estilo ganha forma</p>
+            <p class="m-0 mt-4 text-xs text-bone-600">Mensagem automática. Não responda este e-mail.</p>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>
