@@ -38,6 +38,9 @@ def expire_punctual_time_off(time_off_id: str) -> None:
     except EmployeeTimeOff.DoesNotExist:
         return
 
+    if time_off is None:
+        return
+
     if not time_off.is_punctual:
         return
 

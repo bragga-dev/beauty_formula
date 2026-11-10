@@ -26,9 +26,10 @@ def rated(api, verified_client, completed):
 
 
 @pytest.fixture
-def authorized(rated):
-    rated.is_authorized = True
-    rated.save(update_fields=["is_authorized"])
+def authorized(api, root_admin, rated):
+    """Autoriza pela API: é o service que recalcula os agregados de média."""
+    assert api.patch(f"{BASE}/admin/{rated.id}/authorize", user=root_admin).status_code in (200, 201)
+    rated.refresh_from_db()
     return rated
 
 
@@ -144,7 +145,8 @@ def test_summaries(api, authorized, service, employee):
     s = api.get(f"{BASE}/service/{service.id}/summary")
     e = api.get(f"{BASE}/employee/{employee.id}/summary")
     assert s.status_code == 200 and e.status_code == 200
-    assert "5" in str(s.json()) and "5" in str(e.json())
+    for body in (s.json(), e.json()):
+        assert float(body["average_rating"]) == 5.0 and body["total_reviews"] == 1
 
 
 # ── Moderação (admin / gerente / funcionário só sobre si) ───────────────────

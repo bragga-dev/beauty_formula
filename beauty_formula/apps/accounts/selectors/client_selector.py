@@ -627,11 +627,10 @@ def normalize_phone_for_search(phone: str) -> str:
     clean = re.sub(r'[^\d+]', '', phone)
     
     try:
-        parsed = parse(clean_phone, "BR")
-        e164 = format_number(parsed, PhoneNumberFormat.E164)
-        return Client.objects.filter(phone=e164).first()
+        parsed = parse(clean, "BR")
+        return format_number(parsed, PhoneNumberFormat.E164)
     except NumberParseException:
-        return Client.objects.filter(phone__contains=clean_phone).first()
+        return clean
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
