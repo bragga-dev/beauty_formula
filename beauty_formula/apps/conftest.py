@@ -12,13 +12,17 @@ sem Redis, sem SMTP e sem Asaas de verdade.
 - Cache             -> limpo a cada teste (django-ratelimit usa o cache;
   sem isso um teste herda o contador do anterior e leva 429).
 """
+import io
 from datetime import time, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client as DjangoTestClient
+from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from django.utils import timezone
 from ninja_jwt.tokens import RefreshToken
 
@@ -40,11 +44,19 @@ def _isolate_infra(settings):
     settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
     cache.clear()
     with patch("celery.app.task.Task.delay") as delay, patch("celery.app.task.Task.apply_async") as apply_async:
-        # Expostos pra testes que queiram asserir "a task foi disparada".
-        settings._celery_delay = delay
-        settings._celery_apply_async = apply_async
-        yield
+        yield SimpleNamespace(delay=delay, apply_async=apply_async)
     cache.clear()
+
+
+@pytest.fixture
+def celery_delay(_isolate_infra):
+    """Mock de `Task.delay` — para asserir que uma task foi (ou não) disparada."""
+    return _isolate_infra.delay
+
+
+@pytest.fixture
+def celery_apply_async(_isolate_infra):
+    return _isolate_infra.apply_async
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -171,6 +183,16 @@ class ApiClient:
     def patch(self, path, data=None, user=None):
         return self._c.patch(f"/api{path}", data=data if data is not None else {}, content_type="application/json", **self._headers(user))
 
+    def post_form(self, path, data, user=None):
+        """multipart/form-data (upload de arquivos)."""
+        return self._c.post(f"/api{path}", data=data, **self._headers(user))
+
+    def patch_form(self, path, data, user=None):
+        """PATCH multipart — o test client do Django só monta multipart sozinho para POST."""
+        return self._c.generic(
+            "PATCH", f"/api{path}", encode_multipart(BOUNDARY, data), MULTIPART_CONTENT, **self._headers(user),
+        )
+
     def delete(self, path, user=None, data=None):
         if data is None:
             return self._c.delete(f"/api{path}", **self._headers(user))
@@ -180,3 +202,26 @@ class ApiClient:
 @pytest.fixture
 def api():
     return ApiClient()
+
+
+def image_file(name: str = "foto.png", fmt: str = "PNG", size=(32, 32)) -> SimpleUploadedFile:
+    """Imagem real (passa no validate_image_file) para testes de upload."""
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, (200, 50, 120)).save(buf, format=fmt)
+    return SimpleUploadedFile(name, buf.getvalue(), content_type=f"image/{fmt.lower()}")
+
+
+@pytest.fixture
+def make_scheduling(client_profile, employee, service):
+    """Fábrica de agendamentos direto no banco (sem passar pela API)."""
+    from beauty_formula.apps.services.models.scheduling import Scheduling
+
+    def _make(status=Scheduling.SchedulingStatus.CREATED, days_ahead=2, hour=10, **extra):
+        data = {"service": service, "client": client_profile, "employee": employee,
+                "scheduled_time": next_slot(days_ahead, hour), "status": status}
+        data.update(extra)
+        return Scheduling.objects.create(**data)
+
+    return _make

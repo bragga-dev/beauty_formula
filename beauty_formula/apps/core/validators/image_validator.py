@@ -4,7 +4,7 @@ from PIL import Image, UnidentifiedImageError
 import os
 from django.core.exceptions import ValidationError
 import logging
-from ninja import UploadedFile
+from django.core.files.uploadedfile import UploadedFile
 
 
 

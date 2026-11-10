@@ -426,7 +426,7 @@ def update_punctual_time_off_router(request, time_off_id: uuid.UUID, payload: Em
 
 
 @router.delete(
-    "/{time_off_id}",
+    "/{uuid:time_off_id}",
     response={200: MessageOut, 400: MessageOut, 403: MessageOut, 404: MessageOut},
     auth=EmployeeOnlyAuth(),
     summary="Funcionário exclui um bloqueio próprio",
