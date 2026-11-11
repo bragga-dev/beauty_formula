@@ -1,0 +1,20 @@
+# Modo BOOTSTRAP (sem TLS): usado só para emitir o certificado Let's Encrypt.
+# Depois de emitido, suba com NGINX_MODE=https (ver infra/scripts/init-ssl.sh).
+server {
+    listen 80;
+    server_name ${APP_DOMAIN} ${MEDIA_DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location / {
+        return 503;
+    }
+}

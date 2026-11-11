@@ -139,8 +139,17 @@ def test_update_competencia(api, manager_user, commission):
 
 @pytest.mark.xfail(strict=True, reason="mark_commission_as_paid grava `paid_by`, campo que não existe no model EmployeeCommission")
 def test_mark_single_commission_as_paid(api, root_admin, commission):
-    assert api.patch(f"{BASE}/mark-as-paid/{commission.id}", user=root_admin).status_code == 200
+    response = api.patch(f"{BASE}/mark-as-paid/{commission.id}",
+        user=root_admin,
+    )
 
+    assert response.status_code == 200
+
+    commission.refresh_from_db()
+
+    assert commission.status == C.PAID
+    assert commission.paid_at is not None
+    assert commission.paid_by_id == root_admin.id
 
 def test_mark_paid_revert_and_cancel_cycle(api, root_admin, commission):
     api.patch(f"{BASE}/mark-as-paid-bulk", {"commission_ids": [str(commission.id)]}, user=root_admin)

@@ -1,145 +1,320 @@
-services:
+# =============================================================================
+# Produção / Homologação — Fórmula da Beleza
+#
+# Dimensionado para ~1000 usuários simultâneos em 1 host (4 vCPU / 8 GB).
+# Ver infra/README-staging.md (contas, ajustes e checklist).
+#
+# Subir:   docker compose -f docker-compose.prod.yml up -d --build
+# Primeira vez com TLS: bash infra/scripts/init-ssl.sh
+# =============================================================================
 
-  # =========================================================
-  # DJANGO (gunicorn) — não expõe mais porta pro host,
-  # quem fala com ele agora é o nginx via rede interna
-  # =========================================================
-  web:
-    build: .
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: Dockerfile.prod
+  image: beauty-formula-backend:${IMAGE_TAG:-latest}
+  env_file: .env
+  environment:
+    DJANGO_SETTINGS_MODULE: beauty_formula.config.settings.prod
+  restart: always
+  logging: *default-logging
+
+services:
+  # ---------------------------------------------------------------------------
+  # Migrações + collectstatic: roda 1x por deploy e termina.
+  # (Fora do `web` para não competir entre réplicas nem atrasar o boot.)
+  # ---------------------------------------------------------------------------
+  migrate:
+    <<: *backend
     command: >
       sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+             python manage.py collectstatic --noinput"
+    restart: "no"
     volumes:
-      - .:/app
       - static_volume:/app/staticfiles
-    expose:
-      - "8000"
-    env_file: .env
-    restart: always
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
+      redis-cache:
         condition: service_healthy
 
-  # =========================================================
-  # POSTGRES
-  # =========================================================
+  # ---------------------------------------------------------------------------
+  # API Django (Gunicorn gthread: workers x threads = capacidade simultânea)
+  # ---------------------------------------------------------------------------
+  web:
+    <<: *backend
+    # Config em infra/gunicorn/gunicorn.conf.py (GUNICORN_WORKERS/THREADS no .env)
+    command: ["gunicorn", "-c", "infra/gunicorn/gunicorn.conf.py", "beauty_formula.config.wsgi:application"]
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2).close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "3.0"
+          memory: 2g
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # Celery worker (e-mails, notificações, tarefas de agendamento)
+  # ---------------------------------------------------------------------------
+  celery:
+    <<: *backend
+    command: >
+      celery -A beauty_formula.config.celery:app worker -l info
+      --concurrency ${CELERY_CONCURRENCY:-4}
+      -Ofair --prefetch-multiplier 1
+      --max-tasks-per-child 200
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1g
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # Celery beat — SEMPRE 1 instância (senão as tarefas agendadas duplicam)
+  # ---------------------------------------------------------------------------
+  celery-beat:
+    <<: *backend
+    command: >
+      celery -A beauty_formula.config.celery:app beat -l info
+      --schedule /tmp/celerybeat-schedule
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256m
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 — ajustado para 4 vCPU / 8 GB (db com ~2 GB)
+  # ---------------------------------------------------------------------------
   db:
     image: postgres:16
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=768MB
+      - -c
+      - effective_cache_size=2GB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - wal_compression=on
+      - -c
+      - log_min_duration_statement=500
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-beauty_formula}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    shm_size: 256m
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # =========================================================
-  # REDIS
-  # =========================================================
+  # ---------------------------------------------------------------------------
+  # Redis do Celery (broker + resultados): NUNCA descarta chave (noeviction),
+  # com persistência. Cache/rate-limit ficam em outra instância (abaixo).
+  # ---------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
     restart: always
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  # =========================================================
-  # CELERY WORKER
-  # =========================================================
-  celery:
-    build: .
-    command: celery -A config worker -l info --concurrency 4
-    env_file: .env
+  # ---------------------------------------------------------------------------
+  # Redis de cache + rate-limit + sessões: descartável (LRU), sem disco.
+  # ---------------------------------------------------------------------------
+  redis-cache:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     restart: always
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
-        condition: service_healthy
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  # =========================================================
-  # CELERY BEAT
-  # =========================================================
-  celery-beat:
-    build: .
-    command: celery -A config beat -l info
-    env_file: .env
-    restart: always
-    depends_on:
-      - redis
-
-  # =========================================================
-  # MINIO
-  # =========================================================
+  # ---------------------------------------------------------------------------
+  # MinIO (S3) — acessível só pela rede interna; o Nginx expõe a mídia pública
+  # em https://${MEDIA_DOMAIN}. Console só em 127.0.0.1 (acesso via túnel SSH).
+  # ---------------------------------------------------------------------------
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9001:9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
     restart: always
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Provisionamento do MinIO (buckets, política, imagens padrão): roda e termina.
   createbuckets:
     image: minio/mc:latest
+    restart: "no"
     depends_on:
       minio:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
-      mc mb --ignore-existing local/${MINIO_BUCKET_MEDIA:-beautyformulamedia};
-      mc mb --ignore-existing local/${MINIO_BUCKET_STATIC:-beautyformulastatic};
-      mc anonymous set download local/${MINIO_BUCKET_STATIC:-beautyformulastatic};
-      exit 0;
-      "
+    volumes:
+      - ./default:/default:ro
+      - ./infra/minio/app-policy.json:/policy/app-policy.json:ro
     env_file: .env
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      set -e;
+      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}";
+      mc mb --ignore-existing local/"$${MINIO_BUCKET_MEDIA}";
+      mc mb --ignore-existing local/"$${MINIO_BUCKET_STATIC}";
+      mc mb --ignore-existing local/"$${MINIO_BUCKET_PRIVATE}";
+      mc anonymous set download local/"$${MINIO_BUCKET_STATIC}";
+      mc anonymous set download local/"$${MINIO_BUCKET_MEDIA}";
+      mc admin user add local "$${MINIO_APP_USER}" "$${MINIO_APP_PASSWORD}" || true;
+      mc admin policy create local beauty_formula-app-policy /policy/app-policy.json || true;
+      mc admin policy attach local beauty_formula-app-policy --user "$${MINIO_APP_USER}" || true;
+      mc cp /default/client_img.jpg local/"$${MINIO_BUCKET_MEDIA}"/default/client_img.jpg;
+      mc cp /default/manager_img.jpg local/"$${MINIO_BUCKET_MEDIA}"/default/manager_img.jpg;
+      mc cp /default/employee_img.jpeg local/"$${MINIO_BUCKET_MEDIA}"/default/employee_img.jpeg;
+      mc cp /default/service_img.png local/"$${MINIO_BUCKET_MEDIA}"/default/service_img.png;
+      echo 'MinIO setup concluído';
 
-  # =========================================================
-  # NGINX + FRONTEND
-  # Builda a SPA (formula-da-beleza) e a serve, além de
-  # fazer proxy para /api, /admin e /static do Django.
-  # Assume que os repos estão lado a lado:
-  #   /srv/formula-da-beleza/beauty-formula/        (aqui está este compose)
-  #   /srv/formula-da-beleza/formula-da-beleza/      (repo do frontend)
-  # =========================================================
+  # ---------------------------------------------------------------------------
+  # Nginx + frontend (imagem do repo ../formula-da-beleza, com o build do SPA
+  # em /usr/share/nginx/html). A config daqui SUBSTITUI a da imagem.
+  # NGINX_MODE: https (padrão) | bootstrap (só para emitir certificado)
+  # ---------------------------------------------------------------------------
   nginx:
     build:
       context: ../formula-da-beleza
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      MEDIA_DOMAIN: ${MEDIA_DOMAIN}
     ports:
       - "80:80"
       - "443:443"
     volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/templates/${NGINX_MODE:-https}:/etc/nginx/templates:ro
       - static_volume:/app/staticfiles:ro
+      - certbot_conf:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+      - nginx_cache:/var/cache/nginx
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     depends_on:
       - web
+      - minio
     restart: always
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
 
-# =========================================================
-# VOLUMES
-# =========================================================
+  # Certbot: só roda sob demanda (docker compose run), por isso o profile.
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["tools"]
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+
 volumes:
   postgres_data:
   minio_data:
   static_volume:
+  redis_data:
+  certbot_conf:
+  certbot_www:
+  nginx_cache:

@@ -1,0 +1,181 @@
+# =============================================================================
+# Homologação/produção — HTTPS.
+#   ${APP_DOMAIN}   -> SPA (frontend) + /api (Django) + /static + /admin
+#   ${MEDIA_DOMAIN} -> mídia pública do MinIO (fotos), com cache
+# Premissa: este Nginx é a borda (recebe o IP real do cliente). Se houver
+# Cloudflare/LB na frente, habilite o módulo realip (ver README-staging.md).
+# =============================================================================
+
+# ── :80 — ACME + redirect ────────────────────────────────────────────────────
+server {
+    listen 80;
+    server_name ${APP_DOMAIN} ${MEDIA_DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ── :443 — aplicação ─────────────────────────────────────────────────────────
+server {
+    listen 443 ssl http2;
+    server_name ${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:20m;     # ~80k sessões: evita handshake completo
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options    "nosniff" always;
+    add_header X-Frame-Options           "DENY" always;
+    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
+
+    limit_conn perip 50;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # ── API Django ──────────────────────────────────────────────────────────
+    location /api/ {
+        limit_req zone=api burst=60 nodelay;
+
+        proxy_pass         http://django;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
+        proxy_set_header   Host              $host;
+        # Sobrescreve (nunca repassa) o que o cliente mandar: é o que o
+        # django-ratelimit lê (RATELIMIT_IP_META_KEY=HTTP_X_REAL_IP).
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 5s;
+        proxy_send_timeout    30s;
+        proxy_read_timeout    35s;      # > timeout do gunicorn (30s)
+        proxy_buffering       on;
+        proxy_next_upstream   error timeout http_502 http_503;
+        proxy_next_upstream_tries 2;
+        proxy_next_upstream_timeout 10s;
+    }
+
+    # Rotas de credencial: limite estrito por IP além do que o Django aplica.
+    location ~ ^/api/auth/(login|register|password-reset|resend-verification|google) {
+        limit_req zone=login burst=10 nodelay;
+
+        proxy_pass         http://django;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 35s;
+    }
+
+    # Django admin: mesma origem; limite do `api` também vale.
+    location /admin/ {
+        limit_req zone=api burst=20 nodelay;
+
+        proxy_pass         http://django;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    # ── Estáticos do Django (collectstatic -> volume compartilhado) ─────────
+    location /static/ {
+        alias /app/staticfiles/;
+        expires 7d;
+        add_header Cache-Control "public";
+        access_log off;
+    }
+
+    # ── SPA (build do frontend dentro da imagem nginx) ──────────────────────
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Assets com hash no nome (Vite): cache longo e imutável.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+        try_files $uri =404;
+    }
+
+    # index.html nunca em cache (para pegar deploy novo na hora).
+    location = /index.html {
+        add_header Cache-Control "no-store";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# ── :443 — mídia pública (MinIO) ─────────────────────────────────────────────
+server {
+    listen 443 ssl http2;
+    server_name ${MEDIA_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:20m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options    "nosniff" always;
+
+    # Só leitura: upload é feito pelo Django, nunca pelo navegador.
+    if ($request_method !~ ^(GET|HEAD|OPTIONS)$) {
+        return 405;
+    }
+
+    # Bloqueia listagem de bucket (/<bucket> ou /<bucket>/).
+    location ~ ^/[^/]+/?$ {
+        return 403;
+    }
+
+    location / {
+        limit_req zone=api burst=200 nodelay;
+
+        proxy_pass         http://minio;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection "";
+        proxy_set_header   Host       minio:9000;
+
+        # Cache: as fotos mudam de URL ao serem trocadas (upload_to com uuid).
+        proxy_cache            media;
+        proxy_cache_valid      200 206 7d;
+        proxy_cache_valid      404 1m;
+        proxy_cache_lock       on;
+        proxy_cache_use_stale  error timeout updating http_500 http_502 http_503;
+        add_header             X-Cache $upstream_cache_status;
+        expires                7d;
+
+        # Não repassa cookies/credenciais ao storage.
+        proxy_set_header Authorization "";
+        proxy_hide_header Set-Cookie;
+    }
+}

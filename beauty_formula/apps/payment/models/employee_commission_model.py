@@ -26,6 +26,8 @@ class EmployeeCommission(models.Model):
     paid_at = models.DateTimeField( _("Pago em"), null=True, blank=True)
     competencia_original = models.DateField(_("Competência original (calculada)"), editable=False, default=date.today)
     competencia = models.DateField(_("Competência (mês de referência)"), db_index=True, default=date.today)
+    paid_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="commissions_paid", verbose_name=_("Pago confirmado por"))
+
     competencia_changed_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="commission_competencia_changes",
         verbose_name=_("Competência ajustada por"),

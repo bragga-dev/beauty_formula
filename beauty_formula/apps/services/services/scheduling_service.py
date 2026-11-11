@@ -642,36 +642,60 @@ def mark_scheduling_as_no_show_for_employee(user_id: UUID, scheduling_id: UUID) 
 # Reagendamento (cliente)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, data: SchedulingRescheduleIn) -> SchedulingOut:
+@transaction.atomic
+def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID,  data: SchedulingRescheduleIn) -> SchedulingOut:
+
     """
     Cliente reagenda um atendimento confirmado.
 
-    O agendamento atual é marcado como RESCHEDULED (preservando data,
-    serviço, funcionário e histórico originais) e um novo agendamento,
-    já CONFIRMED, é criado com o novo horário e, opcionalmente, novo
-    serviço/funcionário.
+    O agendamento atual é marcado como RESCHEDULED,
+    preservando o histórico original.
+
+    Um novo agendamento CONFIRMED é criado com o novo horário.
     """
+
     scheduling = _get_own_client_scheduling(user_id, scheduling_id)
 
+    scheduling = Scheduling.objects.select_for_update().get(
+        pk=scheduling.pk
+    )
+
     if not scheduling.can_be_rescheduled:
-        raise SchedulingCannotBeModified(_("Só é possível reagendar um agendamento confirmado."))
+        raise SchedulingCannotBeModified(
+            _("Só é possível reagendar um agendamento confirmado.")
+        )
 
     service = scheduling.service
+
     if data.service_id is not None and data.service_id != scheduling.service_id:
-        service = get_service_by_id(service_id=data.service_id)
+
+        service = get_service_by_id(
+            service_id=data.service_id
+        )
+
         if service is None or not service.is_active:
             raise ServiceNotFound()
 
     employee = scheduling.employee
+
     if data.employee_id is not None and data.employee_id != scheduling.employee_id:
-        employee = get_employee_by_id(employee_id=data.employee_id)
+
+        employee = get_employee_by_id(
+            employee_id=data.employee_id
+        )
+
         if employee is None:
             raise EmployeeNotFoundError()
 
     if data.service_id is not None or data.employee_id is not None:
+
         _validate_employee_offers_service(employee_id=employee.id, service_id=service.id)
 
+    # Serializa operações que envolvem o mesmo funcionário
+    _lock_employee_for_scheduling(employee.id)
+
     _validate_within_booking_window(employee, data.scheduled_time)
+    
     _validate_slot_available(
         employee_id=employee.id,
         scheduled_time=data.scheduled_time,
@@ -686,12 +710,23 @@ def reschedule_own_scheduling_for_client(user_id: UUID, scheduling_id: UUID, dat
         scheduled_time=data.scheduled_time,
         notes=data.notes,
     )
-    service.increment_bookings()
-    _confirm_rescheduling(scheduling=new_scheduling)
-    notify_scheduling_rescheduled(scheduling_id=new_scheduling.id)
-    notify_scheduling_rescheduled_employee(scheduling_id=new_scheduling.id)
-    return SchedulingOut.from_orm(new_scheduling)
 
+    service.increment_bookings()
+
+    _confirm_rescheduling(
+        scheduling=new_scheduling
+    )
+
+    # Notificações
+    notify_scheduling_rescheduled(
+        scheduling_id=new_scheduling.id
+    )
+
+    notify_scheduling_rescheduled_employee(
+        scheduling_id=new_scheduling.id
+    )
+
+    return SchedulingOut.from_orm(new_scheduling)
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exclusão (somente admin)
 # ═══════════════════════════════════════════════════════════════════════════════

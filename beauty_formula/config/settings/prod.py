@@ -22,6 +22,8 @@ DATABASES = {
 
 
 DATABASES["default"]["CONN_MAX_AGE"] = 60
+# Descarta conexão persistente quebrada (restart do Postgres) em vez de dar 500.
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 
 
 # =========================================================
@@ -86,8 +88,26 @@ CACHES = {
             "REDIS_URL",
             default="redis://127.0.0.1:6379/1"
         ),
+        # Redis fora do ar não pode pendurar os workers do Gunicorn.
+        "OPTIONS": {
+            "socket_connect_timeout": 2,
+            "socket_timeout": 2,
+        },
     }
 }
+
+# Atrás do Nginx, REMOTE_ADDR é sempre o IP do proxy: sem isto o rate-limit
+# `key="ip"` trataria TODOS os usuários como um só. O Nginx SOBRESCREVE
+# X-Real-IP com o IP real do cliente (infra/nginx/templates/https).
+def client_ip(request):
+    """IP real (X-Real-IP do Nginx); sem o header (tráfego interno), cai no REMOTE_ADDR."""
+    return request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR")
+
+
+RATELIMIT_IP_META_KEY = "beauty_formula.config.settings.prod.client_ip"
+
+# Desligar só em homologação durante teste de carga (RATELIMIT_ENABLE=False).
+RATELIMIT_ENABLE = env.bool("RATELIMIT_ENABLE", default=True)
 
 
 # =========================================================
@@ -103,8 +123,11 @@ SESSION_CACHE_ALIAS = "default"
 # CELERY
 # =========================================================
 
-CELERY_BROKER_URL = env("REDIS_URL")
-CELERY_RESULT_BACKEND = env("REDIS_URL")
+# Broker/resultados em Redis próprio (noeviction); cache fica em REDIS_URL.
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=env("REDIS_URL"))
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=env("REDIS_URL"))
+CELERY_RESULT_EXPIRES = 3600
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
