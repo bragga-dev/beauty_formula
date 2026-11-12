@@ -3,6 +3,7 @@ Tasks Celery — verificação de email.
 """
 import logging
 from celery import shared_task
+from django.conf import settings
 from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.core.emails.sender import send_html_email
 from beauty_formula.apps.accounts.selectors.user_selector import get_user_by_id
@@ -41,6 +42,7 @@ def send_verification_email_employee(self, user_id: str, temporary_password: str
             "user_email": user.email,
             "verify_url": verify_url,
             "temporary_password": temporary_password,
+            "frontend_url": settings.FRONTEND_URL.rstrip("/"),
         }
 
         send_html_email(
