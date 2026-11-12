@@ -230,7 +230,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Provisionamento do MinIO (buckets, política, imagens padrão): roda e termina.
+   # Provisionamento do MinIO (buckets, política, imagens padrão): roda e termina.
   createbuckets:
     image: minio/mc:latest
     restart: "no"
@@ -239,7 +239,7 @@ services:
         condition: service_healthy
     volumes:
       - ./default:/default:ro
-      - ./infra/minio/app-policy.json:/policy/app-policy.json:ro
+      - ./infra/minio:/infra/minio:ro
     env_file: .env
     entrypoint: ["/bin/sh", "-c"]
     command: >
@@ -251,7 +251,8 @@ services:
       mc anonymous set download local/"$${MINIO_BUCKET_STATIC}";
       mc anonymous set download local/"$${MINIO_BUCKET_MEDIA}";
       mc admin user add local "$${MINIO_APP_USER}" "$${MINIO_APP_PASSWORD}" || true;
-      mc admin policy create local beauty_formula-app-policy /policy/app-policy.json || true;
+      sh /infra/minio/scripts/render-policy.sh /infra/minio/policies/app-policy.json.template /tmp/app-policy.json;
+      mc admin policy create local beauty_formula-app-policy /tmp/app-policy.json || true;
       mc admin policy attach local beauty_formula-app-policy --user "$${MINIO_APP_USER}" || true;
       mc cp /default/client_img.jpg local/"$${MINIO_BUCKET_MEDIA}"/default/client_img.jpg;
       mc cp /default/manager_img.jpg local/"$${MINIO_BUCKET_MEDIA}"/default/manager_img.jpg;

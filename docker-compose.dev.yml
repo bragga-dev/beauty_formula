@@ -113,10 +113,11 @@ services:
       timeout: 5s
       retries: 5
 
-  # =========================================================
+   # =========================================================
   # SETUP MINIO
   # Cria buckets, usuário IAM, política e faz upload dos defaults.
-  # A política vem de ./infra/minio/app-policy.json (sem heredoc).
+  # A política vem do template ./infra/minio/policies/app-policy.json.template,
+  # renderizado com os nomes dos buckets do .env (sem heredoc).
   # =========================================================
   setup-minio:
     image: minio/mc:latest
@@ -126,7 +127,7 @@ services:
         condition: service_healthy
     volumes:
       - ./default:/default
-      - ./infra/minio/app-policy.json:/policy/app-policy.json:ro
+      - ./infra/minio:/infra/minio:ro
     env_file:
       - .env
     entrypoint: /bin/sh
@@ -151,9 +152,12 @@ services:
         # ── 4. Usuário IAM dedicado (idempotente) ──────────────────
         mc admin user add local "$MINIO_APP_USER" "$MINIO_APP_PASSWORD" || true
 
-        # ── 5. Política de acesso restrito (lida do arquivo) ────────
+        # ── 5. Política de acesso restrito (template + .env) ────────
+        sh /infra/minio/scripts/render-policy.sh \
+          /infra/minio/policies/app-policy.json.template /tmp/app-policy.json
+
         mc admin policy create local beauty_formula-app-policy \
-          /policy/app-policy.json || true
+          /tmp/app-policy.json || true
 
         mc admin policy attach local beauty_formula-app-policy \
           --user "$MINIO_APP_USER"
@@ -163,9 +167,9 @@ services:
         mc cp /default/manager_img.jpg local/"$MINIO_BUCKET_MEDIA"/default/manager_img.jpg
         mc cp /default/employee_img.jpeg   local/"$MINIO_BUCKET_MEDIA"/default/employee_img.jpeg
         mc cp /default/service_img.png   local/"$MINIO_BUCKET_MEDIA"/default/service_img.png
-        
-        echo "✅ MinIO setup concluído"
 
+        echo "✅ MinIO setup concluído"
+        
 # =========================================================
 # VOLUMES
 # =========================================================
