@@ -23,6 +23,7 @@ from beauty_formula.apps.payment.api.employee_commission import router as commis
 from beauty_formula.apps.payment.api.refund_request import router as refund_request_router
 from beauty_formula.apps.reports.api.monthly_report import router as reports_router
 from beauty_formula.apps.notifications.api.notification import router as notifications_router
+from beauty_formula.apps.legal.api.legal import router as legal_router
 
 
 from django_ratelimit.exceptions import Ratelimited
@@ -70,6 +71,7 @@ api.add_router("/commissions/", commission_router, tags=["Commissions"])
 api.add_router("/payments/refund-requests/", refund_request_router, tags=["Refund Requests"])
 api.add_router("/reports/", reports_router, tags=["Reports"])
 api.add_router("/notifications/", notifications_router, tags=["Notifications"])
+api.add_router("/legal/", legal_router, tags=["Legal"])
 
 
 # ── Handlers de erro globais ──────────────────────────────────────────────────

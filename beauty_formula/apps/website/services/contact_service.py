@@ -1,13 +1,17 @@
 import uuid
 from typing import Optional
 
+from django.conf import settings
 from django.db.models import QuerySet
+from django.utils import timezone
+from dateutil.relativedelta import relativedelta
 
 from beauty_formula.apps.website.models.contact_models import Contact
 from beauty_formula.apps.website.repositories.contact_repository import (
     create_contact,
     update_contact,
     delete_contact,
+    delete_contacts_older_than,
 )
 from beauty_formula.apps.website.schemas.contact_schema import (
     ContactCreateIn,
@@ -24,6 +28,7 @@ from beauty_formula.apps.core.exceptions.contact_exception import (
     ContactNotFound,
     ContactNameAlreadyExists,
 )
+from beauty_formula.apps.legal import constants
 from beauty_formula.apps.website.tasks.send_email_confirm_contact import send_email_confirm_contact
 from beauty_formula.apps.website.tasks.send_email_notify_admins import send_email_notify_admins
 
@@ -41,6 +46,8 @@ def create_contact_public(data: ContactCreateIn) -> ContactOut:
         phone=data.phone,
         message=data.message,
         subject=data.subject,
+        privacy_policy_version=constants.PRIVACY_VERSION,
+        consent_given_at=timezone.now(),
     )
     send_email_confirm_contact.delay(
         full_name=data.full_name,
@@ -95,3 +102,16 @@ def delete_contact_for_admin(contact_id: uuid.UUID) -> None:
     if contact is None:
         raise ContactNotFound()
     delete_contact(contact=contact)
+
+
+def purge_expired_contacts() -> int:
+    """
+    Retenção (LGPD — princípio da necessidade): exclui contatos RESOLVIDOS ou
+    ARQUIVADOS mais antigos que settings.LEGAL_CONTACT_RETENTION_MONTHS.
+    Contatos pendentes/em andamento nunca são apagados por esta rotina.
+    """
+    cutoff = timezone.now() - relativedelta(months=settings.LEGAL_CONTACT_RETENTION_MONTHS)
+    return delete_contacts_older_than(
+        cutoff=cutoff,
+        statuses=[Contact.ContactStatus.RESOLVED, Contact.ContactStatus.ARCHIVED],
+    )

@@ -25,6 +25,8 @@ class Contact(models.Model):
     phone = models.CharField(_("Telefone"), max_length=20, blank=False, null=False)
     status = models.TextField(_("Status"), blank=False, null=False, choices=ContactStatus.choices, default=ContactStatus.PENDING)
     created_at = models.DateTimeField(_("Criado em"), auto_now_add=True)
+    privacy_policy_version = models.CharField(_("Versão da Política de Privacidade aceita"), max_length=20, blank=True, default="")
+    consent_given_at = models.DateTimeField(_("Consentimento dado em"), null=True, blank=True)
 
     def __str__(self):
         return self.full_name

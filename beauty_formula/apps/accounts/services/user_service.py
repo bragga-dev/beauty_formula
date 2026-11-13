@@ -59,7 +59,10 @@ from beauty_formula.apps.accounts.tasks.verification_account import (
 )
 from beauty_formula.apps.core.exceptions.permissions import PermissionDenied
 from beauty_formula.apps.core.exceptions.auth import InvalidGoogleToken, InvalidPassword
-from beauty_formula.apps.core.exceptions.user import UserAlreadyExists
+from beauty_formula.apps.core.exceptions.user import UserAlreadyExists, ConsentRequired
+from beauty_formula.apps.accounts.models.consent_log import ConsentLog
+from beauty_formula.apps.accounts.repositories.consent_repository import list_consent_logs
+from beauty_formula.apps.accounts.services.consent_service import record_signup_consent
 from beauty_formula.apps.core.exceptions.user import AccountHasProtectedRecords
 from django.db.models import ProtectedError
 from beauty_formula.apps.accounts.repositories.client_repository import detach_client_user
@@ -115,7 +118,7 @@ def update_employee_profile(user_id: uuid.UUID, payload: EmployeeUpdateIn) -> Em
 
 
 @transaction.atomic
-def register_user_default_client(data: RegisterIn, user_agent: str = "") -> dict:
+def register_user_default_client(data: RegisterIn, user_agent: str = "", ip: Optional[str] = None) -> dict:
     """
     Cria o User + Client e dispara e-mail de verificação.
     Retorna os tokens JWT diretamente para o cliente já poder operar.
@@ -127,12 +130,24 @@ def register_user_default_client(data: RegisterIn, user_agent: str = "") -> dict
     if user.role == User.UserRole.CLIENT:
         create_client(user)
 
+    record_signup_consent(
+        user, marketing_opt_in=data.marketing_opt_in,
+        source=ConsentLog.Source.SIGNUP, ip=ip, user_agent=user_agent,
+    )
+
     send_verification_email.delay(user.pk)   
     return make_tokens(user, user_agent=user_agent)
 
 
 @transaction.atomic
-def login_or_register_client_google(id_token: str, user_agent: str = "") -> tuple[dict, bool]:
+def login_or_register_client_google(
+    id_token: str,
+    user_agent: str = "",
+    ip: Optional[str] = None,
+    accept_terms: bool = False,
+    accept_privacy_policy: bool = False,
+    marketing_opt_in: bool = False,
+) -> tuple[dict, bool]:
     """
     Login/Cadastro de Cliente via Google (Sign in with Google).
 
@@ -156,11 +171,17 @@ def login_or_register_client_google(id_token: str, user_agent: str = "") -> tupl
     created = False
 
     if user is None:
+        if not (accept_terms and accept_privacy_policy):
+            raise ConsentRequired()
         user = create_user(email=email, password=None, role=User.UserRole.CLIENT)
         create_client(
             user,
             first_name=claims.get("given_name"),
             last_name=claims.get("family_name"),
+        )
+        record_signup_consent(
+            user, marketing_opt_in=marketing_opt_in,
+            source=ConsentLog.Source.GOOGLE, ip=ip, user_agent=user_agent,
         )
         created = True
 
@@ -360,7 +381,8 @@ def _anonymize_user_account(user: User, profile: Optional[object]) -> None:
     user.set_unusable_password()
     user.is_active = False
     user.is_trusty = False
-    user.save(update_fields=["email", "password", "is_active", "is_trusty"])
+    user.marketing_opt_in = False     
+    user.save(update_fields=["email", "password", "is_active", "is_trusty", "marketing_opt_in"])
 
     if profile is None:
         return
@@ -423,8 +445,25 @@ def export_user_data(user_id: uuid.UUID) -> dict:
         if hasattr(profile, "bio"):
             data["perfil"]["biografia"] = profile.bio
 
+    data["consentimentos"] = {
+        "termos_de_uso": {"versao": user.terms_version, "aceito_em": _iso(user.terms_accepted_at)},
+        "politica_de_privacidade": {"versao": user.privacy_version, "aceito_em": _iso(user.privacy_accepted_at)},
+        "comunicacoes_promocionais": {"ativo": user.marketing_opt_in, "alterado_em": _iso(user.marketing_opt_in_at)},
+        "historico": [
+            {
+                "documento": log.document, "versao": log.version, "acao": log.action,
+                "origem": log.source, "ip": log.ip_address, "data": log.created_at.isoformat(),
+            }
+            for log in list_consent_logs(user.id)
+        ],
+    }
+
     data["gerado_em"] = timezone.now().isoformat()
     return data
+
+
+def _iso(value) -> Optional[str]:
+    return value.isoformat() if value else None
 
 # ── Admin: listagem ──────────────────────────────────────────────────────────
 

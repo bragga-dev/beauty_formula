@@ -19,7 +19,11 @@ UPDATABLE_CONTACT_FIELDS = {"status"}
 
 
 @transaction.atomic
-def create_contact(*, full_name: str, email: str, phone: str, message: str, subject: str = Contact.ContactSubject.OTHER) -> Contact:
+def create_contact(
+    *, full_name: str, email: str, phone: str, message: str,
+    subject: str = Contact.ContactSubject.OTHER,
+    privacy_policy_version: str = "", consent_given_at=None,
+) -> Contact:
     """Cria um novo contato (formulário público). Roda full_clean() antes de salvar."""
     contact = Contact(
         full_name=full_name,
@@ -27,6 +31,8 @@ def create_contact(*, full_name: str, email: str, phone: str, message: str, subj
         phone=phone,
         message=message,
         subject=subject,
+        privacy_policy_version=privacy_policy_version,
+        consent_given_at=consent_given_at,
     )
     contact.full_clean()
     contact.save()
@@ -65,3 +71,9 @@ def delete_contact(contact: Contact) -> None:
     (e recomendável por retenção de dados/LGPD).
     """
     contact.delete()
+
+
+def delete_contacts_older_than(*, cutoff, statuses) -> int:
+    """Exclui contatos já tratados criados antes de `cutoff`. Retorna quantos foram excluídos."""
+    deleted, _ = Contact.objects.filter(created_at__lt=cutoff, status__in=statuses).delete()
+    return deleted

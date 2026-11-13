@@ -28,3 +28,10 @@ class ClientHasActiveSchedulings(Exception):
         if message is None:
             message = _("Cliente possui agendamento ativo. Cancele ou conclua antes de promover.")
         super().__init__(message)
+
+
+class ConsentRequired(Exception):
+    def __init__(self, message=None):
+        if message is None:
+            message = _("É necessário aceitar os Termos de Uso e a Política de Privacidade.")
+        super().__init__(message)

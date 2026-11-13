@@ -4,7 +4,7 @@ from typing import Optional
 import uuid
 
 from ninja import Schema
-from pydantic import field_validator, Field
+from pydantic import field_validator, model_validator, Field
 
 from beauty_formula.apps.website.models.contact_models import Contact
 
@@ -44,9 +44,16 @@ class ContactCreateIn(Schema):
     message: str = Field(..., min_length=1, max_length=5000)
     email: str
     phone: str
+    accept_privacy_policy: bool
 
     _name_validator = field_validator("full_name")(_validate_name_format)
     _phone_validator = field_validator("phone")(_validate_phone_format)
+
+    @model_validator(mode="after")
+    def privacy_accepted(self) -> "ContactCreateIn":
+        if not self.accept_privacy_policy:
+            raise ValueError("É necessário aceitar a Política de Privacidade para enviar a mensagem.")
+        return self
 
 
 class ContactUpdateIn(Schema):
