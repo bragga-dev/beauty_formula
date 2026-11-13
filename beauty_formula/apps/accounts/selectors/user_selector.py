@@ -177,3 +177,8 @@ def search_users_by_role_and_status(role: str, is_active: bool) -> QuerySet[User
 def get_users_by_date_range(start: datetime, end: datetime) -> QuerySet[User]:
     """Usuários cadastrados num período — útil pra relatórios."""
     return User.objects.filter(date_joined__date__range=(start, end))
+
+
+
+def list_unverified_clients_older_than(cutoff):
+    return User.objects.filter(role=User.UserRole.CLIENT, is_trusty=False, created_at__lt=cutoff)

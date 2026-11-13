@@ -436,3 +436,20 @@ RATELIMIT_FAIL_OPEN = False
 # GOOGLE OAUTH
 # =========================================================
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
+
+# =========================================================
+# LGPD / DOCUMENTOS LEGAIS
+# (preenchem os placeholders dos Termos de Uso e da Política de Privacidade)
+# =========================================================
+
+LEGAL_COMPANY_NAME = env("LEGAL_COMPANY_NAME", default="Fórmula da Beleza")
+LEGAL_COMPANY_CNPJ = env("LEGAL_COMPANY_CNPJ", default="00.000.000/0000-00")
+LEGAL_COMPANY_ADDRESS = env("LEGAL_COMPANY_ADDRESS", default="Endereço do estabelecimento")
+LEGAL_CONTACT_EMAIL = env("LEGAL_CONTACT_EMAIL", default="bragawebdevelopment.com.br")
+LEGAL_DPO_NAME = env("LEGAL_DPO_NAME", default="Encarregado de Dados")
+LEGAL_DPO_EMAIL = env("LEGAL_DPO_EMAIL", default="bragawebdevelopment.com.br")
+
+# Retenção (Política de Privacidade, seção 7): ajustar aqui muda a regra aplicada
+# pelas tarefas agendadas E deve ser refletido no texto da política.
+LEGAL_CONTACT_RETENTION_MONTHS = env.int("LEGAL_CONTACT_RETENTION_MONTHS", default=12)
+LEGAL_UNVERIFIED_ACCOUNT_RETENTION_DAYS = env.int("LEGAL_UNVERIFIED_ACCOUNT_RETENTION_DAYS", default=30)

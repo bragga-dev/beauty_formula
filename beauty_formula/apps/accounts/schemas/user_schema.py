@@ -28,6 +28,16 @@ class RegisterIn(Schema):
     email:     EmailStr
     password:  str = Field(..., min_length=8)
     password2: str = Field(..., min_length=8)
+    # LGPD: aceite explícito e obrigatório; promoções são opcionais e começam desligadas.
+    accept_terms: bool
+    accept_privacy_policy: bool
+    marketing_opt_in: bool = False
+
+    @model_validator(mode="after")
+    def consent_given(self) -> "RegisterIn":
+        if not (self.accept_terms and self.accept_privacy_policy):
+            raise ValueError("É necessário aceitar os Termos de Uso e a Política de Privacidade.")
+        return self
 
     @field_validator("password")
     @classmethod
@@ -66,6 +76,10 @@ class GoogleLoginIn(Schema):
     no frontend após o usuário se autenticar com a conta Google.
     """
     id_token: str = Field(..., min_length=10)
+    # Exigidos só quando a conta ainda não existe (cadastro). Login de quem já tem conta ignora.
+    accept_terms: bool = False
+    accept_privacy_policy: bool = False
+    marketing_opt_in: bool = False
 
 
 class TokenOut(Schema):

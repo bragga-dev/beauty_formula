@@ -36,3 +36,4 @@ def deactivate_user(user: User) -> User:
 
 def delete_user(user: User) -> None:
     user.delete()
+

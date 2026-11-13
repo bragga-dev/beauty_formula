@@ -8,6 +8,7 @@ from beauty_formula.apps.accounts.models.user import User
 from beauty_formula.apps.accounts.models.client import Client
 from beauty_formula.apps.accounts.models.employee import Employee
 from beauty_formula.apps.accounts.models.manager import Manager
+from beauty_formula.apps.accounts.schemas.consent_schema import ConsentStatusOut
 from beauty_formula.apps.accounts.schemas.user_schema import UserOut
 from beauty_formula.apps.accounts.schemas.client_schema import GenderEnum
 
@@ -100,6 +101,7 @@ class MeOut(Schema):
     client:   Optional[ClientProfileOut]   = None
     employee: Optional[EmployeeProfileOut] = None
     manager:  Optional[ManagerProfileOut]  = None
+    consent:  Optional[ConsentStatusOut]   = None
 
     @classmethod
     def from_user(cls, user: User) -> "MeOut":
@@ -112,6 +114,7 @@ class MeOut(Schema):
             client=ClientProfileOut.from_orm(client) if client else None,
             employee=EmployeeProfileOut.from_orm(employee) if employee else None,
             manager=ManagerProfileOut.from_orm(manager) if manager else None,
+            consent=ConsentStatusOut.from_user(user),
         )
 
 

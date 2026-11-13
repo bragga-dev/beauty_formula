@@ -71,6 +71,19 @@ from beauty_formula.apps.accounts.schemas.user_schema import (
     EmployeeCreatedOut,
 )
 
+from beauty_formula.apps.accounts.schemas.consent_schema import (
+    ConsentAcceptIn,
+    ConsentLogOut,
+    ConsentStatusOut,
+    MarketingConsentIn,
+)
+from beauty_formula.apps.accounts.services.consent_service import (
+    accept_current_documents,
+    serialize_history,
+    set_marketing_consent,
+)
+from beauty_formula.apps.core.exceptions.user import ConsentRequired
+from beauty_formula.apps.core.utils.request_info import get_client_ip, get_user_agent
 from beauty_formula.apps.accounts.schemas.me_schema import (
     MeOut,
     )
@@ -189,24 +202,33 @@ def login_router(request, payload: LoginIn):
 
 @router.post(
     "/google",
-    response={200: AccessTokenOut, 201: AccessTokenOut, 401: MessageOut},
+    response={200: AccessTokenOut, 201: AccessTokenOut, 400: MessageOut, 401: MessageOut},
     auth=None,
     summary="Login/Cadastro de Cliente via Google",
     description=(
         "Recebe o id_token (credential) emitido pelo Google Identity Services "
         "no frontend. Se já existir um usuário com o e-mail da conta Google, "
         "efetua login (200). Caso contrário, cria um novo Cliente já verificado (201). "
-        "Sempre cadastra/loga com role 'client'. O refresh token vai num cookie httpOnly."
+        "Sempre cadastra/loga com role 'client'. O refresh token vai num cookie httpOnly. "
+        "Para CRIAR conta, accept_terms e accept_privacy_policy precisam ser true (senão 400); "
+        "quem já tem conta só faz login."
     ),
 )
 @ratelimit(key="ip", rate="10/m", block=True)
 def google_login_router(request, payload: GoogleLoginIn):
     try:
         tokens, created = login_or_register_client_google(
-            payload.id_token, user_agent=request.headers.get("User-Agent", "")
+            payload.id_token,
+            user_agent=get_user_agent(request),
+            ip=get_client_ip(request),
+            accept_terms=payload.accept_terms,
+            accept_privacy_policy=payload.accept_privacy_policy,
+            marketing_opt_in=payload.marketing_opt_in,
         )
     except InvalidGoogleToken as e:
         return 401, {"detail": str(e)}
+    except ConsentRequired as e:
+        return 400, {"detail": str(e)}
 
     response = JsonResponse({"access": tokens["access"]}, status=201 if created else 200)
     set_refresh_cookie(response, tokens["refresh"])
@@ -333,13 +355,58 @@ def refresh_router(request):
 @ratelimit(key="ip", rate="5/h", block=True)
 def register_router(request, payload: RegisterIn):
     try:
-        tokens = register_user_default_client(payload, user_agent=request.headers.get("User-Agent", ""))
+        tokens = register_user_default_client(
+            payload, user_agent=get_user_agent(request), ip=get_client_ip(request),
+        )
     except UserAlreadyExists as e:
         return 409, {"detail": str(e)}
 
     response = JsonResponse({"access": tokens["access"]}, status=201)
     set_refresh_cookie(response, tokens["refresh"])
     return response
+
+
+@router.get(
+    "/consents/history",
+    response={200: list[ConsentLogOut]},
+    auth=AllRolesAuth(),
+    summary="Histórico dos meus consentimentos (LGPD)",
+)
+def consent_history_router(request):
+    return 200, serialize_history(request.auth)
+
+
+@router.post(
+    "/consents/accept",
+    response={200: ConsentStatusOut, 400: MessageOut},
+    auth=AllRolesAuth(),
+    summary="Aceitar os Termos de Uso e a Política de Privacidade vigentes",
+    description=(
+        "Para contas criadas pelo admin (que ainda não aceitaram) e quando os documentos "
+        "mudam de versão (GET /auth/me → consent.needs_acceptance). Exige os dois aceites."
+    ),
+)
+@ratelimit(key="user", rate="20/h", block=True)
+def accept_consent_router(request, payload: ConsentAcceptIn):
+    try:
+        return 200, accept_current_documents(
+            request.auth, payload, ip=get_client_ip(request), user_agent=get_user_agent(request),
+        )
+    except ConsentRequired as e:
+        return 400, {"detail": str(e)}
+
+
+@router.patch(
+    "/consents/marketing",
+    response={200: ConsentStatusOut},
+    auth=AllRolesAuth(),
+    summary="Ativar/revogar comunicações promocionais",
+)
+@ratelimit(key="user", rate="30/h", block=True)
+def marketing_consent_router(request, payload: MarketingConsentIn):
+    return 200, set_marketing_consent(
+        request.auth, payload.opt_in, ip=get_client_ip(request), user_agent=get_user_agent(request),
+    )
 
 
 @router.get("/verify-email/{uidb64}/{token}", summary="Confirmar e-mail",  description="Confirma o email e redireciona para o frontend.", auth=None,)
