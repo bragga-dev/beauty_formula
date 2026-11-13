@@ -137,7 +137,6 @@ def test_update_competencia(api, manager_user, commission):
     assert str(commission.competencia) == "2026-01-01"
 
 
-@pytest.mark.xfail(strict=True, reason="mark_commission_as_paid grava `paid_by`, campo que não existe no model EmployeeCommission")
 def test_mark_single_commission_as_paid(api, root_admin, commission):
     response = api.patch(f"{BASE}/mark-as-paid/{commission.id}",
         user=root_admin,

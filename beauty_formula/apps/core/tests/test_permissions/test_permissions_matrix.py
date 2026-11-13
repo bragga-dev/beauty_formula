@@ -15,6 +15,9 @@ from beauty_formula.config.api import api as ninja_api
 # Rotas que PODEM ser acessadas sem token (método, path openapi).
 PUBLIC_ROUTES = {
     ("post", "/api/auth/login"),
+    ("get", "/api/legal/terms"),
+    ("get", "/api/legal/privacy"),
+    ("get", "/api/legal/versions"),
     ("post", "/api/auth/google"),
     ("post", "/api/auth/password-reset/request"),
     ("post", "/api/auth/password-reset/confirm"),

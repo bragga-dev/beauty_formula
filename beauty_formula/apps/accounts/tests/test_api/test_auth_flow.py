@@ -13,6 +13,7 @@ from beauty_formula.apps.core.tokens.signing import generate_uid_token
 pytestmark = pytest.mark.django_db
 
 STRONG = "Senha-Forte-98765!"
+CONSENT = {"accept_terms": True, "accept_privacy_policy": True}
 
 
 def _login(api, email, password):
@@ -22,7 +23,7 @@ def _login(api, email, password):
 # ── Cadastro / verificação ──────────────────────────────────────────────────
 
 def test_register_creates_inactive_client_and_sets_refresh_cookie(api):
-    r = api.post("/auth/register", {"email": "nova@example.com", "password": STRONG, "password2": STRONG})
+    r = api.post("/auth/register", {"email": "nova@example.com", "password": STRONG, "password2": STRONG, **CONSENT})
     assert r.status_code == 201
     assert REFRESH_COOKIE_NAME in r.cookies
     assert r.cookies[REFRESH_COOKIE_NAME]["httponly"]
@@ -31,23 +32,23 @@ def test_register_creates_inactive_client_and_sets_refresh_cookie(api):
 
 
 def test_register_duplicate_email_is_409(api, verified_client):
-    r = api.post("/auth/register", {"email": verified_client.email, "password": STRONG, "password2": STRONG})
+    r = api.post("/auth/register", {"email": verified_client.email, "password": STRONG, "password2": STRONG, **CONSENT})
     assert r.status_code == 409
 
 
 @pytest.mark.parametrize("pwd", ["12345678", "password", "abcdefgh"])
 def test_register_rejects_weak_password(api, pwd):
-    r = api.post("/auth/register", {"email": "fraca@example.com", "password": pwd, "password2": pwd})
+    r = api.post("/auth/register", {"email": "fraca@example.com", "password": pwd, "password2": pwd, **CONSENT})
     assert r.status_code == 422
 
 
 def test_register_password_mismatch(api):
-    r = api.post("/auth/register", {"email": "x@example.com", "password": STRONG, "password2": STRONG + "x"})
+    r = api.post("/auth/register", {"email": "x@example.com", "password": STRONG, "password2": STRONG + "x", **CONSENT})
     assert r.status_code == 422
 
 
 def test_register_cannot_choose_role(api):
-    r = api.post("/auth/register", {"email": "esperto@example.com", "password": STRONG, "password2": STRONG, "role": "admin"})
+    r = api.post("/auth/register", {"email": "esperto@example.com", "password": STRONG, "password2": STRONG, "role": "admin", **CONSENT})
     assert r.status_code == 201
     assert User.objects.get(email="esperto@example.com").role == "client"
 

@@ -7,7 +7,7 @@ from beauty_formula.apps.website.models.contact_models import Contact
 
 pytestmark = pytest.mark.django_db
 
-PAYLOAD = {"full_name": "Ana Souza", "subject": "question", "message": "Qual o horário?", "email": "ana@example.com", "phone": "(77) 99999-0000"}
+PAYLOAD = {"full_name": "Ana Souza", "subject": "question", "message": "Qual o horário?", "email": "ana@example.com", "phone": "(77) 99999-0000", "accept_privacy_policy": True}
 
 
 @pytest.fixture
@@ -99,3 +99,24 @@ def test_delete_contact(api, root_admin, contact):
 
 def test_delete_unknown_is_404(api, root_admin):
     assert api.delete(f"/contacts/delete-contact/{uuid.uuid4()}", user=root_admin).status_code == 404
+
+
+# ── LGPD: aceite da Política de Privacidade no formulário ───────────────────
+
+@pytest.mark.parametrize("value", [False, None])
+def test_create_requires_privacy_acceptance(api, value):
+    data = {**PAYLOAD, "accept_privacy_policy": value}
+    assert api.post("/contacts/create-contact", data).status_code == 422
+    assert not Contact.objects.exists()
+
+
+def test_create_without_the_field_is_422(api):
+    data = {k: v for k, v in PAYLOAD.items() if k != "accept_privacy_policy"}
+    assert api.post("/contacts/create-contact", data).status_code == 422
+
+
+def test_create_stores_proof_of_consent(api):
+    from beauty_formula.apps.legal import constants
+    assert api.post("/contacts/create-contact", PAYLOAD).status_code == 201
+    c = Contact.objects.get()
+    assert c.privacy_policy_version == constants.PRIVACY_VERSION and c.consent_given_at is not None

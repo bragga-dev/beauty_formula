@@ -140,3 +140,5 @@ pytest beauty_formula/apps/accounts/tests/test_models/test_user_manage.py -v
 
 # Com cobertura
 pytest --cov=beauty_formula.apps.accounts.models beauty_formula/apps/accounts/tests/test_models/
+
+# pytest --cov=. --cov-report=term-missing
